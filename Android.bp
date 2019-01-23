@@ -18,18 +18,46 @@ java_import_host {
 }
 
 java_import_host {
-    name: "dagger2-auto-factory",
+    name: "dagger2-auto-factory-jar",
     jars: ["lib/auto-factory-1.0-20150915.183854-35.jar"],
 }
 
-java_import_host {
-    name: "dagger2-auto-service",
-    jars: ["lib/auto-service-1.0-rc2.jar"],
+java_plugin {
+    name: "dagger2-auto-factory",
+    processor_class: "com.google.auto.factory.processor.AutoFactoryProcessor",
+    static_libs: [
+        "dagger2-auto-factory-jar",
+        "dagger2-auto-common",
+        "guava",
+    ],
 }
 
 java_import_host {
-    name: "dagger2-auto-value",
+    name: "dagger2-auto-service-jar",
+    jars: ["lib/auto-service-1.0-rc2.jar"],
+}
+
+java_plugin {
+    name: "dagger2-auto-service",
+    processor_class: "com.google.auto.service.processor.AutoServiceProcessor",
+    static_libs: ["dagger2-auto-service-jar"],
+}
+
+java_import_host {
+    name: "dagger2-auto-value-jar",
     jars: ["lib/auto-value-1.4.1.jar"],
+}
+
+java_plugin {
+    name: "dagger2-auto-value",
+    processor_class: "com.google.auto.value.processor.AutoValueProcessor",
+    static_libs: ["dagger2-auto-value-jar"],
+}
+
+java_plugin {
+    name: "dagger2-auto-annotation",
+    processor_class: "com.google.auto.value.processor.AutoAnnotationProcessor",
+    static_libs: ["dagger2-auto-value-jar"],
 }
 
 java_import_host {
@@ -54,10 +82,10 @@ java_library_host {
     java_version: "1.7",
 }
 
-// build dagger2 producers host jar
+// build dagger2 producers plugin
 // ============================================================
 
-java_library_host {
+java_plugin {
     name: "dagger2-producers",
 
     srcs: ["producers/src/main/java/**/*.java"],
@@ -72,11 +100,13 @@ java_library_host {
     java_version: "1.7",
 }
 
-// build dagger2 compiler host jar
+// build dagger2 compiler plugin
 // ============================================================
 
-java_library_host {
+java_plugin {
     name: "dagger2-compiler",
+    processor_class: "dagger.internal.codegen.ComponentProcessor",
+    generates_api: true,
 
     // Required for use of javax.annotation.Generated per http://b/62050818
     javacflags: ["-J--add-modules=java.xml.ws.annotation"],
@@ -98,19 +128,11 @@ java_library_host {
         "guava",
     ],
 
-    annotation_processors: [
-        "dagger2-auto-common",
+    plugins: [
         "dagger2-auto-factory",
         "dagger2-auto-service",
         "dagger2-auto-value",
-        "guava",
-    ],
-
-    annotation_processor_classes: [
-        "com.google.auto.factory.processor.AutoFactoryProcessor",
-        "com.google.auto.service.processor.AutoServiceProcessor",
-        "com.google.auto.value.processor.AutoAnnotationProcessor",
-        "com.google.auto.value.processor.AutoValueProcessor",
+        "dagger2-auto-annotation",
     ],
 
     java_version: "1.7",
