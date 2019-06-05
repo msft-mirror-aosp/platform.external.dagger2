@@ -148,12 +148,6 @@ java_plugin {
     name: "dagger2-compiler",
     processor_class: "dagger.internal.codegen.ComponentProcessor",
     generates_api: true,
-
-    javacflags: [
-        // Required for use of javax.annotation.Generated per http://b/62050818
-        "-J--add-modules=java.xml.ws.annotation",
-    ],
-
     use_tools_jar: true,
 
     srcs: [
