@@ -16,9 +16,9 @@
 
 package dagger.internal.codegen;
 
-import static dagger.internal.codegen.DaggerElements.closestEnclosingTypeElement;
 import static dagger.internal.codegen.Formatter.INDENT;
 import static dagger.internal.codegen.Scopes.getReadableSource;
+import static dagger.internal.codegen.langmodel.DaggerElements.closestEnclosingTypeElement;
 import static dagger.model.BindingKind.INJECTION;
 import static java.util.stream.Collectors.joining;
 import static javax.tools.Diagnostic.Kind.ERROR;
@@ -70,9 +70,11 @@ final class IncompatiblyScopedBindingsValidator implements BindingGraphPlugin {
                 ComponentNode componentNode =
                     bindingGraph.componentNode(binding.componentPath()).get();
                 if (!componentNode.scopes().contains(scope)) {
-                  // @Inject bindings in full binding graphs will appear at the properly scoped
-                  // ancestor component, so ignore them here.
-                  if (binding.kind().equals(INJECTION) && bindingGraph.isFullBindingGraph()) {
+                  // @Inject bindings in module or subcomponent binding graphs will appear at the
+                  // properly scoped ancestor component, so ignore them here.
+                  if (binding.kind().equals(INJECTION)
+                      && (bindingGraph.rootComponentNode().isSubcomponent()
+                          || !bindingGraph.rootComponentNode().isRealComponent())) {
                     return;
                   }
                   incompatibleBindings.put(componentNode, binding);
