@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.checkerframework.checker.nullness.compatqual;
+package net.ltgt.gradle.incap;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -37,4 +37,7 @@ import java.lang.annotation.Target;
   ElementType.TYPE_USE
 })
 @Retention(RetentionPolicy.SOURCE)
-public @interface NullableDecl {}
+public @interface IncrementalAnnotationProcessor {
+
+  IncrementalAnnotationProcessorType value();
+}
