@@ -26,6 +26,7 @@ import com.google.auto.common.MoreTypes;
 import com.google.common.collect.ImmutableList;
 import dagger.internal.codegen.serialization.AnnotationProto;
 import dagger.internal.codegen.serialization.AnnotationValueProto;
+import java.util.Collections;
 import java.util.List;
 import javax.inject.Inject;
 import javax.lang.model.element.AnnotationMirror;
@@ -51,8 +52,9 @@ final class AnnotationProtoConverter {
     getAnnotationValuesWithDefaults(annotationMirror)
         .forEach(
             (attribute, value) ->
-                builder.putValues(
-                    attribute.getSimpleName().toString(), annotationValueProto(value)));
+                builder.putAllValues(
+                    Collections.singletonMap(
+                        attribute.getSimpleName().toString(), annotationValueProto(value))));
     return builder.build();
   }
 
@@ -60,7 +62,7 @@ final class AnnotationProtoConverter {
   AnnotationMirror fromProto(AnnotationProto annotation) {
     return SimpleAnnotationMirror.of(
         MoreTypes.asTypeElement(typeProtoConverter.fromProto(annotation.getAnnotationType())),
-        transformValues(annotation.getValuesMap(), AnnotationValueFromProto::new));
+        transformValues(annotation.getValues(), AnnotationValueFromProto::new));
   }
 
   private static final AnnotationValueVisitor<
