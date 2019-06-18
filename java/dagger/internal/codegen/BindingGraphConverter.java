@@ -19,10 +19,9 @@ package dagger.internal.codegen;
 import static com.google.auto.common.MoreTypes.asTypeElement;
 import static dagger.internal.codegen.BindingRequest.bindingRequest;
 import static dagger.internal.codegen.DaggerGraphs.unreachableNodes;
-import static dagger.internal.codegen.DaggerStreams.presentValues;
-import static dagger.internal.codegen.DaggerStreams.toImmutableSet;
 import static dagger.model.BindingKind.SUBCOMPONENT_CREATOR;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.graph.MutableNetwork;
@@ -34,6 +33,7 @@ import dagger.model.BindingGraph.Edge;
 import dagger.model.BindingGraph.MissingBinding;
 import dagger.model.BindingGraph.Node;
 import dagger.model.BindingGraphProxies;
+import dagger.model.ComponentPath;
 import dagger.model.DependencyRequest;
 import javax.inject.Inject;
 import javax.lang.model.element.ExecutableElement;
@@ -42,15 +42,11 @@ import javax.lang.model.type.TypeMirror;
 
 /** Converts {@link dagger.internal.codegen.BindingGraph}s to {@link dagger.model.BindingGraph}s. */
 final class BindingGraphConverter {
-
   private final BindingDeclarationFormatter bindingDeclarationFormatter;
-  private final CompilerOptions compilerOptions;
 
   @Inject
-  BindingGraphConverter(
-      BindingDeclarationFormatter bindingDeclarationFormatter, CompilerOptions compilerOptions) {
+  BindingGraphConverter(BindingDeclarationFormatter bindingDeclarationFormatter) {
     this.bindingDeclarationFormatter = bindingDeclarationFormatter;
-    this.compilerOptions = compilerOptions;
   }
 
   /**
@@ -83,15 +79,20 @@ final class BindingGraphConverter {
   }
 
   private final class Traverser extends ComponentTreeTraverser {
-
     private final MutableNetwork<Node, Edge> network =
         NetworkBuilder.directed().allowsParallelEdges(true).allowsSelfLoops(true).build();
+    private final boolean isRootSubcomponent;
+    private final boolean isFullBindingGraph;
 
+    private final ComponentPath rootComponentPath;
     private ComponentNode parentComponent;
     private ComponentNode currentComponent;
 
     Traverser(BindingGraph graph) {
-      super(graph, compilerOptions);
+      super(graph);
+      rootComponentPath = ComponentPath.create(ImmutableList.of(graph.componentTypeElement()));
+      isRootSubcomponent = graph.componentDescriptor().isSubcomponent();
+      isFullBindingGraph = graph.isFullBindingGraph();
     }
 
     @Override
@@ -103,7 +104,6 @@ final class BindingGraphConverter {
       network.addNode(currentComponent);
 
       for (ResolvedBindings resolvedBindings : graph.resolvedBindings()) {
-        ImmutableSet<TypeElement> declaringModules = subcomponentDeclaringModules(resolvedBindings);
         for (BindingNode binding : bindingNodes(resolvedBindings)) {
           addBinding(binding);
           if (binding.kind().equals(SUBCOMPONENT_CREATOR)
@@ -111,7 +111,8 @@ final class BindingGraphConverter {
             network.addEdge(
                 binding,
                 subcomponentNode(binding.key().type(), graph),
-                new SubcomponentCreatorBindingEdgeImpl(declaringModules));
+                new SubcomponentCreatorBindingEdgeImpl(
+                    resolvedBindings.subcomponentDeclarations()));
           }
         }
       }
@@ -219,7 +220,12 @@ final class BindingGraphConverter {
     }
 
     private MissingBinding missingBindingNode(ResolvedBindings dependencies) {
-      return BindingGraphProxies.missingBindingNode(componentPath(), dependencies.key());
+      // TODO(b/117833324): Revisit whether limiting missing binding nodes to the root component is
+      // necessary to limit the amount of missing binding nodes in the network, or if perhaps *all*
+      // missing binding nodes should be structured this way.
+      return BindingGraphProxies.missingBindingNode(
+          isRootSubcomponent && !isFullBindingGraph ? rootComponentPath : componentPath(),
+          dependencies.key());
     }
 
     private ComponentNode subcomponentNode(TypeMirror subcomponentBuilderType, BindingGraph graph) {
@@ -228,16 +234,6 @@ final class BindingGraphConverter {
           graph.componentDescriptor().getChildComponentWithBuilderType(subcomponentBuilderElement);
       return ComponentNodeImpl.create(
           componentPath().childPath(subcomponent.typeElement()), subcomponent);
-    }
-
-    private ImmutableSet<TypeElement> subcomponentDeclaringModules(
-        ResolvedBindings resolvedBindings) {
-      return resolvedBindings
-          .subcomponentDeclarations()
-          .stream()
-          .map(SubcomponentDeclaration::contributingModule)
-          .flatMap(presentValues())
-          .collect(toImmutableSet());
     }
   }
 }

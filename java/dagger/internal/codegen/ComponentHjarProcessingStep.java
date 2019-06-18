@@ -24,7 +24,7 @@ import static com.squareup.javapoet.MethodSpec.constructorBuilder;
 import static dagger.internal.codegen.ComponentAnnotation.rootComponentAnnotations;
 import static dagger.internal.codegen.ComponentCreatorKind.BUILDER;
 import static dagger.internal.codegen.ComponentGenerator.componentName;
-import static dagger.internal.codegen.TypeSpecs.addSupertype;
+import static dagger.internal.codegen.javapoet.TypeSpecs.addSupertype;
 import static javax.lang.model.element.Modifier.ABSTRACT;
 import static javax.lang.model.element.Modifier.FINAL;
 import static javax.lang.model.element.Modifier.PRIVATE;
@@ -42,6 +42,8 @@ import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 import dagger.BindsInstance;
 import dagger.internal.codegen.ComponentValidator.ComponentValidationReport;
+import dagger.internal.codegen.langmodel.DaggerElements;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.producers.internal.CancellationListener;
 import java.lang.annotation.Annotation;
 import java.util.Optional;
@@ -139,8 +141,12 @@ final class ComponentHjarProcessingStep extends TypeCheckingProcessingStep<TypeE
         ClassName generatedTypeName, ComponentDescriptor componentDescriptor) {
       TypeSpec.Builder generatedComponent =
           TypeSpec.classBuilder(generatedTypeName)
-              .addModifiers(PUBLIC, FINAL)
+              .addModifiers(FINAL)
               .addMethod(privateConstructor());
+      if (componentDescriptor.typeElement().getModifiers().contains(PUBLIC)) {
+        generatedComponent.addModifiers(PUBLIC);
+      }
+
       TypeElement componentElement = componentDescriptor.typeElement();
       addSupertype(generatedComponent, componentElement);
 
@@ -156,8 +162,12 @@ final class ComponentHjarProcessingStep extends TypeCheckingProcessingStep<TypeE
       } else {
         TypeSpec.Builder builder =
             TypeSpec.classBuilder("Builder")
-                .addModifiers(PUBLIC, STATIC, FINAL)
+                .addModifiers(STATIC, FINAL)
                 .addMethod(privateConstructor());
+        if (componentDescriptor.typeElement().getModifiers().contains(PUBLIC)) {
+          builder.addModifiers(PUBLIC);
+        }
+
         ClassName builderClassName = generatedTypeName.nestedClass("Builder");
         builderMethodReturnType = builderClassName;
         creatorKind = BUILDER;

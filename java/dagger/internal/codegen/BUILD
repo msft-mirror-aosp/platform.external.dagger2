@@ -19,18 +19,19 @@ package(default_visibility = ["//:src"])
 
 load("//:build_defs.bzl", "DOCLINT_HTML_AND_SYNTAX", "DOCLINT_REFERENCES")
 load("//tools:maven.bzl", "POM_VERSION", "pom_file")
-load("//tools:simple_jar.bzl", "simple_jar")
 
 EXPERIMENTAL_VISUALIZER_SRCS = ["BindingNetworkVisualizer.java"]
 
-KYTHE_SRCS = [
-    "DaggerKythePlugin.java",
-    "JavacPluginModule.java",
-]
+JAVAC_PLUGIN_MODULE_SRCS = ["JavacPluginModule.java"]
+
+KYTHE_SRCS = ["DaggerKythePlugin.java"]
+
+STATISTICS_COLLECTOR_SRCS = ["BindingGraphStatisticsCollector.java"]
 
 CODEGEN_SRCS = glob(
     ["*.java"],
-    exclude = EXPERIMENTAL_VISUALIZER_SRCS + KYTHE_SRCS,
+    exclude = EXPERIMENTAL_VISUALIZER_SRCS + KYTHE_SRCS + STATISTICS_COLLECTOR_SRCS +
+              JAVAC_PLUGIN_MODULE_SRCS,
 )
 
 CODEGEN_PLUGINS = [":bootstrap_compiler_plugin"]
@@ -47,6 +48,7 @@ CODEGEN_SHARED_DEPS = [
     "@google_bazel_common//third_party/java/jsr250_annotations",
     "@google_bazel_common//third_party/java/jsr330_inject",
     "//java/dagger:core",
+    "//java/dagger/internal/codegen/serialization",
     "//java/dagger/producers",
     "//java/dagger/model",
     "//java/dagger/spi",
@@ -78,23 +80,20 @@ java_library(
 java_library(
     name = "base",
     srcs = [
-        "Accessibility.java",
-        "AnnotationSpecs.java",
+        "AnnotationProtoConverter.java",
         "ClearableCache.java",
-        "CodeBlocks.java",
         "CompilerOptions.java",
         "ComponentAnnotation.java",
         "ContributionType.java",
-        "DaggerElements.java",
         "DaggerStatistics.java",
         "DaggerStatisticsCollectingProcessingStep.java",
         "DaggerStatisticsCollector.java",
         "DaggerStatisticsRecorder.java",
-        "DaggerTypes.java",
         "DiagnosticFormatting.java",
-        "Expression.java",
+        "ElementFormatter.java",
         "FeatureStatus.java",
         "Formatter.java",
+        "ForwardingCompilerOptions.java",
         "FrameworkTypes.java",
         "InjectionAnnotations.java",
         "Keys.java",
@@ -105,6 +104,7 @@ java_library(
         "MoreAnnotationValues.java",
         "MultibindingAnnotations.java",
         "OptionalType.java",
+        "ProcessingEnvironmentCompilerOptions.java",
         "ProcessingOptions.java",
         "RequestKinds.java",
         "Scopes.java",
@@ -114,8 +114,7 @@ java_library(
         "SourceFileGenerationException.java",  # Used in :writing and :processor
         "SourceFileGenerator.java",  # Needed by InjectBindingRegistry in :binding and also :writing
         "TypeCheckingProcessingStep.java",
-        "TypeNames.java",
-        "TypeSpecs.java",
+        "TypeProtoConverter.java",
         "UniqueNameSet.java",
         "Util.java",
         "ValidationType.java",
@@ -123,7 +122,10 @@ java_library(
     ],
     plugins = CODEGEN_PLUGINS,
     tags = ["maven:merged"],
-    deps = CODEGEN_DEPS,
+    deps = CODEGEN_DEPS + [
+        "//java/dagger/internal/codegen/javapoet",
+        "//java/dagger/internal/codegen/langmodel",
+    ],
 )
 
 # Classes that help to build a model of the binding graph
@@ -165,6 +167,7 @@ java_library(
         "FrameworkType.java",
         "FrameworkTypeMapper.java",
         "InjectBindingRegistry.java",
+        "InjectionSiteFactory.java",
         "KeyFactory.java",
         "KeyVariableNamer.java",  # needs ConfigurationAnnotations, SourceFiles
         "MapKeys.java",
@@ -184,7 +187,11 @@ java_library(
     ],
     plugins = CODEGEN_PLUGINS,
     tags = ["maven:merged"],
-    deps = CODEGEN_DEPS + [":base"],
+    deps = CODEGEN_DEPS + [
+        ":base",
+        "//java/dagger/internal/codegen/langmodel",
+        "//java/dagger/internal/codegen/javapoet",
+    ],
 )
 
 # Code related to validating the user-written Dagger code
@@ -192,10 +199,14 @@ java_library(
     name = "validation",
     srcs = [
         "AnyBindingMethodValidator.java",
+        "BindingElementValidator.java",
         "BindingGraphPlugins.java",
         "BindingGraphValidator.java",
         "BindingMethodProcessingStep.java",
         "BindingMethodValidator.java",
+        "BindsInstanceElementValidator.java",
+        "BindsInstanceMethodValidator.java",
+        "BindsInstanceParameterValidator.java",
         "BindsInstanceProcessingStep.java",
         "BindsMethodValidator.java",
         "BindsOptionalOfMethodValidator.java",
@@ -221,6 +232,7 @@ java_library(
     deps = CODEGEN_DEPS + [
         ":base",
         ":binding",
+        "//java/dagger/internal/codegen/langmodel",
     ],
 )
 
@@ -244,6 +256,7 @@ java_library(
         ":base",
         ":binding",
         ":validation",
+        "//java/dagger/internal/codegen/langmodel",
     ],
 )
 
@@ -333,12 +346,9 @@ java_library(
     deps = CODEGEN_DEPS + [
         ":base",
         ":binding",
+        "//java/dagger/internal/codegen/javapoet",
+        "//java/dagger/internal/codegen/langmodel",
     ],
-)
-
-simple_jar(
-    name = "processor_manifest_files",
-    srcs = glob(["META-INF/**"]),
 )
 
 # The processor's "main", if you will
@@ -355,6 +365,7 @@ java_library(
         "ComponentProcessingStep.java",
         "ComponentProcessor.java",
         "CurrentImplementationSubcomponent.java",
+        "DeserializedComponentImplementationBuilder.java",
         "GenerationOptionsModule.java",
         "InjectBindingRegistryImpl.java",
         "InjectBindingRegistryModule.java",
@@ -369,7 +380,6 @@ java_library(
         "TopLevelImplementationComponent.java",
     ],
     plugins = CODEGEN_PLUGINS,
-    resource_jars = [":processor_manifest_files.jar"],
     tags = ["maven_coordinates=com.google.dagger:dagger-compiler:" + POM_VERSION],
     deps = CODEGEN_DEPS + [
         ":base",
@@ -377,6 +387,9 @@ java_library(
         ":binding_graph_validation",
         ":writing",
         ":validation",
+        "//java/dagger/internal/codegen/javapoet",
+        "//java/dagger/internal/codegen/langmodel",
+        "@google_bazel_common//third_party/java/incap",
     ],
 )
 
@@ -391,6 +404,23 @@ pom_file(
         ":binding_graph_validation",
         ":writing",
         ":validation",
+        "//java/dagger/internal/codegen/serialization",
+        "//java/dagger/internal/codegen/javapoet",
+    ],
+)
+
+java_library(
+    name = "javac-plugin-module",
+    srcs = JAVAC_PLUGIN_MODULE_SRCS,
+    plugins = [":component-codegen"],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":base",
+        ":binding",
+        ":javac",
+        ":processor",
+        "//java/dagger:core",
+        "//java/dagger/internal/codegen/langmodel",
     ],
 )
 
@@ -401,16 +431,24 @@ java_library(
     deps = [
         ":base",
         ":binding",
+        ":javac",
+        ":javac-plugin-module",
         ":kythe_plugin",
         ":processor",
         "//java/dagger:core",
+        "//java/dagger/internal/codegen/langmodel",
         "//java/dagger/model",
         "//java/dagger/producers",
-        "@bazel_tools//third_party/java/jdk/langtools:javac",
         "@google_bazel_common//third_party/java/auto:common",
         "@google_bazel_common//third_party/java/auto:service",
         "@google_bazel_common//third_party/java/guava",
     ],
+)
+
+# Replacement for @bazel_tools//third_party/java/jdk/langtools:javac, which seems to have gone away?
+java_import(
+    name = "javac",
+    jars = ["@bazel_tools//third_party/java/jdk/langtools:javac_jar"],
 )
 
 # A _deploy.jar consisting of the java_librarys in https://github.com/kythe/kythe needed to build a
@@ -433,7 +471,6 @@ java_plugin(
     name = "bootstrap_compiler_plugin",
     generates_api = 1,
     processor_class = "dagger.internal.codegen.ComponentProcessor",
-    visibility = ["//visibility:private"],
     deps = [":bootstrap_compiler"],
 )
 
@@ -452,7 +489,11 @@ java_library(
     srcs = CODEGEN_SRCS,
     javacopts = DOCLINT_HTML_AND_SYNTAX + DOCLINT_REFERENCES,
     plugins = CODEGEN_PLUGINS,
-    deps = CODEGEN_DEPS,
+    deps = CODEGEN_DEPS + [
+        "//java/dagger/internal/codegen/langmodel",
+        "//java/dagger/internal/codegen/javapoet",
+        "@google_bazel_common//third_party/java/incap",
+    ],
 )
 
 java_plugin(
@@ -467,4 +508,20 @@ java_plugin(
         "genclass=${package}.Dagger${outerclasses}${classname}",
     ],
     deps = [":processor"],
+)
+
+java_library(
+    name = "statistics",
+    srcs = STATISTICS_COLLECTOR_SRCS,
+    plugins = [":component-codegen"],
+    deps = [
+        ":base",
+        ":binding",
+        ":javac",
+        ":javac-plugin-module",
+        ":processor",
+        "//java/dagger:core",
+        "//java/dagger/model",
+        "@google_bazel_common//third_party/java/error_prone:check_api",
+    ],
 )

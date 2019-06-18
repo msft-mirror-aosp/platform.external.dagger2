@@ -24,16 +24,16 @@ import static com.google.common.base.Verify.verify;
 import static dagger.internal.codegen.DaggerStreams.toImmutableList;
 import static dagger.internal.codegen.DaggerStreams.toImmutableSet;
 import static dagger.internal.codegen.Optionals.optionalComparator;
-import static dagger.internal.codegen.TypeNames.DOUBLE_CHECK;
-import static dagger.internal.codegen.TypeNames.MAP_FACTORY;
-import static dagger.internal.codegen.TypeNames.MAP_OF_PRODUCED_PRODUCER;
-import static dagger.internal.codegen.TypeNames.MAP_OF_PRODUCER_PRODUCER;
-import static dagger.internal.codegen.TypeNames.MAP_PRODUCER;
-import static dagger.internal.codegen.TypeNames.MAP_PROVIDER_FACTORY;
-import static dagger.internal.codegen.TypeNames.PROVIDER_OF_LAZY;
-import static dagger.internal.codegen.TypeNames.SET_FACTORY;
-import static dagger.internal.codegen.TypeNames.SET_OF_PRODUCED_PRODUCER;
-import static dagger.internal.codegen.TypeNames.SET_PRODUCER;
+import static dagger.internal.codegen.javapoet.TypeNames.DOUBLE_CHECK;
+import static dagger.internal.codegen.javapoet.TypeNames.MAP_FACTORY;
+import static dagger.internal.codegen.javapoet.TypeNames.MAP_OF_PRODUCED_PRODUCER;
+import static dagger.internal.codegen.javapoet.TypeNames.MAP_OF_PRODUCER_PRODUCER;
+import static dagger.internal.codegen.javapoet.TypeNames.MAP_PRODUCER;
+import static dagger.internal.codegen.javapoet.TypeNames.MAP_PROVIDER_FACTORY;
+import static dagger.internal.codegen.javapoet.TypeNames.PROVIDER_OF_LAZY;
+import static dagger.internal.codegen.javapoet.TypeNames.SET_FACTORY;
+import static dagger.internal.codegen.javapoet.TypeNames.SET_OF_PRODUCED_PRODUCER;
+import static dagger.internal.codegen.javapoet.TypeNames.SET_PRODUCER;
 import static dagger.model.BindingKind.INJECTION;
 import static dagger.model.BindingKind.MULTIBOUND_MAP;
 import static dagger.model.BindingKind.MULTIBOUND_SET;
@@ -201,10 +201,8 @@ class SourceFiles {
       case MEMBERS_INJECTION:
         return membersInjectorNameForType(
             ((MembersInjectionBinding) binding).membersInjectedType());
-
-      default:
-        throw new AssertionError();
     }
+    throw new AssertionError();
   }
 
   /**
@@ -245,10 +243,6 @@ class SourceFiles {
   static ClassName generatedMonitoringModuleName(
       TypeElement componentElement) {
     return siblingClassName(componentElement, "_MonitoringModule");
-  }
-
-  static ClassName generatedProductionExecutorModuleName(TypeElement componentElement) {
-    return siblingClassName(componentElement, "_ProductionExecutorModule");
   }
 
   // TODO(ronshapiro): when JavaPoet migration is complete, replace the duplicated code

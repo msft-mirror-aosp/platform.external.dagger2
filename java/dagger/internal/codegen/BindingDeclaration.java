@@ -16,6 +16,7 @@
 
 package dagger.internal.codegen;
 
+import dagger.internal.codegen.langmodel.DaggerElements;
 import dagger.model.BindingKind;
 import dagger.model.Key;
 import java.util.Optional;
@@ -48,7 +49,7 @@ abstract class BindingDeclaration {
    * The type enclosing the {@link #bindingElement()}, or {@link Optional#empty()} if {@link
    * #bindingElement()} is empty.
    */
-  Optional<TypeElement> bindingTypeElement() {
+  final Optional<TypeElement> bindingTypeElement() {
     return bindingElement().map(DaggerElements::closestEnclosingTypeElement);
   }
   

@@ -19,9 +19,9 @@ package dagger.internal.codegen;
 import static com.google.auto.common.AnnotationMirrors.getAnnotationValue;
 import static com.google.auto.common.MoreTypes.asTypeElement;
 import static com.google.common.base.Preconditions.checkArgument;
-import static dagger.internal.codegen.DaggerElements.getAnyAnnotation;
 import static dagger.internal.codegen.DaggerStreams.toImmutableList;
 import static dagger.internal.codegen.MoreAnnotationValues.asAnnotationValues;
+import static dagger.internal.codegen.langmodel.DaggerElements.getAnyAnnotation;
 
 import com.google.auto.common.MoreTypes;
 import com.google.auto.value.AutoValue;
@@ -39,6 +39,9 @@ import javax.lang.model.element.TypeElement;
 /** A {@code @Module} or {@code @ProducerModule} annotation. */
 @AutoValue
 abstract class ModuleAnnotation {
+  private static final ImmutableSet<Class<? extends Annotation>> MODULE_ANNOTATIONS =
+      ImmutableSet.of(Module.class, ProducerModule.class);
+
   /** The annotation itself. */
   // This does not use AnnotationMirrors.equivalence() because we want the actual annotation
   // instance.
@@ -102,8 +105,10 @@ abstract class ModuleAnnotation {
         .anyMatch(asTypeElement(annotation.getAnnotationType()).getQualifiedName()::contentEquals);
   }
 
-  private static final ImmutableSet<Class<? extends Annotation>> MODULE_ANNOTATIONS =
-      ImmutableSet.of(Module.class, ProducerModule.class);
+  /** The module annotation types. */
+  static ImmutableSet<Class<? extends Annotation>> moduleAnnotations() {
+    return MODULE_ANNOTATIONS;
+  }
 
   /**
    * Creates an object that represents a {@code @Module} or {@code @ProducerModule}.
