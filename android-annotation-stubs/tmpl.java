@@ -20,20 +20,24 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+__IMPORT__
 
 /* This is an annotation stub to avoid dependencies on annotations that aren't
  * in the Android platform source tree. */
 
 @Target({
-    ElementType.ANNOTATION_TYPE,
-    ElementType.CONSTRUCTOR,
-    ElementType.FIELD,
-    ElementType.LOCAL_VARIABLE,
-    ElementType.METHOD,
-    ElementType.PACKAGE,
-    ElementType.PARAMETER,
-    ElementType.TYPE,
-    ElementType.TYPE_PARAMETER,
-    ElementType.TYPE_USE})
+  ElementType.ANNOTATION_TYPE,
+  ElementType.CONSTRUCTOR,
+  ElementType.FIELD,
+  ElementType.LOCAL_VARIABLE,
+  ElementType.METHOD,
+  ElementType.PACKAGE,
+  ElementType.PARAMETER,
+  ElementType.TYPE,
+  ElementType.TYPE_PARAMETER,
+  ElementType.TYPE_USE})
 @Retention(RetentionPolicy.SOURCE)
-public @interface __CLASS__ {}
+public @interface __CLASS__ {
+  __INNER__
+  __PARAMETER__
+}
