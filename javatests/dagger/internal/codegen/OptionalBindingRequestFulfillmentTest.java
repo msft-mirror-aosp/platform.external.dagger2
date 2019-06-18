@@ -19,7 +19,7 @@ package dagger.internal.codegen;
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static dagger.internal.codegen.CompilerMode.DEFAULT_MODE;
 import static dagger.internal.codegen.CompilerMode.FAST_INIT_MODE;
-import static dagger.internal.codegen.Compilers.daggerCompiler;
+import static dagger.internal.codegen.Compilers.compilerWithOptions;
 import static dagger.internal.codegen.GeneratedLines.GENERATED_ANNOTATION;
 
 import com.google.testing.compile.Compilation;
@@ -71,7 +71,7 @@ public class OptionalBindingRequestFulfillmentTest {
             "",
             "public class Maybe {",
             "  @Module",
-            "  public interface MaybeModule {",
+            "  public static class MaybeModule {",
             "    @Provides static Maybe provideMaybe() { return new Maybe(); }",
             "  }",
             "}");
@@ -111,7 +111,7 @@ public class OptionalBindingRequestFulfillmentTest {
                 "import com.google.common.base.Optional;",
                 "",
                 GENERATED_ANNOTATION,
-                "public final class DaggerTestComponent implements TestComponent {")
+                "final class DaggerTestComponent implements TestComponent {")
             .addLinesIn(
                 FAST_INIT_MODE,
                 "  private volatile Provider<Maybe> provideMaybeProvider;",
@@ -135,10 +135,10 @@ public class OptionalBindingRequestFulfillmentTest {
                 "  public Optional<Provider<Lazy<Maybe>>> providerOfLazyOfMaybe() {",
                 "    return Optional.of(ProviderOfLazy.create(")
             .addLinesIn(
-                DEFAULT_MODE,
+                DEFAULT_MODE, //
                 "        Maybe_MaybeModule_ProvideMaybeFactory.create()));")
             .addLinesIn(
-                FAST_INIT_MODE,
+                FAST_INIT_MODE, //
                 "        getMaybeProvider()));")
             .addLines(
                 "  }",
@@ -176,8 +176,10 @@ public class OptionalBindingRequestFulfillmentTest {
                 "}")
             .build();
     Compilation compilation =
-        daggerCompiler()
-            .withOptions(compilerMode.javacopts())
+        compilerWithOptions(
+                compilerMode
+                , CompilerMode.JAVA7
+                )
             .compile(module, maybe, definitelyNot, component);
     assertThat(compilation).succeeded();
     assertThat(compilation)
@@ -212,7 +214,7 @@ public class OptionalBindingRequestFulfillmentTest {
             "",
             "public class Maybe {",
             "  @Module",
-            "  public interface MaybeModule {",
+            "  public static class MaybeModule {",
             "    @Provides static Maybe provideMaybe() { return new Maybe(); }",
             "  }",
             "}");
@@ -249,8 +251,7 @@ public class OptionalBindingRequestFulfillmentTest {
             "import dagger.producers.internal.CancellationListener;",
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerTestComponent implements TestComponent, "
-                + "CancellationListener {",
+            "final class DaggerTestComponent implements TestComponent, CancellationListener {",
             "  @Override",
             "  public ListenableFuture<Optional<Maybe>> maybe() {",
             "    return Futures.immediateFuture(",
@@ -268,8 +269,10 @@ public class OptionalBindingRequestFulfillmentTest {
             "}");
 
     Compilation compilation =
-        daggerCompiler()
-            .withOptions(compilerMode.javacopts())
+        compilerWithOptions(
+                compilerMode
+                , CompilerMode.JAVA7
+                )
             .compile(module, maybe, definitelyNot, component);
     assertThat(compilation).succeeded();
     assertThat(compilation)

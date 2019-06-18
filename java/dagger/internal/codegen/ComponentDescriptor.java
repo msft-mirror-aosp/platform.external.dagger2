@@ -21,7 +21,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static dagger.internal.codegen.DaggerStreams.toImmutableMap;
 import static dagger.internal.codegen.DaggerStreams.toImmutableSet;
-import static dagger.internal.codegen.DaggerTypes.isFutureType;
+import static dagger.internal.codegen.langmodel.DaggerTypes.isFutureType;
 import static javax.lang.model.element.Modifier.ABSTRACT;
 import static javax.lang.model.type.TypeKind.VOID;
 
@@ -32,11 +32,14 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.errorprone.annotations.CheckReturnValue;
 import dagger.Component;
 import dagger.Module;
 import dagger.Subcomponent;
+import dagger.internal.codegen.langmodel.DaggerElements;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.model.DependencyRequest;
 import dagger.model.Scope;
 import dagger.producers.CancellationPolicy;
@@ -193,6 +196,12 @@ abstract class ComponentDescriptor {
    */
   abstract ImmutableBiMap<ComponentMethodDescriptor, ComponentDescriptor>
       childComponentsDeclaredByFactoryMethods();
+
+  /** Returns a map of {@link #childComponents()} indexed by {@link #typeElement()}. */
+  @Memoized
+  ImmutableMap<TypeElement, ComponentDescriptor> childComponentsByElement() {
+    return Maps.uniqueIndex(childComponents(), ComponentDescriptor::typeElement);
+  }
 
   /** Returns the factory method that declares a child component. */
   final Optional<ComponentMethodDescriptor> getFactoryMethodForChildComponent(

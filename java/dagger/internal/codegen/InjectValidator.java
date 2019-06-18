@@ -29,7 +29,9 @@ import static javax.lang.model.type.TypeKind.DECLARED;
 import com.google.auto.common.MoreElements;
 import com.google.auto.common.MoreTypes;
 import com.google.common.collect.ImmutableSet;
-import dagger.internal.codegen.ValidationReport.Builder;
+import dagger.internal.codegen.langmodel.Accessibility;
+import dagger.internal.codegen.langmodel.DaggerElements;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.model.Scope;
 import java.util.Optional;
 import java.util.Set;
@@ -307,7 +309,8 @@ final class InjectValidator {
     return false;
   }
 
-  private void checkInjectIntoPrivateClass(Element element, Builder<TypeElement> builder) {
+  private void checkInjectIntoPrivateClass(
+      Element element, ValidationReport.Builder<TypeElement> builder) {
     if (!Accessibility.isElementAccessibleFromOwnPackage(
         DaggerElements.closestEnclosingTypeElement(element))) {
       builder.addItem(
