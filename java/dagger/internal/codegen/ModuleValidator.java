@@ -26,14 +26,15 @@ import static dagger.internal.codegen.ComponentAnnotation.isComponentAnnotation;
 import static dagger.internal.codegen.ComponentAnnotation.subcomponentAnnotation;
 import static dagger.internal.codegen.ComponentCreatorAnnotation.getCreatorAnnotations;
 import static dagger.internal.codegen.ConfigurationAnnotations.getSubcomponentCreator;
-import static dagger.internal.codegen.DaggerElements.getAnnotationMirror;
-import static dagger.internal.codegen.DaggerElements.isAnyAnnotationPresent;
 import static dagger.internal.codegen.DaggerStreams.toImmutableSet;
 import static dagger.internal.codegen.ModuleAnnotation.isModuleAnnotation;
 import static dagger.internal.codegen.ModuleAnnotation.moduleAnnotation;
 import static dagger.internal.codegen.MoreAnnotationMirrors.simpleName;
 import static dagger.internal.codegen.MoreAnnotationValues.asType;
 import static dagger.internal.codegen.Util.reentrantComputeIfAbsent;
+import static dagger.internal.codegen.ValidationType.NONE;
+import static dagger.internal.codegen.langmodel.DaggerElements.getAnnotationMirror;
+import static dagger.internal.codegen.langmodel.DaggerElements.isAnyAnnotationPresent;
 import static java.util.EnumSet.noneOf;
 import static java.util.stream.Collectors.joining;
 import static javax.lang.model.element.Modifier.ABSTRACT;
@@ -49,8 +50,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Sets;
+import com.google.errorprone.annotations.FormatMethod;
 import dagger.Module;
 import dagger.Subcomponent;
+import dagger.internal.codegen.langmodel.DaggerElements;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.model.BindingGraph;
 import dagger.producers.ProducerModule;
 import dagger.producers.ProductionSubcomponent;
@@ -225,7 +229,7 @@ final class ModuleValidator {
     validateSelfCycles(module, builder);
 
     if (builder.build().isClean()
-        && !compilerOptions.moduleBindingValidationType().equals(ValidationType.NONE)) {
+        && !compilerOptions.fullBindingGraphValidationType(module).equals(NONE)) {
       validateModuleBindings(module, builder);
     }
 
@@ -430,6 +434,7 @@ final class ModuleValidator {
                   return null;
                 }
 
+                @FormatMethod
                 private void reportError(String format, Object... args) {
                   subreport.addError(
                       String.format(format, args), annotatedType, annotation, includedModule);

@@ -19,17 +19,17 @@ package dagger.internal.codegen;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Verify.verify;
-import static dagger.internal.codegen.Accessibility.isRawTypeAccessible;
-import static dagger.internal.codegen.Accessibility.isRawTypePubliclyAccessible;
-import static dagger.internal.codegen.Accessibility.isTypeAccessibleFrom;
 import static dagger.internal.codegen.BindingRequest.bindingRequest;
 import static dagger.internal.codegen.BindingType.MEMBERS_INJECTION;
-import static dagger.internal.codegen.CodeBlocks.makeParametersCodeBlock;
 import static dagger.internal.codegen.DelegateBindingExpression.isBindsScopeStrongerThanDependencyScope;
 import static dagger.internal.codegen.MemberSelect.staticFactoryCreation;
 import static dagger.internal.codegen.RequestKinds.isDerivedFromProvider;
-import static dagger.internal.codegen.TypeNames.DOUBLE_CHECK;
-import static dagger.internal.codegen.TypeNames.SINGLE_CHECK;
+import static dagger.internal.codegen.javapoet.CodeBlocks.makeParametersCodeBlock;
+import static dagger.internal.codegen.javapoet.TypeNames.DOUBLE_CHECK;
+import static dagger.internal.codegen.javapoet.TypeNames.SINGLE_CHECK;
+import static dagger.internal.codegen.langmodel.Accessibility.isRawTypeAccessible;
+import static dagger.internal.codegen.langmodel.Accessibility.isRawTypePubliclyAccessible;
+import static dagger.internal.codegen.langmodel.Accessibility.isTypeAccessibleFrom;
 import static dagger.model.BindingKind.DELEGATE;
 import static dagger.model.BindingKind.MULTIBOUND_MAP;
 import static dagger.model.BindingKind.MULTIBOUND_SET;
@@ -43,6 +43,9 @@ import com.squareup.javapoet.MethodSpec;
 import dagger.internal.codegen.ComponentDescriptor.ComponentMethodDescriptor;
 import dagger.internal.codegen.FrameworkFieldInitializer.FrameworkInstanceCreationExpression;
 import dagger.internal.codegen.MethodBindingExpression.MethodImplementationStrategy;
+import dagger.internal.codegen.javapoet.Expression;
+import dagger.internal.codegen.langmodel.DaggerElements;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.model.DependencyRequest;
 import dagger.model.RequestKind;
 import java.util.HashMap;
@@ -50,6 +53,7 @@ import java.util.Map;
 import java.util.Optional;
 import javax.inject.Inject;
 import javax.inject.Provider;
+import javax.lang.model.SourceVersion;
 import javax.lang.model.type.TypeMirror;
 
 /** A central repository of code expressions used to access any binding available to a component. */
@@ -66,6 +70,7 @@ final class ComponentBindingExpressions {
   private final OptionalFactories optionalFactories;
   private final DaggerTypes types;
   private final DaggerElements elements;
+  private final SourceVersion sourceVersion;
   private final CompilerOptions compilerOptions;
   private final MembersInjectionMethods membersInjectionMethods;
   private final InnerSwitchingProviders innerSwitchingProviders;
@@ -81,6 +86,7 @@ final class ComponentBindingExpressions {
       OptionalFactories optionalFactories,
       DaggerTypes types,
       DaggerElements elements,
+      SourceVersion sourceVersion,
       @GenerationCompilerOptions CompilerOptions compilerOptions) {
     this.parent = parent;
     this.graph = graph;
@@ -89,6 +95,7 @@ final class ComponentBindingExpressions {
     this.optionalFactories = checkNotNull(optionalFactories);
     this.types = checkNotNull(types);
     this.elements = checkNotNull(elements);
+    this.sourceVersion = checkNotNull(sourceVersion);
     this.compilerOptions = checkNotNull(compilerOptions);
     this.membersInjectionMethods =
         new MembersInjectionMethods(componentImplementation, this, graph, elements, types);
@@ -273,10 +280,8 @@ final class ComponentBindingExpressions {
 
       case PRODUCTION:
         return productionBindingExpression(resolvedBindings, request);
-
-      default:
-        throw new AssertionError(resolvedBindings);
     }
+    throw new AssertionError(resolvedBindings);
   }
 
   /**
@@ -425,7 +430,7 @@ final class ComponentBindingExpressions {
         return producerFromProviderBindingExpression(resolvedBindings);
 
       case FUTURE:
-        return new ImmediateFutureBindingExpression(resolvedBindings, this, types);
+        return new ImmediateFutureBindingExpression(resolvedBindings, this, types, sourceVersion);
 
       case MEMBERS_INJECTION:
         throw new IllegalArgumentException();
@@ -568,7 +573,8 @@ final class ComponentBindingExpressions {
                 resolvedBindings, componentImplementation, graph, this, types, elements));
 
       case OPTIONAL:
-        return Optional.of(new OptionalBindingExpression(resolvedBindings, this, types));
+        return Optional.of(
+            new OptionalBindingExpression(resolvedBindings, this, types, sourceVersion));
 
       case BOUND_INSTANCE:
         return Optional.of(
@@ -587,7 +593,8 @@ final class ComponentBindingExpressions {
                 membersInjectionMethods,
                 componentRequirementExpressions,
                 types,
-                elements));
+                elements,
+                sourceVersion));
 
       case MEMBERS_INJECTOR:
         return Optional.empty();

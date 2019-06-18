@@ -25,11 +25,14 @@ import com.sun.tools.javac.util.Context;
 import dagger.Binds;
 import dagger.Module;
 import dagger.Provides;
+import dagger.internal.codegen.langmodel.DaggerElements;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import javax.annotation.processing.Messager;
 import javax.inject.Inject;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 
@@ -41,21 +44,97 @@ import javax.tools.Diagnostic;
 abstract class JavacPluginModule {
   @Provides
   static CompilerOptions compilerOptions() {
-    return CompilerOptions.builder()
-        .usesProducers(true)
-        .writeProducerNameInToken(true)
-        .nullableValidationKind(NOTE)
-        .privateMemberValidationKind(NOTE)
-        .staticMemberValidationKind(NOTE)
-        .ignorePrivateAndStaticInjectionForComponent(false)
-        .scopeCycleValidationType(NONE)
-        .warnIfInjectionFactoryNotGeneratedUpstream(false)
-        .fastInit(false)
-        .aheadOfTimeSubcomponents(false)
-        .moduleBindingValidationType(NONE)
-        .moduleHasDifferentScopesDiagnosticKind(NOTE)
-        .explicitBindingConflictsWithInjectValidationType(NONE)
-        .build();
+    return new CompilerOptions() {
+      @Override
+      boolean usesProducers() {
+        return true;
+      }
+
+      @Override
+      boolean fastInit() {
+        return false;
+      }
+
+      @Override
+      boolean formatGeneratedSource() {
+        return false;
+      }
+
+      @Override
+      boolean writeProducerNameInToken() {
+        return true;
+      }
+
+      @Override
+      Diagnostic.Kind nullableValidationKind() {
+        return NOTE;
+      }
+
+      @Override
+      Diagnostic.Kind privateMemberValidationKind() {
+        return NOTE;
+      }
+
+      @Override
+      Diagnostic.Kind staticMemberValidationKind() {
+        return NOTE;
+      }
+
+      @Override
+      boolean ignorePrivateAndStaticInjectionForComponent() {
+        return false;
+      }
+
+      @Override
+      ValidationType scopeCycleValidationType() {
+        return NONE;
+      }
+
+      @Override
+      boolean warnIfInjectionFactoryNotGeneratedUpstream() {
+        return false;
+      }
+
+      @Override
+      boolean headerCompilation() {
+        return false;
+      }
+
+      @Override
+      boolean aheadOfTimeSubcomponents() {
+        return false;
+      }
+
+      @Override
+      boolean forceUseSerializedComponentImplementations() {
+        return false;
+      }
+
+      @Override
+      boolean emitModifiableMetadataAnnotations() {
+        return false;
+      }
+
+      @Override
+      boolean useGradleIncrementalProcessing() {
+        return false;
+      }
+
+      @Override
+      ValidationType fullBindingGraphValidationType(TypeElement element) {
+        return NONE;
+      }
+
+      @Override
+      Diagnostic.Kind moduleHasDifferentScopesDiagnosticKind() {
+        return NOTE;
+      }
+
+      @Override
+      ValidationType explicitBindingConflictsWithInjectValidationType() {
+        return NONE;
+      }
+    };
   }
 
   @Binds
