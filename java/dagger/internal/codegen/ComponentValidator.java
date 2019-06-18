@@ -33,13 +33,13 @@ import static dagger.internal.codegen.ComponentCreatorAnnotation.subcomponentCre
 import static dagger.internal.codegen.ComponentKind.annotationsFor;
 import static dagger.internal.codegen.ConfigurationAnnotations.enclosedAnnotatedTypes;
 import static dagger.internal.codegen.ConfigurationAnnotations.getTransitiveModules;
-import static dagger.internal.codegen.DaggerElements.getAnnotationMirror;
-import static dagger.internal.codegen.DaggerElements.getAnyAnnotation;
 import static dagger.internal.codegen.DaggerStreams.toImmutableList;
 import static dagger.internal.codegen.DaggerStreams.toImmutableSet;
 import static dagger.internal.codegen.ErrorMessages.ComponentCreatorMessages.builderMethodRequiresNoArgs;
 import static dagger.internal.codegen.ErrorMessages.ComponentCreatorMessages.moreThanOneRefToSubcomponent;
 import static dagger.internal.codegen.ModuleAnnotation.moduleAnnotation;
+import static dagger.internal.codegen.langmodel.DaggerElements.getAnnotationMirror;
+import static dagger.internal.codegen.langmodel.DaggerElements.getAnyAnnotation;
 import static java.util.Comparator.comparing;
 import static javax.lang.model.element.ElementKind.CLASS;
 import static javax.lang.model.element.ElementKind.INTERFACE;
@@ -59,6 +59,8 @@ import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
 import dagger.Component;
 import dagger.Reusable;
+import dagger.internal.codegen.langmodel.DaggerElements;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.model.DependencyRequest;
 import dagger.model.Key;
 import dagger.producers.CancellationPolicy;
@@ -78,7 +80,9 @@ import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.ExecutableType;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.TypeVisitor;
 import javax.lang.model.util.SimpleTypeVisitor6;
+import javax.lang.model.util.SimpleTypeVisitor8;
 
 /**
  * Performs superficial validation of the contract of the {@link Component} and {@link
@@ -482,35 +486,27 @@ final class ComponentValidator {
 
   private static <T extends Element> void validateComponentDependencies(
       ValidationReport.Builder<T> report, Iterable<TypeMirror> types) {
-    validateTypesAreDeclared(report, types, "component dependency");
     for (TypeMirror type : types) {
-      if (moduleAnnotation(MoreTypes.asTypeElement(type)).isPresent()) {
-        report.addError(
-            String.format("%s is a module, which cannot be a component dependency", type));
-      }
+      type.accept(CHECK_DEPENDENCY_TYPES, report);
     }
   }
 
-  private static <T extends Element> void validateTypesAreDeclared(
-      final ValidationReport.Builder<T> report, Iterable<TypeMirror> types, final String typeName) {
-    for (TypeMirror type : types) {
-      type.accept(
-          new SimpleTypeVisitor6<Void, Void>() {
-            @Override
-            protected Void defaultAction(TypeMirror e, Void aVoid) {
-              report.addError(String.format("%s is not a valid %s type", e, typeName));
-              return null;
-            }
+  private static final TypeVisitor<Void, ValidationReport.Builder<?>> CHECK_DEPENDENCY_TYPES =
+      new SimpleTypeVisitor8<Void, ValidationReport.Builder<?>>() {
+        @Override
+        protected Void defaultAction(TypeMirror type, ValidationReport.Builder<?> report) {
+          report.addError(type + " is not a valid component dependency type");
+          return null;
+        }
 
-            @Override
-            public Void visitDeclared(DeclaredType t, Void aVoid) {
-              // Declared types are valid
-              return null;
-            }
-          },
-          null);
-    }
-  }
+        @Override
+        public Void visitDeclared(DeclaredType type, ValidationReport.Builder<?> report) {
+          if (moduleAnnotation(MoreTypes.asTypeElement(type)).isPresent()) {
+            report.addError(type + " is a module, which cannot be a component dependency");
+          }
+          return null;
+        }
+      };
 
   private static Optional<AnnotationMirror> checkForAnnotations(
       TypeMirror type, final Set<? extends Class<? extends Annotation>> annotations) {

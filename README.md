@@ -180,12 +180,8 @@ gradle.projectsEvaluated {
     * [Dagger development Javadocs][latestapi] (from the `master` branch
       on GitHub)
     * [Google's Dagger project site on GitHub][project]
-    * <a href="https://plus.google.com/118328287768685565185"
-         rel="publisher">Google+ Dagger Project Page</a>
-    * [Google+ Dagger Users Community][community]
   * 1.x (square/dagger)
     * [Square's original Dagger project site on GitHub][square]
-    * [Square Open Source Community][squarecommunity]
 
 
 If you do not use maven, gradle, ivy, or other build systems that consume
@@ -198,9 +194,7 @@ the GitHub project's master branch.
 
 ## Building Dagger
 
-Dagger is built with [`bazel`]. The tests can be run with `bazel test //...`.
-`util/install-local-snapshot.sh` will build all of the Dagger libraries and
-install a copy in your local maven repository with the version `LOCAL-SNAPSHOT`.
+See [the CONTRIBUTING.md docs][Building Dagger].
 
 ## License
 
@@ -218,18 +212,17 @@ install a copy in your local maven repository with the version `LOCAL-SNAPSHOT`.
     See the License for the specific language governing permissions and
     limitations under the License.
 
-[20api]: https://google.github.io/dagger/api/2.0/
+[20api]: https://dagger.dev/api/2.0/
 [`bazel`]: https://bazel.build
 [bazel-external-deps]: https://docs.bazel.build/versions/master/external.html#depending-on-other-bazel-projects
-[community]: https://plus.google.com/communities/111933036769103367883
+[Building Dagger]: CONTRIBUTING.md#building-dagger
 [dagger-snap]: https://oss.sonatype.org/content/repositories/snapshots/com/google/dagger/
 [databinding]: https://developer.android.com/topic/libraries/data-binding/
 [gaktalk]: https://www.youtube.com/watch?v=oK_XtfXPkqw
-[latestapi]: https://google.github.io/dagger/api/latest/
+[latestapi]: https://dagger.dev/api/latest/
 [mavenbadge-svg]: https://maven-badges.herokuapp.com/maven-central/com.google.dagger/dagger/badge.svg
 [mavencentral]: https://search.maven.org/artifact/com.google.dagger/dagger
 [project]: http://github.com/google/dagger/
 [proposal]: https://github.com/square/dagger/issues/366
 [square]: http://github.com/square/dagger/
-[squarecommunity]: https://plus.google.com/communities/109244258569782858265
-[website]: https://google.github.io/dagger
+[website]: https://dagger.dev

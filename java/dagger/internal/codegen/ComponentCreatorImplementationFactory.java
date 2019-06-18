@@ -23,9 +23,9 @@ import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.squareup.javapoet.MethodSpec.constructorBuilder;
 import static com.squareup.javapoet.MethodSpec.methodBuilder;
 import static com.squareup.javapoet.TypeSpec.classBuilder;
-import static dagger.internal.codegen.CodeBlocks.toParametersCodeBlock;
 import static dagger.internal.codegen.SourceFiles.simpleVariableName;
-import static dagger.internal.codegen.TypeSpecs.addSupertype;
+import static dagger.internal.codegen.javapoet.CodeBlocks.toParametersCodeBlock;
+import static dagger.internal.codegen.javapoet.TypeSpecs.addSupertype;
 import static javax.lang.model.element.Modifier.ABSTRACT;
 import static javax.lang.model.element.Modifier.FINAL;
 import static javax.lang.model.element.Modifier.PRIVATE;
@@ -46,6 +46,9 @@ import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 import dagger.internal.Preconditions;
 import dagger.internal.codegen.ComponentRequirement.NullPolicy;
+import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.langmodel.DaggerElements;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import java.util.Optional;
 import java.util.Set;
 import javax.inject.Inject;
@@ -68,7 +71,7 @@ final class ComponentCreatorImplementationFactory {
 
   /** Returns a new creator implementation for the given component, if necessary. */
   Optional<ComponentCreatorImplementation> create(
-      ComponentImplementation componentImplementation, BindingGraph graph) {
+      ComponentImplementation componentImplementation, Optional<BindingGraph> graph) {
     if (!componentImplementation.componentDescriptor().hasCreator()) {
       return Optional.empty();
     }
@@ -167,15 +170,15 @@ final class ComponentCreatorImplementationFactory {
     }
 
     private void setModifiers() {
-      classBuilder.addModifiers(visibility());
+      visibility().ifPresent(classBuilder::addModifiers);
       if (!componentImplementation.isNested()) {
         classBuilder.addModifiers(STATIC);
       }
       classBuilder.addModifiers(componentImplementation.isAbstract() ? ABSTRACT : FINAL);
     }
 
-    /** Returns the visibility modifier the generated class should have. */
-    protected abstract Modifier visibility();
+    /** Returns the visibility modifier the generated class should have, if any. */
+    protected abstract Optional<Modifier> visibility();
 
     /** Sets the superclass being extended or interface being implemented for this creator. */
     protected abstract void setSupertype();
@@ -253,7 +256,7 @@ final class ComponentCreatorImplementationFactory {
           .addAnnotation(Deprecated.class)
           .addJavadoc(
               "@deprecated This module is declared, but an instance is not used in the component. "
-                  + "This method is a no-op. For more, see https://google.github.io/dagger/unused-modules.\n")
+                  + "This method is a no-op. For more, see https://dagger.dev/unused-modules.\n")
           .addStatement("$T.checkNotNull($N)", Preconditions.class, parameter);
       return maybeReturnThis(method);
     }
@@ -378,12 +381,12 @@ final class ComponentCreatorImplementationFactory {
   /** Builder for a creator type defined by a {@code ComponentCreatorDescriptor}. */
   private final class BuilderForCreatorDescriptor extends Builder {
     final ComponentCreatorDescriptor creatorDescriptor;
-    private final BindingGraph graph;
+    private final Optional<BindingGraph> graph;
 
     BuilderForCreatorDescriptor(
         ComponentImplementation componentImplementation,
         ComponentCreatorDescriptor creatorDescriptor,
-        BindingGraph graph) {
+        Optional<BindingGraph> graph) {
       super(componentImplementation);
       this.creatorDescriptor = creatorDescriptor;
       this.graph = graph;
@@ -395,22 +398,21 @@ final class ComponentCreatorImplementationFactory {
     }
 
     @Override
-    protected Modifier visibility() {
+    protected Optional<Modifier> visibility() {
       if (componentImplementation.isAbstract()) {
         // The component creator class of a top-level component implementation in ahead-of-time
         // subcomponents mode must be public, not protected, because the creator's subclass will
         // be a sibling of the component subclass implementation, not nested.
-        return componentImplementation.isNested() ? PROTECTED : PUBLIC;
+        return Optional.of(componentImplementation.isNested() ? PROTECTED : PUBLIC);
       }
-      return PRIVATE;
+      return Optional.of(PRIVATE);
     }
 
     @Override
     protected void setSupertype() {
       if (componentImplementation.baseCreatorImplementation().isPresent()) {
         // If an abstract base implementation for this creator exists, extend that class.
-        classBuilder.superclass(
-            componentImplementation.baseCreatorImplementation().get().name());
+        classBuilder.superclass(componentImplementation.baseCreatorImplementation().get().name());
       } else {
         addSupertype(classBuilder, creatorDescriptor.typeElement());
       }
@@ -476,7 +478,7 @@ final class ComponentCreatorImplementationFactory {
      * Returns whether the given {@code requirement} is for a module type owned by the component.
      */
     private boolean isOwnedModule(ComponentRequirement requirement) {
-      return graph.ownedModuleTypes().contains(requirement.typeElement());
+      return graph.map(g -> g.ownedModuleTypes().contains(requirement.typeElement())).orElse(true);
     }
 
     private boolean hasBaseCreatorImplementation() {
@@ -516,8 +518,12 @@ final class ComponentCreatorImplementationFactory {
     }
 
     @Override
-    protected Modifier visibility() {
-      return PUBLIC;
+    protected Optional<Modifier> visibility() {
+      return componentImplementation
+          .componentDescriptor()
+          .typeElement()
+          .getModifiers()
+          .contains(PUBLIC) ? Optional.of(PUBLIC) : Optional.empty();
     }
 
     @Override
