@@ -24,17 +24,16 @@ import static com.google.common.collect.Iterables.getLast;
 import static com.google.common.collect.Iterables.indexOf;
 import static com.google.common.collect.Iterables.transform;
 import static com.google.common.collect.Lists.asList;
-import static dagger.internal.codegen.DaggerElements.DECLARATION_ORDER;
-import static dagger.internal.codegen.DaggerElements.closestEnclosingTypeElement;
-import static dagger.internal.codegen.DaggerElements.elementEncloses;
-import static dagger.internal.codegen.DaggerElements.elementFormatter;
-import static dagger.internal.codegen.DaggerElements.elementToString;
 import static dagger.internal.codegen.DaggerGraphs.shortestPath;
 import static dagger.internal.codegen.DaggerStreams.instancesOf;
 import static dagger.internal.codegen.DaggerStreams.presentValues;
 import static dagger.internal.codegen.DaggerStreams.toImmutableList;
 import static dagger.internal.codegen.DaggerStreams.toImmutableSet;
+import static dagger.internal.codegen.ElementFormatter.elementToString;
 import static dagger.internal.codegen.ValidationType.NONE;
+import static dagger.internal.codegen.langmodel.DaggerElements.DECLARATION_ORDER;
+import static dagger.internal.codegen.langmodel.DaggerElements.closestEnclosingTypeElement;
+import static dagger.internal.codegen.langmodel.DaggerElements.elementEncloses;
 import static java.util.Collections.min;
 import static java.util.Comparator.comparing;
 import static java.util.Comparator.comparingInt;
@@ -50,6 +49,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Table;
 import com.google.errorprone.annotations.FormatMethod;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.model.BindingGraph;
 import dagger.model.BindingGraph.ChildFactoryMethodEdge;
 import dagger.model.BindingGraph.ComponentNode;
@@ -77,6 +77,7 @@ final class DiagnosticReporterFactory {
   private final DaggerTypes types;
   private final Messager messager;
   private final DependencyRequestFormatter dependencyRequestFormatter;
+  private final ElementFormatter elementFormatter;
   private final CompilerOptions compilerOptions;
 
   @Inject
@@ -84,10 +85,12 @@ final class DiagnosticReporterFactory {
       DaggerTypes types,
       Messager messager,
       DependencyRequestFormatter dependencyRequestFormatter,
+      ElementFormatter elementFormatter,
       CompilerOptions compilerOptions) {
     this.types = types;
     this.messager = messager;
     this.dependencyRequestFormatter = dependencyRequestFormatter;
+    this.elementFormatter = elementFormatter;
     this.compilerOptions = compilerOptions;
   }
 
@@ -233,12 +236,14 @@ final class DiagnosticReporterFactory {
         Diagnostic.Kind diagnosticKind,
         CharSequence message,
         @NullableDecl Element elementToReport) {
-      if (graph.isModuleBindingGraph()) {
-        if (compilerOptions.moduleBindingValidationType().equals(NONE)) {
+      if (graph.isFullBindingGraph()) {
+        ValidationType validationType =
+            compilerOptions.fullBindingGraphValidationType(rootComponent);
+        if (validationType.equals(NONE)) {
           return;
         }
         if (diagnosticKind.equals(ERROR)) {
-          diagnosticKind = compilerOptions.moduleBindingValidationType().diagnosticKind().get();
+          diagnosticKind = validationType.diagnosticKind().get();
         }
       }
       reportedDiagnosticKinds.add(diagnosticKind);
@@ -296,12 +301,12 @@ final class DiagnosticReporterFactory {
       @Override
       public String toString() {
         StringBuilder message =
-            graph.isModuleBindingGraph()
+            graph.isFullBindingGraph()
                 ? new StringBuilder()
                 : new StringBuilder(dependencyTrace.size() * 100 /* a guess heuristic */);
 
-        // Print the dependency trace unless it's a module binding graph
-        if (!graph.isModuleBindingGraph()) {
+        // Print the dependency trace unless it's a full binding graph
+        if (!graph.isFullBindingGraph()) {
           dependencyTrace.forEach(
               edge ->
                   dependencyRequestFormatter.appendFormatLine(message, edge.dependencyRequest()));
@@ -316,7 +321,7 @@ final class DiagnosticReporterFactory {
                 // if printing entry points, skip entry points and the traced request
                 .filter(
                     request ->
-                        graph.isModuleBindingGraph()
+                        graph.isFullBindingGraph()
                             || (!request.isEntryPoint() && !isTracedRequest(request)))
                 .map(request -> request.dependencyRequest().requestElement())
                 .flatMap(presentValues())
@@ -324,14 +329,14 @@ final class DiagnosticReporterFactory {
         if (!requestsToPrint.isEmpty()) {
           message
               .append("\nIt is")
-              .append(graph.isModuleBindingGraph() ? " " : " also ")
+              .append(graph.isFullBindingGraph() ? " " : " also ")
               .append("requested at:");
-          elementFormatter().formatIndentedList(message, requestsToPrint, 1);
+          elementFormatter.formatIndentedList(message, requestsToPrint, 1);
         }
 
-        // Print the remaining entry points, showing which component they're in, unless we're in a
-        // module binding graph
-        if (!graph.isModuleBindingGraph() && entryPoints.size() > 1) {
+        // Print the remaining entry points, showing which component they're in, unless it's a full
+        // binding graph
+        if (!graph.isFullBindingGraph() && entryPoints.size() > 1) {
           message.append("\nThe following other entry points also depend on it:");
           entryPointFormatter.formatIndentedList(
               message,

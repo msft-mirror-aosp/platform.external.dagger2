@@ -17,13 +17,10 @@
 package dagger.internal.codegen;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.collect.Maps.transformValues;
 import static com.squareup.javapoet.MethodSpec.constructorBuilder;
 import static com.squareup.javapoet.MethodSpec.methodBuilder;
 import static com.squareup.javapoet.TypeSpec.classBuilder;
-import static dagger.internal.codegen.AnnotationSpecs.Suppression.RAWTYPES;
-import static dagger.internal.codegen.AnnotationSpecs.Suppression.UNCHECKED;
-import static dagger.internal.codegen.AnnotationSpecs.suppressWarnings;
-import static dagger.internal.codegen.CodeBlocks.makeParametersCodeBlock;
 import static dagger.internal.codegen.ContributionBinding.FactoryCreationStrategy.DELEGATE;
 import static dagger.internal.codegen.ContributionBinding.FactoryCreationStrategy.SINGLETON_INSTANCE;
 import static dagger.internal.codegen.GwtCompatibility.gwtIncompatibleAnnotation;
@@ -33,7 +30,11 @@ import static dagger.internal.codegen.SourceFiles.frameworkTypeUsageStatement;
 import static dagger.internal.codegen.SourceFiles.generateBindingFieldsForDependencies;
 import static dagger.internal.codegen.SourceFiles.generatedClassNameForBinding;
 import static dagger.internal.codegen.SourceFiles.parameterizedGeneratedTypeNameForBinding;
-import static dagger.internal.codegen.TypeNames.factoryOf;
+import static dagger.internal.codegen.javapoet.AnnotationSpecs.Suppression.RAWTYPES;
+import static dagger.internal.codegen.javapoet.AnnotationSpecs.Suppression.UNCHECKED;
+import static dagger.internal.codegen.javapoet.AnnotationSpecs.suppressWarnings;
+import static dagger.internal.codegen.javapoet.CodeBlocks.makeParametersCodeBlock;
+import static dagger.internal.codegen.javapoet.TypeNames.factoryOf;
 import static dagger.model.BindingKind.PROVISION;
 import static javax.lang.model.element.Modifier.FINAL;
 import static javax.lang.model.element.Modifier.PRIVATE;
@@ -54,6 +55,9 @@ import dagger.internal.Factory;
 import dagger.internal.Preconditions;
 import dagger.internal.codegen.InjectionMethods.InjectionSiteMethod;
 import dagger.internal.codegen.InjectionMethods.ProvisionMethod;
+import dagger.internal.codegen.javapoet.CodeBlocks;
+import dagger.internal.codegen.langmodel.DaggerElements;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.model.Key;
 import java.util.List;
 import java.util.Optional;
@@ -161,15 +165,13 @@ final class FactoryGenerator extends SourceFileGenerator<ProvisionBinding> {
     if (binding.requiresModuleInstance()) {
       uniqueFieldNames.claim("module");
     }
-    ImmutableMap.Builder<Key, FieldSpec> fields = ImmutableMap.builder();
-    generateBindingFieldsForDependencies(binding)
-        .forEach(
-            (key, frameworkField) -> {
-              TypeName type = frameworkField.type();
-              String name = uniqueFieldNames.getUniqueName(frameworkField.name());
-              fields.put(key, FieldSpec.builder(type, name, PRIVATE, FINAL).build());
-            });
-    return fields.build();
+    return ImmutableMap.copyOf(
+        transformValues(
+            generateBindingFieldsForDependencies(binding),
+            field ->
+                FieldSpec.builder(
+                        field.type(), uniqueFieldNames.getUniqueName(field.name()), PRIVATE, FINAL)
+                    .build()));
   }
 
   private void addCreateMethod(ProvisionBinding binding, TypeSpec.Builder factoryBuilder) {

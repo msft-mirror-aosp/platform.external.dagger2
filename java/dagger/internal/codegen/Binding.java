@@ -32,6 +32,7 @@ import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.model.BindingKind;
 import dagger.model.DependencyRequest;
 import dagger.model.Key;
@@ -82,6 +83,11 @@ abstract class Binding extends BindingDeclaration {
   /** The {@link BindingType} of this binding. */
   abstract BindingType bindingType();
 
+  /** The {@link FrameworkType} of this binding. */
+  final FrameworkType frameworkType() {
+    return FrameworkType.forBindingType(bindingType());
+  }
+
   /**
    * The explicit set of {@link DependencyRequest dependencies} required to satisfy this binding as
    * defined by the user-defined injection sites.
@@ -112,7 +118,7 @@ abstract class Binding extends BindingDeclaration {
    * union of {@link #explicitDependencies()} and {@link #implicitDependencies()}. This returns an
    * unmodifiable set.
    */
-  ImmutableSet<DependencyRequest> dependencies() {
+  final ImmutableSet<DependencyRequest> dependencies() {
     return dependencies.get();
   }
 
@@ -158,7 +164,7 @@ abstract class Binding extends BindingDeclaration {
   /* TODO(dpb): The stable-order postcondition is actually hard to verify in code for two equal
    * instances of Binding, because it really depends on the order of the binding's dependencies,
    * and two equal instances of Binding may have the same dependencies in a different order. */
-  ImmutableList<FrameworkDependency> frameworkDependencies() {
+  final ImmutableList<FrameworkDependency> frameworkDependencies() {
     return frameworkDependencies.get();
   }
 
@@ -206,7 +212,7 @@ abstract class Binding extends BindingDeclaration {
    * multiple times if the {@linkplain Binding#unresolved() unresolved} binding requires it. If that
    * distinction is not important, the entries can be merged into a single mapping.
    */
-  ImmutableList<DependencyAssociation> dependencyAssociations() {
+  final ImmutableList<DependencyAssociation> dependencyAssociations() {
     return dependencyAssociations.get();
   }
 
@@ -230,7 +236,8 @@ abstract class Binding extends BindingDeclaration {
    * Returns the mapping from each {@linkplain #dependencies dependency} to its associated {@link
    * FrameworkDependency}.
    */
-  ImmutableMap<DependencyRequest, FrameworkDependency> dependenciesToFrameworkDependenciesMap() {
+  final ImmutableMap<DependencyRequest, FrameworkDependency>
+      dependenciesToFrameworkDependenciesMap() {
     return frameworkDependenciesMap.get();
   }
 

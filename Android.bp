@@ -88,7 +88,6 @@ java_import_host {
     jars: ["lib/javax.inject-1.jar"],
 }
 
-
 java_import_host {
     name: "dagger2-bootstrap-compiler-jar",
     jars: ["java/dagger/internal/codegen/bootstrap_compiler_deploy.jar"],
@@ -152,12 +151,14 @@ java_plugin {
 
     srcs: [
         "java/dagger/internal/codegen/**/*.java",
+        "java/dagger/internal/codegen/**/*.proto",
 
         "java/dagger/model/*.java",
         "java/dagger/spi/*.java",
     ],
 
     exclude_srcs: [
+        "java/dagger/internal/codegen/BindingGraphStatisticsCollector.java",
         "java/dagger/internal/codegen/DaggerKythePlugin.java",
     ],
 
@@ -192,6 +193,11 @@ java_plugin {
         "dagger2-auto-annotation",
         "dagger2-bootstrap-compiler",
     ],
+
+    proto: {
+        type: "full",
+        include_dirs: ["external/protobuf/src/"],
+    },
 
     java_version: "1.8",
 }

@@ -16,9 +16,9 @@
 
 package dagger.internal.codegen;
 
+import static dagger.internal.codegen.BindingElementValidator.AllowsMultibindings.NO_MULTIBINDINGS;
+import static dagger.internal.codegen.BindingElementValidator.AllowsScoping.NO_SCOPING;
 import static dagger.internal.codegen.BindingMethodValidator.Abstractness.MUST_BE_ABSTRACT;
-import static dagger.internal.codegen.BindingMethodValidator.AllowsMultibindings.NO_MULTIBINDINGS;
-import static dagger.internal.codegen.BindingMethodValidator.AllowsScoping.NO_SCOPING;
 import static dagger.internal.codegen.BindingMethodValidator.ExceptionSuperclass.NO_EXCEPTIONS;
 import static dagger.internal.codegen.InjectionAnnotations.getQualifiers;
 import static dagger.internal.codegen.InjectionAnnotations.injectedConstructors;
@@ -29,6 +29,8 @@ import com.google.auto.common.MoreTypes;
 import com.google.common.collect.ImmutableSet;
 import dagger.BindsOptionalOf;
 import dagger.Module;
+import dagger.internal.codegen.langmodel.DaggerElements;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.producers.ProducerModule;
 import javax.inject.Inject;
 import javax.lang.model.element.ExecutableElement;
@@ -58,29 +60,33 @@ final class BindsOptionalOfMethodValidator extends BindingMethodValidator {
   }
 
   @Override
-  protected void checkMethod(ValidationReport.Builder<ExecutableElement> builder) {
-    super.checkMethod(builder);
-    checkParameters(builder);
+  protected ElementValidator elementValidator(ExecutableElement element) {
+    return new Validator(element);
   }
 
-  @Override
-  protected void checkKeyType(
-      ValidationReport.Builder<ExecutableElement> builder, TypeMirror keyType) {
-    super.checkKeyType(builder, keyType);
-    if (isValidImplicitProvisionKey(
-            getQualifiers(builder.getSubject()).stream().findFirst(), keyType, types)
-        && !injectedConstructors(MoreElements.asType(MoreTypes.asDeclared(keyType).asElement()))
-            .isEmpty()) {
-      builder.addError(
-          "@BindsOptionalOf methods cannot return unqualified types that have an @Inject-"
-              + "annotated constructor because those are always present");
+  private class Validator extends MethodValidator {
+    Validator(ExecutableElement element) {
+      super(element);
     }
-  }
 
-  @Override
-  protected void checkParameters(ValidationReport.Builder<ExecutableElement> builder) {
-    if (!builder.getSubject().getParameters().isEmpty()) {
-      builder.addError("@BindsOptionalOf methods cannot have parameters");
+    @Override
+    protected void checkKeyType(TypeMirror keyType) {
+      super.checkKeyType(keyType);
+      if (isValidImplicitProvisionKey(
+              getQualifiers(element).stream().findFirst(), keyType, types)
+          && !injectedConstructors(MoreElements.asType(MoreTypes.asDeclared(keyType).asElement()))
+              .isEmpty()) {
+        report.addError(
+            "@BindsOptionalOf methods cannot return unqualified types that have an @Inject-"
+                + "annotated constructor because those are always present");
+      }
+    }
+
+    @Override
+    protected void checkParameters() {
+      if (!element.getParameters().isEmpty()) {
+        report.addError("@BindsOptionalOf methods cannot have parameters");
+      }
     }
   }
 }
