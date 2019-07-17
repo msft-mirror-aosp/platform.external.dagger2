@@ -16,21 +16,21 @@
 
 package dagger.internal.codegen;
 
-import static dagger.internal.codegen.DaggerElements.getAllAnnotations;
+import static dagger.internal.codegen.langmodel.DaggerElements.getAllAnnotations;
 
 import com.google.common.collect.ImmutableSet;
 import dagger.multibindings.ElementsIntoSet;
 import dagger.multibindings.IntoMap;
 import dagger.multibindings.IntoSet;
 import javax.lang.model.element.AnnotationMirror;
-import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Element;
 
 /**
  * Utility methods related to processing {@link IntoSet}, {@link ElementsIntoSet}, and {@link
  * IntoMap}.
  */
 final class MultibindingAnnotations {
-  static ImmutableSet<AnnotationMirror> forMethod(ExecutableElement method) {
+  static ImmutableSet<AnnotationMirror> forElement(Element method) {
     return getAllAnnotations(method, IntoSet.class, ElementsIntoSet.class, IntoMap.class);
   }
 }

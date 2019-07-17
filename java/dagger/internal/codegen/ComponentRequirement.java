@@ -19,9 +19,9 @@ package dagger.internal.codegen;
 import static com.google.auto.common.MoreElements.getLocalAndInheritedMethods;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static dagger.internal.codegen.DaggerElements.isAnyAnnotationPresent;
 import static dagger.internal.codegen.SourceFiles.simpleVariableName;
 import static dagger.internal.codegen.Util.componentCanMakeNewInstances;
+import static dagger.internal.codegen.langmodel.DaggerElements.isAnyAnnotationPresent;
 import static javax.lang.model.element.Modifier.ABSTRACT;
 import static javax.lang.model.element.Modifier.STATIC;
 
@@ -34,6 +34,10 @@ import com.squareup.javapoet.TypeName;
 import dagger.Binds;
 import dagger.BindsOptionalOf;
 import dagger.Provides;
+import dagger.internal.codegen.langmodel.DaggerElements;
+import dagger.internal.codegen.langmodel.DaggerTypes;
+import dagger.internal.codegen.serialization.ComponentRequirementProto;
+import dagger.internal.codegen.serialization.ComponentRequirementProto.BoundInstanceRequirement;
 import dagger.model.BindingKind;
 import dagger.model.Key;
 import dagger.multibindings.Multibinds;
@@ -181,6 +185,29 @@ abstract class ComponentRequirement {
   /** Returns a parameter spec for this requirement. */
   ParameterSpec toParameterSpec() {
     return ParameterSpec.builder(TypeName.get(type()), variableName()).build();
+  }
+
+  /** Creates a proto representation of this requirement. */
+  ComponentRequirementProto toProto() {
+    switch (kind()) {
+      case DEPENDENCY:
+        return ComponentRequirementProto.newBuilder()
+            .setDependency(TypeProtoConverter.toProto(type()))
+            .build();
+      case MODULE:
+        return ComponentRequirementProto.newBuilder()
+            .setModule(TypeProtoConverter.toProto(type()))
+            .build();
+      case BOUND_INSTANCE:
+        return ComponentRequirementProto.newBuilder()
+            .setBoundInstance(
+                BoundInstanceRequirement.newBuilder()
+                    .setKey(KeyFactory.toProto(key().get()))
+                    .setNullable(overrideNullPolicy().equals(Optional.of(NullPolicy.ALLOW)))
+                    .setVariableName(variableName()))
+            .build();
+    }
+    throw new AssertionError(this);
   }
 
   static ComponentRequirement forDependency(TypeMirror type) {

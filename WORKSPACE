@@ -16,10 +16,19 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 http_archive(
     name = "google_bazel_common",
-    strip_prefix = "bazel-common-1c225e62390566a9e88916471948ddd56e5f111c",
-    urls = ["https://github.com/google/bazel-common/archive/1c225e62390566a9e88916471948ddd56e5f111c.zip"],
+    strip_prefix = "bazel-common-26011657fee96a949c66500b1662c4c7288a4968",
+    urls = ["https://github.com/google/bazel-common/archive/26011657fee96a949c66500b1662c4c7288a4968.zip"],
 )
 
 load("@google_bazel_common//:workspace_defs.bzl", "google_common_workspace_rules")
 
 google_common_workspace_rules()
+
+# This fixes an issue with protobuf starting to use zlib by default in 3.7.0.
+# TODO(ronshapiro): Figure out if this is in fact necessary, or if proto can depend on the
+# @bazel_tools library directly. See discussion in
+# https://github.com/protocolbuffers/protobuf/pull/5389#issuecomment-481785716
+bind(
+    name = "zlib",
+    actual = "@bazel_tools//third_party/zlib",
+)
