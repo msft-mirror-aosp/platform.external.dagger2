@@ -19,6 +19,7 @@ package dagger.internal.codegen;
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static dagger.internal.codegen.CompilerMode.DEFAULT_MODE;
 import static dagger.internal.codegen.CompilerMode.FAST_INIT_MODE;
+import static dagger.internal.codegen.Compilers.compilerWithOptions;
 import static dagger.internal.codegen.Compilers.daggerCompiler;
 import static dagger.internal.codegen.GeneratedLines.GENERATED_ANNOTATION;
 
@@ -128,7 +129,7 @@ public class MapBindingExpressionWithGuavaTest {
                 "package test;",
                 "",
                 GENERATED_ANNOTATION,
-                "public final class DaggerTestComponent implements TestComponent {")
+                "final class DaggerTestComponent implements TestComponent {")
             .addLinesIn(
                 FAST_INIT_MODE,
                 "  private volatile Provider<Integer> provideIntProvider;",
@@ -194,7 +195,7 @@ public class MapBindingExpressionWithGuavaTest {
                 DEFAULT_MODE, //
                 "        0, MapModule_ProvideIntFactory.create());")
             .addLinesIn(
-                FAST_INIT_MODE,
+                FAST_INIT_MODE, //
                 "        0, getProvideIntProvider());")
             .addLines(
                 "  }",
@@ -403,7 +404,7 @@ public class MapBindingExpressionWithGuavaTest {
             "import other.UsesInaccessible_Factory;",
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerTestComponent implements TestComponent {",
+            "final class DaggerTestComponent implements TestComponent {",
             "  @Override",
             "  public UsesInaccessible usesInaccessible() {",
             "    return UsesInaccessible_Factory.newInstance((Map) ImmutableMap.of());",
@@ -466,7 +467,7 @@ public class MapBindingExpressionWithGuavaTest {
             "package test;",
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerParent implements Parent {",
+            "final class DaggerParent implements Parent {",
             "  private final ParentModule parentModule;",
             "",
             "  private final class ChildImpl implements Child {",
@@ -522,7 +523,7 @@ public class MapBindingExpressionWithGuavaTest {
             "import dagger.producers.internal.CancellationListener;",
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerTestComponent implements TestComponent, "
+            "final class DaggerTestComponent implements TestComponent, "
                 + "CancellationListener {",
             "  @Override",
             "  public ListenableFuture<Map<String, String>> stringMap() {",
@@ -534,8 +535,10 @@ public class MapBindingExpressionWithGuavaTest {
             "  public void onProducerFutureCancelled(boolean mayInterruptIfRunning) {}",
             "}");
     Compilation compilation =
-        daggerCompiler()
-            .withOptions(compilerMode.javacopts())
+        compilerWithOptions(
+                compilerMode
+                , CompilerMode.JAVA7
+                )
             .compile(mapModuleFile, componentFile);
     assertThat(compilation).succeeded();
     assertThat(compilation)

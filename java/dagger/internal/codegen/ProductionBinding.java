@@ -17,7 +17,7 @@
 package dagger.internal.codegen;
 
 import static dagger.internal.codegen.DaggerStreams.toImmutableSet;
-import static dagger.internal.codegen.DaggerTypes.isFutureType;
+import static dagger.internal.codegen.langmodel.DaggerTypes.isFutureType;
 
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
@@ -66,7 +66,7 @@ abstract class ProductionBinding extends ContributionBinding {
     static ProductionKind fromProducesMethod(ExecutableElement producesMethod) {
       if (isFutureType(producesMethod.getReturnType())) {
         return FUTURE;
-      } else if (ContributionType.fromBindingMethod(producesMethod)
+      } else if (ContributionType.fromBindingElement(producesMethod)
               .equals(ContributionType.SET_VALUES)
           && isFutureType(SetType.from(producesMethod.getReturnType()).elementType())) {
         return SET_OF_FUTURE;

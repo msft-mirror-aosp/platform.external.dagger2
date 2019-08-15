@@ -24,6 +24,7 @@ import static dagger.internal.codegen.GeneratedLines.GENERATION_OPTIONS_ANNOTATI
 import static dagger.internal.codegen.GeneratedLines.IMPORT_GENERATED_ANNOTATION;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ObjectArrays;
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
 import javax.tools.JavaFileObject;
@@ -66,6 +67,9 @@ public final class AheadOfTimeSubcomponentsTest {
             GENERATED_ANNOTATION,
             "public abstract class DaggerLeaf implements Leaf {",
             "  protected DaggerLeaf() {}",
+            "",
+            "  @Override",
+            "  public abstract MissingInLeaf missingFromComponentMethod();",
             "}");
     Compilation compilation = compile(filesToCompile.build());
     assertThat(compilation).succeededWithoutWarnings();
@@ -162,6 +166,9 @@ public final class AheadOfTimeSubcomponentsTest {
             GENERATED_ANNOTATION,
             "public abstract class DaggerLeaf implements Leaf {",
             "  protected DaggerLeaf() {}",
+            "",
+            "  @Override",
+            "  public abstract MissingInLeaf missingComponentMethod();",
             "",
             "  @Override",
             "  public DependsOnComponentMethod dependsOnComponentMethod() {",
@@ -472,7 +479,7 @@ public final class AheadOfTimeSubcomponentsTest {
             IMPORT_GENERATED_ANNOTATION,
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerRoot implements Root {",
+            "final class DaggerRoot implements Root {",
             "  private DaggerRoot() {}",
             "",
             "  public static Builder builder() {",
@@ -488,7 +495,7 @@ public final class AheadOfTimeSubcomponentsTest {
             "    return new AncestorImpl();",
             "  }",
             "",
-            "  public static final class Builder {",
+            "  static final class Builder {",
             "    private Builder() {}",
             "",
             "    public Root build() {",
@@ -636,7 +643,7 @@ public final class AheadOfTimeSubcomponentsTest {
             IMPORT_GENERATED_ANNOTATION,
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerRoot implements Root {",
+            "final class DaggerRoot implements Root {",
             "  private DaggerRoot() {}",
             "",
             "  public static Builder builder() {",
@@ -652,7 +659,7 @@ public final class AheadOfTimeSubcomponentsTest {
             "    return new AncestorImpl();",
             "  }",
             "",
-            "  public static final class Builder {",
+            "  static final class Builder {",
             "    private Builder() {}",
             "",
             "    public Root build() {",
@@ -750,6 +757,9 @@ public final class AheadOfTimeSubcomponentsTest {
             "public abstract class DaggerAncestor implements Ancestor {",
             "  protected DaggerAncestor() {}",
             "",
+            "  @Override",
+            "  public abstract Leaf.Builder leaf();",
+            "",
             "  protected abstract class LeafImpl extends DaggerLeaf {",
             "    protected LeafImpl() {}",
             "  }",
@@ -779,7 +789,7 @@ public final class AheadOfTimeSubcomponentsTest {
             IMPORT_GENERATED_ANNOTATION,
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerRoot implements Root {",
+            "final class DaggerRoot implements Root {",
             "  private DaggerRoot() {}",
             "",
             "  public static Builder builder() {",
@@ -795,7 +805,7 @@ public final class AheadOfTimeSubcomponentsTest {
             "    return new AncestorImpl();",
             "  }",
             "",
-            "  public static final class Builder {",
+            "  static final class Builder {",
             "    private Builder() {}",
             "",
             "    public Root build() {",
@@ -938,7 +948,7 @@ public final class AheadOfTimeSubcomponentsTest {
             IMPORT_GENERATED_ANNOTATION,
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerRoot implements Root {",
+            "final class DaggerRoot implements Root {",
             "  private DaggerRoot() {}",
             "",
             "  public static Builder builder() {",
@@ -954,7 +964,7 @@ public final class AheadOfTimeSubcomponentsTest {
             "    return new MaybeLeafImpl();",
             "  }",
             "",
-            "  public static final class Builder {",
+            "  static final class Builder {",
             "    private Builder() {}",
             "",
             "    public Root build() {",
@@ -1098,7 +1108,11 @@ public final class AheadOfTimeSubcomponentsTest {
             "    return Optional.<SatisfiedInAncestor>empty();",
             "  }",
             "}");
-    Compilation compilation = compile(filesToCompile.build());
+    Compilation compilation =
+        compile(
+            filesToCompile.build()
+            , CompilerMode.JAVA7
+            );
     assertThat(compilation).succeededWithoutWarnings();
     assertThat(compilation)
         .generatedSourceFile("test.DaggerLeaf")
@@ -1154,7 +1168,11 @@ public final class AheadOfTimeSubcomponentsTest {
             "",
             "  }",
             "}");
-    compilation = compile(filesToCompile.build());
+    compilation =
+        compile(
+            filesToCompile.build()
+            , CompilerMode.JAVA7
+            );
     assertThat(compilation).succeededWithoutWarnings();
     assertThat(compilation)
         .generatedSourceFile("test.DaggerAncestor")
@@ -1208,7 +1226,11 @@ public final class AheadOfTimeSubcomponentsTest {
             "    return Optional.<SatisfiedInGrandAncestor>empty();",
             "  }",
             "}");
-    Compilation compilation = compile(filesToCompile.build());
+    Compilation compilation =
+        compile(
+            filesToCompile.build()
+            , CompilerMode.JAVA7
+            );
     assertThat(compilation).succeededWithoutWarnings();
     assertThat(compilation)
         .generatedSourceFile("test.DaggerLeaf")
@@ -1242,7 +1264,11 @@ public final class AheadOfTimeSubcomponentsTest {
             "    protected LeafImpl() {}",
             "  }",
             "}");
-    compilation = compile(filesToCompile.build());
+    compilation =
+        compile(
+            filesToCompile.build()
+            , CompilerMode.JAVA7
+            );
     assertThat(compilation).succeededWithoutWarnings();
     assertThat(compilation)
         .generatedSourceFile("test.DaggerAncestor")
@@ -1302,7 +1328,11 @@ public final class AheadOfTimeSubcomponentsTest {
             "    }",
             "  }",
             "}");
-    compilation = compile(filesToCompile.build());
+    compilation =
+        compile(
+            filesToCompile.build()
+            , CompilerMode.JAVA7
+            );
     assertThat(compilation).succeededWithoutWarnings();
     assertThat(compilation)
         .generatedSourceFile("test.DaggerGreatAncestor")
@@ -1371,7 +1401,11 @@ public final class AheadOfTimeSubcomponentsTest {
             "    return Optional.<SatisfiedInAncestor>empty();",
             "  }",
             "}");
-    Compilation compilation = compile(filesToCompile.build());
+    Compilation compilation =
+        compile(
+            filesToCompile.build()
+            , CompilerMode.JAVA7
+            );
     assertThat(compilation).succeededWithoutWarnings();
     assertThat(compilation)
         .generatedSourceFile("test.DaggerLeaf")
@@ -1426,7 +1460,11 @@ public final class AheadOfTimeSubcomponentsTest {
             "    }",
             "  }",
             "}");
-    compilation = compile(filesToCompile.build());
+    compilation =
+        compile(
+            filesToCompile.build()
+            , CompilerMode.JAVA7
+            );
     assertThat(compilation).succeededWithoutWarnings();
     assertThat(compilation)
         .generatedSourceFile("test.DaggerAncestor")
@@ -1455,12 +1493,17 @@ public final class AheadOfTimeSubcomponentsTest {
             "package test;",
             "",
             "import dagger.internal.GenerationOptions;",
+            "import java.util.Optional;",
             IMPORT_GENERATED_ANNOTATION,
             "",
             GENERATION_OPTIONS_ANNOTATION,
             GENERATED_ANNOTATION,
             "public abstract class DaggerLeaf implements Leaf {",
             "  protected DaggerLeaf() {}",
+            "",
+            "  @Override",
+            "  public abstract Optional<SatisfiedInGrandAncestor>",
+            "      boundInAncestorSatisfiedInGrandAncestor();",
             "}");
     Compilation compilation = compile(filesToCompile.build());
     assertThat(compilation).succeededWithoutWarnings();
@@ -1515,7 +1558,11 @@ public final class AheadOfTimeSubcomponentsTest {
             "    }",
             "  }",
             "}");
-    compilation = compile(filesToCompile.build());
+    compilation =
+        compile(
+            filesToCompile.build()
+            , CompilerMode.JAVA7
+            );
     assertThat(compilation).succeededWithoutWarnings();
     assertThat(compilation)
         .generatedSourceFile("test.DaggerAncestor")
@@ -1575,7 +1622,11 @@ public final class AheadOfTimeSubcomponentsTest {
             "    }",
             "  }",
             "}");
-    compilation = compile(filesToCompile.build());
+    compilation =
+        compile(
+            filesToCompile.build()
+            , CompilerMode.JAVA7
+            );
     assertThat(compilation).succeededWithoutWarnings();
     assertThat(compilation)
         .generatedSourceFile("test.DaggerGrandAncestor")
@@ -2037,7 +2088,7 @@ public final class AheadOfTimeSubcomponentsTest {
             IMPORT_GENERATED_ANNOTATION,
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerRoot implements Root {",
+            "final class DaggerRoot implements Root {",
             "  private DaggerRoot() {}",
             "",
             "  public static Builder builder() {",
@@ -2053,7 +2104,7 @@ public final class AheadOfTimeSubcomponentsTest {
             "    return new LeafImpl();",
             "  }",
             "",
-            "  public static final class Builder {",
+            "  static final class Builder {",
             "    private Builder() {}",
             "",
             "    @Deprecated",
@@ -2191,7 +2242,7 @@ public final class AheadOfTimeSubcomponentsTest {
             IMPORT_GENERATED_ANNOTATION,
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerRoot implements Root {",
+            "final class DaggerRoot implements Root {",
             "  private DaggerRoot() {}",
             "",
             "  public static Builder builder() {",
@@ -2207,7 +2258,7 @@ public final class AheadOfTimeSubcomponentsTest {
             "    return new LeafImpl();",
             "  }",
             "",
-            "  public static final class Builder {",
+            "  static final class Builder {",
             "    private Builder() {}",
             "",
             "    @Deprecated",
@@ -2379,7 +2430,7 @@ public final class AheadOfTimeSubcomponentsTest {
             IMPORT_GENERATED_ANNOTATION,
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerRoot implements Root {",
+            "final class DaggerRoot implements Root {",
             "  private DaggerRoot() {}",
             "",
             "  public static Builder builder() {",
@@ -2395,7 +2446,7 @@ public final class AheadOfTimeSubcomponentsTest {
             "    return new AncestorImpl();",
             "  }",
             "",
-            "  public static final class Builder {",
+            "  static final class Builder {",
             "    private Builder() {}",
             "",
             "    public Root build() {",
@@ -2630,7 +2681,7 @@ public final class AheadOfTimeSubcomponentsTest {
             "import javax.inject.Provider;",
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerRoot implements Root, CancellationListener {",
+            "final class DaggerRoot implements Root, CancellationListener {",
             "  private Provider<Executor> productionImplementationExecutorProvider;",
             "  private Provider<Root> rootProvider;",
             "  private Provider<ProductionComponentMonitor> monitorProvider;",
@@ -3153,6 +3204,10 @@ public final class AheadOfTimeSubcomponentsTest {
             "    return LeafModule_FromModuleFactory.fromModule(leafModule());",
             "  }",
             "",
+            "  @Override",
+            "  public abstract InducesDependenciesOnBuilderFields",
+            "      inducesDependenciesOnBuilderFields();",
+            "",
             "  protected LeafModule leafModule() {",
             "    return leafModule;",
             "  }",
@@ -3233,6 +3288,9 @@ public final class AheadOfTimeSubcomponentsTest {
             "public abstract class DaggerAncestor implements Ancestor {",
             "  protected DaggerAncestor() {}",
             "",
+            "  @Override",
+            "  public abstract Leaf.Builder leaf();",
+            "",
             "  protected abstract class LeafImpl extends DaggerLeaf {",
             "    private String inducedInSubclass;",
             "",
@@ -3283,7 +3341,7 @@ public final class AheadOfTimeSubcomponentsTest {
             IMPORT_GENERATED_ANNOTATION,
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerRoot implements Root {",
+            "final class DaggerRoot implements Root {",
             "  private DaggerRoot() {}",
             "",
             "  public static Builder builder() {",
@@ -3299,7 +3357,7 @@ public final class AheadOfTimeSubcomponentsTest {
             "    return new AncestorImpl();",
             "  }",
             "",
-            "  public static final class Builder {",
+            "  static final class Builder {",
             "    private Builder() {}",
             "",
             "    public Root build() {",
@@ -3477,7 +3535,7 @@ public final class AheadOfTimeSubcomponentsTest {
             IMPORT_GENERATED_ANNOTATION,
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerRoot implements Root {",
+            "final class DaggerRoot implements Root {",
             "  private DaggerRoot() {}",
             "",
             "  public static Builder builder() {",
@@ -3493,7 +3551,7 @@ public final class AheadOfTimeSubcomponentsTest {
             "    return new LeafBuilder();",
             "  }",
             "",
-            "  public static final class Builder {",
+            "  static final class Builder {",
             "    private Builder() {}",
             "",
             "    public Root build() {",
@@ -3632,7 +3690,7 @@ public final class AheadOfTimeSubcomponentsTest {
             IMPORT_GENERATED_ANNOTATION,
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerRoot implements Root {",
+            "final class DaggerRoot implements Root {",
             "  private final RepeatedModule repeatedModule;",
             "",
             "  private DaggerRoot(RepeatedModule repeatedModuleParam) {",
@@ -3652,7 +3710,7 @@ public final class AheadOfTimeSubcomponentsTest {
             "    return new LeafBuilder();",
             "  }",
             "",
-            "  public static final class Builder {",
+            "  static final class Builder {",
             "    private RepeatedModule repeatedModule;",
             "",
             "    private Builder() {}",
@@ -3741,6 +3799,9 @@ public final class AheadOfTimeSubcomponentsTest {
             GENERATED_ANNOTATION,
             "public abstract class DaggerLeaf implements Leaf {",
             "  protected DaggerLeaf() {}",
+            "",
+            "  @Override",
+            "  public abstract Object bindsWithMissingDependencyInLeaf();",
             "}");
     Compilation compilation = compile(filesToCompile.build());
     assertThat(compilation).succeededWithoutWarnings();
@@ -3781,7 +3842,7 @@ public final class AheadOfTimeSubcomponentsTest {
             IMPORT_GENERATED_ANNOTATION,
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerRoot implements Root {",
+            "final class DaggerRoot implements Root {",
             "  private DaggerRoot() {}",
             "",
             "  public static Builder builder() {",
@@ -3797,7 +3858,7 @@ public final class AheadOfTimeSubcomponentsTest {
             "    return new LeafImpl();",
             "  }",
             "",
-            "  public static final class Builder {",
+            "  static final class Builder {",
             "    private Builder() {}",
             "",
             "    public Root build() {",
@@ -3915,7 +3976,7 @@ public final class AheadOfTimeSubcomponentsTest {
             IMPORT_GENERATED_ANNOTATION,
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerRoot implements Root {",
+            "final class DaggerRoot implements Root {",
             "  private DaggerRoot() {}",
             "",
             "  public static Builder builder() {",
@@ -3931,7 +3992,7 @@ public final class AheadOfTimeSubcomponentsTest {
             "    return new LeafImpl();",
             "  }",
             "",
-            "  public static final class Builder {",
+            "  static final class Builder {",
             "    private Builder() {}",
             "",
             "    public Root build() {",
@@ -4117,7 +4178,7 @@ public final class AheadOfTimeSubcomponentsTest {
             "import javax.inject.Provider;",
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerRoot implements Root {",
+            "final class DaggerRoot implements Root {",
             "  private DaggerRoot() {}",
             "",
             "  public static Builder builder() {",
@@ -4133,7 +4194,7 @@ public final class AheadOfTimeSubcomponentsTest {
             "    return new LeafImpl();",
             "  }",
             "",
-            "  public static final class Builder {",
+            "  static final class Builder {",
             "    private Builder() {}",
             "",
             "    public Root build() {",
@@ -4287,6 +4348,9 @@ public final class AheadOfTimeSubcomponentsTest {
             "    return LeafModule_DepOnFooThingFactory.depOnFooThing(getThing());",
             "  }",
             "",
+            "  @Override",
+            "  public abstract WillInduceSetOfRunnable willInduceSetOfRunnable();",
+            "",
             "  protected abstract Thing getThing();",
             "}");
     Compilation compilation = compile(filesToCompile.build());
@@ -4434,6 +4498,9 @@ public final class AheadOfTimeSubcomponentsTest {
             GENERATED_ANNOTATION,
             "public abstract class DaggerMaybeLeaf implements MaybeLeaf {",
             "  protected DaggerMaybeLeaf() {}",
+            "",
+            "  @Override",
+            "  public abstract Inducer inducer();",
             "}");
     Compilation compilation = compile(filesToCompile.build());
     assertThat(compilation).succeededWithoutWarnings();
@@ -4567,6 +4634,9 @@ public final class AheadOfTimeSubcomponentsTest {
             GENERATED_ANNOTATION,
             "public abstract class DaggerLeaf implements Leaf {",
             "  protected DaggerLeaf() {}",
+            "",
+            "  @Override",
+            "  public abstract AtInjectRootScoped shouldBeEffectivelyMissingInLeaf();",
             "}");
     Compilation compilation = compile(filesToCompile.build());
     assertThat(compilation).succeededWithoutWarnings();
@@ -4595,7 +4665,7 @@ public final class AheadOfTimeSubcomponentsTest {
             IMPORT_GENERATED_ANNOTATION,
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerRoot implements Root {",
+            "final class DaggerRoot implements Root {",
             "  protected final class LeafImpl extends DaggerLeaf {",
             "    @Override",
             "    public AtInjectRootScoped shouldBeEffectivelyMissingInLeaf() {",
@@ -4709,7 +4779,7 @@ public final class AheadOfTimeSubcomponentsTest {
             IMPORT_GENERATED_ANNOTATION,
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerRoot implements Root {",
+            "final class DaggerRoot implements Root {",
             "  protected final class LeafImpl extends DaggerLeaf {",
             "    @Override",
             "    public Modified modified() {",
@@ -4928,7 +4998,7 @@ public final class AheadOfTimeSubcomponentsTest {
             "import a.Mod;",
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerRoot implements Root {",
+            "final class DaggerRoot implements Root {",
             "  private final class HasUnusedModuleLeafBuilder",
             "      extends DaggerHasUnusedModuleLeaf.Builder {",
             "    @Override",
@@ -5085,7 +5155,7 @@ public final class AheadOfTimeSubcomponentsTest {
             "package test;",
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerRoot implements Root {",
+            "final class DaggerRoot implements Root {",
             "  protected final class LeafImpl extends DaggerLeaf {",
             "    private LeafImpl() {}",
             "",
@@ -5386,7 +5456,7 @@ public final class AheadOfTimeSubcomponentsTest {
             "package test;",
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerRoot implements Root {",
+            "final class DaggerRoot implements Root {",
             "  protected final class AncestorImpl extends DaggerAncestor {",
             "    protected final class LeafImpl extends DaggerAncestor.LeafImpl {",
             "      @Override",
@@ -5536,7 +5606,7 @@ public final class AheadOfTimeSubcomponentsTest {
             "package test;",
             "",
             GENERATED_ANNOTATION,
-            "public final class DaggerRoot implements Root, CancellationListener {",
+            "final class DaggerRoot implements Root, CancellationListener {",
             "  private Producer<Dependency> dependencyProducer;",
             "  private Producer<Injected> replaceInjectWithProducesProducer;",
             "",
@@ -5598,7 +5668,10 @@ public final class AheadOfTimeSubcomponentsTest {
     }
   }
 
-  private static Compilation compile(Iterable<JavaFileObject> files) {
-    return compilerWithOptions(AHEAD_OF_TIME_SUBCOMPONENTS_MODE).compile(files);
+  private static Compilation compile(Iterable<JavaFileObject> files, CompilerMode... modes) {
+    return compilerWithOptions(
+            ObjectArrays.concat(
+                new CompilerMode[] {AHEAD_OF_TIME_SUBCOMPONENTS_MODE}, modes, CompilerMode.class))
+        .compile(files);
   }
 }

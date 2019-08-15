@@ -23,6 +23,7 @@ import static dagger.internal.codegen.Keys.isValidMembersInjectionKey;
 import static dagger.internal.codegen.RequestKinds.canBeSatisfiedByProductionBinding;
 import static javax.tools.Diagnostic.Kind.ERROR;
 
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.model.BindingGraph;
 import dagger.model.BindingGraph.ComponentNode;
 import dagger.model.BindingGraph.DependencyEdge;
@@ -54,7 +55,7 @@ final class MissingBindingValidator implements BindingGraphPlugin {
 
   @Override
   public void visitGraph(BindingGraph graph, DiagnosticReporter diagnosticReporter) {
-    // Don't report missing bindings when validating a full graph or a graph built from a
+    // Don't report missing bindings when validating a full binding graph or a graph built from a
     // subcomponent.
     if (graph.isFullBindingGraph() || graph.rootComponentNode().isSubcomponent()) {
       return;

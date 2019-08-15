@@ -18,10 +18,10 @@ package dagger.internal.codegen;
 
 import static com.google.auto.common.MoreElements.asExecutable;
 import static com.google.common.base.Preconditions.checkArgument;
-import static dagger.internal.codegen.Accessibility.isTypeAccessibleFrom;
-import static dagger.internal.codegen.CodeBlocks.toParametersCodeBlock;
 import static dagger.internal.codegen.InjectionMethods.ProvisionMethod.requiresInjectionMethod;
-import static dagger.internal.codegen.TypeNames.rawTypeName;
+import static dagger.internal.codegen.javapoet.CodeBlocks.toParametersCodeBlock;
+import static dagger.internal.codegen.javapoet.TypeNames.rawTypeName;
+import static dagger.internal.codegen.langmodel.Accessibility.isTypeAccessibleFrom;
 
 import com.google.auto.common.MoreTypes;
 import com.google.common.collect.ImmutableMap;
@@ -31,9 +31,13 @@ import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.TypeName;
 import dagger.internal.codegen.InjectionMethods.ProvisionMethod;
+import dagger.internal.codegen.javapoet.Expression;
+import dagger.internal.codegen.langmodel.DaggerElements;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.model.DependencyRequest;
 import java.util.Optional;
 import java.util.function.Function;
+import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.type.DeclaredType;
@@ -51,6 +55,7 @@ final class SimpleMethodBindingExpression extends SimpleInvocationBindingExpress
   private final ComponentRequirementExpressions componentRequirementExpressions;
   private final DaggerTypes types;
   private final DaggerElements elements;
+  private final SourceVersion sourceVersion;
 
   SimpleMethodBindingExpression(
       ResolvedBindings resolvedBindings,
@@ -59,7 +64,8 @@ final class SimpleMethodBindingExpression extends SimpleInvocationBindingExpress
       MembersInjectionMethods membersInjectionMethods,
       ComponentRequirementExpressions componentRequirementExpressions,
       DaggerTypes types,
-      DaggerElements elements) {
+      DaggerElements elements,
+      SourceVersion sourceVersion) {
     super(resolvedBindings);
     this.compilerOptions = compilerOptions;
     this.provisionBinding = (ProvisionBinding) resolvedBindings.contributionBinding();
@@ -72,6 +78,7 @@ final class SimpleMethodBindingExpression extends SimpleInvocationBindingExpress
     this.componentRequirementExpressions = componentRequirementExpressions;
     this.types = types;
     this.elements = elements;
+    this.sourceVersion = sourceVersion;
   }
 
   @Override
@@ -151,14 +158,15 @@ final class SimpleMethodBindingExpression extends SimpleInvocationBindingExpress
     if (provisionBinding.injectionSites().isEmpty()) {
       return Expression.create(simpleMethodReturnType(), instance);
     }
-    // Java 7 type inference can't figure out that instance in
-    // injectParameterized(Parameterized_Factory.newParameterized()) is Parameterized<T> and not
-    // Parameterized<Object>
-    if (!MoreTypes.asDeclared(provisionBinding.key().type()).getTypeArguments().isEmpty()) {
-      TypeName keyType = TypeName.get(provisionBinding.key().type());
-      instance = CodeBlock.of("($T) ($T) $L", keyType, rawTypeName(keyType), instance);
+    if (sourceVersion.compareTo(SourceVersion.RELEASE_7) <= 0) {
+      // Java 7 type inference can't figure out that instance in
+      // injectParameterized(Parameterized_Factory.newParameterized()) is Parameterized<T> and not
+      // Parameterized<Object>
+      if (!MoreTypes.asDeclared(provisionBinding.key().type()).getTypeArguments().isEmpty()) {
+        TypeName keyType = TypeName.get(provisionBinding.key().type());
+        instance = CodeBlock.of("($T) ($T) $L", keyType, rawTypeName(keyType), instance);
+      }
     }
-
     MethodSpec membersInjectionMethod = membersInjectionMethods.getOrCreate(provisionBinding.key());
     TypeMirror returnType =
         membersInjectionMethod.returnType.equals(TypeName.OBJECT)

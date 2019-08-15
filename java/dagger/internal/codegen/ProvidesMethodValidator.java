@@ -16,22 +16,22 @@
 
 package dagger.internal.codegen;
 
+import static dagger.internal.codegen.BindingElementValidator.AllowsMultibindings.ALLOWS_MULTIBINDINGS;
+import static dagger.internal.codegen.BindingElementValidator.AllowsScoping.ALLOWS_SCOPING;
 import static dagger.internal.codegen.BindingMethodValidator.Abstractness.MUST_BE_CONCRETE;
-import static dagger.internal.codegen.BindingMethodValidator.AllowsMultibindings.ALLOWS_MULTIBINDINGS;
-import static dagger.internal.codegen.BindingMethodValidator.AllowsScoping.ALLOWS_SCOPING;
 import static dagger.internal.codegen.BindingMethodValidator.ExceptionSuperclass.RUNTIME_EXCEPTION;
 
 import com.google.common.collect.ImmutableSet;
 import dagger.Module;
 import dagger.Provides;
+import dagger.internal.codegen.langmodel.DaggerElements;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.producers.ProducerModule;
 import javax.inject.Inject;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.VariableElement;
 
-/**
- * A validator for {@link Provides} methods.
- */
+/** A validator for {@link Provides} methods. */
 final class ProvidesMethodValidator extends BindingMethodValidator {
 
   private final DependencyRequestValidator dependencyRequestValidator;
@@ -55,15 +55,24 @@ final class ProvidesMethodValidator extends BindingMethodValidator {
   }
 
   @Override
-  protected void checkMethod(ValidationReport.Builder<ExecutableElement> builder) {
-    super.checkMethod(builder);
+  protected ElementValidator elementValidator(ExecutableElement element) {
+    return new Validator(element);
   }
 
-  /** Adds an error if a {@link Provides @Provides} method depends on a producer type. */
-  @Override
-  protected void checkParameter(
-      ValidationReport.Builder<ExecutableElement> builder, VariableElement parameter) {
-    super.checkParameter(builder, parameter);
-    dependencyRequestValidator.checkNotProducer(builder, parameter);
+  private class Validator extends MethodValidator {
+    Validator(ExecutableElement element) {
+      super(element);
+    }
+
+    @Override
+    protected void checkAdditionalMethodProperties() {
+    }
+
+    /** Adds an error if a {@link Provides @Provides} method depends on a producer type. */
+    @Override
+    protected void checkParameter(VariableElement parameter) {
+      super.checkParameter(parameter);
+      dependencyRequestValidator.checkNotProducer(report, parameter);
+    }
   }
 }
