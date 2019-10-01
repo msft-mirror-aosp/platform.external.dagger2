@@ -40,7 +40,11 @@ java_import_host {
 java_plugin {
     name: "dagger2-auto-service",
     processor_class: "com.google.auto.service.processor.AutoServiceProcessor",
-    static_libs: ["dagger2-auto-service-jar"],
+    static_libs: [
+        "dagger2-auto-common",
+        "dagger2-auto-service-jar",
+        "guava",
+    ],
 }
 
 java_import_host {
