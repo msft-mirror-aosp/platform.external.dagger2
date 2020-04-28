@@ -1,10 +1,11 @@
 package coffee;
 
-import dagger.Binds;
 import dagger.Module;
+import dagger.Provides;
 
 @Module
-abstract class PumpModule {
-  @Binds
-  abstract Pump providePump(Thermosiphon pump);
+class PumpModule {
+  @Provides Pump providePump(Thermosiphon pump) {
+    return pump;
+  }
 }
