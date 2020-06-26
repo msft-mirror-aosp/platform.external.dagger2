@@ -97,8 +97,9 @@ java_plugin {
     static_libs: ["dagger2-bootstrap-compiler-jar"],
 }
 
-java_library_host {
+java_library {
     name: "dagger2",
+    host_supported: true,
 
     srcs: [
         "java/dagger/*.java",
@@ -114,13 +115,15 @@ java_library_host {
     ],
 
     java_version: "1.8",
+    sdk_version: "core_current",
 }
 
 // build dagger2 producers library
 // ============================================================
 
-java_library_host {
+java_library {
     name: "dagger2-producers",
+    host_supported: true,
 
     srcs: ["java/dagger/producers/**/*.java"],
 
@@ -136,6 +139,7 @@ java_library_host {
     ],
 
     java_version: "1.8",
+    sdk_version: "core_current",
 }
 
 // build dagger2 compiler plugin
