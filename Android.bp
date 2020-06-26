@@ -169,14 +169,11 @@ java_plugin {
     java_resource_dirs: ["resources"],
 
     static_libs: [
+        "auto_common",
         "dagger2",
-        "dagger2-auto-common",
-        "dagger2-auto-factory",
-        "dagger2-auto-service",
-        "dagger2-auto-value",
-        "dagger2-google-java-format",
-        "dagger2-inject",
         "dagger2-producers",
+        "google_java_format",
+        "dagger2-inject",
         "guava",
         "javapoet",
     ],
@@ -185,14 +182,19 @@ java_plugin {
     jarjar_rules: "jarjar-rules.txt",
 
     libs: [
+        "auto_factory_annotations",
+        "auto_service_annotations",
+        "auto_value_annotations",
+        "auto_value_memoized_extension_annotations",
         "dagger2-android-annotation-stubs",
     ],
 
     plugins: [
-        "dagger2-auto-factory",
-        "dagger2-auto-service",
-        "dagger2-auto-value",
-        "dagger2-auto-annotation",
+        "auto_factory_plugin",
+        "auto_service_plugin",
+        "auto_value_plugin",
+        "auto_value_memoized_extension_plugin",
+        "auto_annotation_plugin",
         "dagger2-bootstrap-compiler",
     ],
 
