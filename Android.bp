@@ -86,11 +86,6 @@ java_import_host {
 }
 
 java_import_host {
-    name: "dagger2-inject",
-    jars: ["lib/javax.inject-1.jar"],
-}
-
-java_import_host {
     name: "dagger2-bootstrap-compiler-jar",
     jars: ["java/dagger/internal/codegen/bootstrap_compiler_deploy.jar"],
 }
@@ -113,9 +108,10 @@ java_library_host {
     ],
     exclude_srcs: ["java/dagger/android/**/*.java"],
 
-    static_libs: ["dagger2-inject"],
-
-    libs: ["guava"],
+    libs: [
+        "guava",
+        "jsr330",
+    ],
 
     java_version: "1.8",
 }
@@ -129,7 +125,6 @@ java_library_host {
     srcs: ["java/dagger/producers/**/*.java"],
 
     static_libs: [
-        "dagger2-inject",
         "error_prone_annotations",
     ],
 
@@ -137,6 +132,7 @@ java_library_host {
         "dagger2",
         "dagger2-android-annotation-stubs",
         "guava",
+        "jsr330",
     ],
 
     java_version: "1.8",
@@ -173,9 +169,9 @@ java_plugin {
         "dagger2",
         "dagger2-producers",
         "google_java_format",
-        "dagger2-inject",
         "guava",
         "javapoet",
+        "jsr330",
     ],
 
     // shade guava to avoid conflicts with guava embedded in Error Prone.
