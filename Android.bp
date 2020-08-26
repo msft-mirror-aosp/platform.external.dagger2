@@ -13,84 +13,6 @@
 // limitations under the License.
 
 java_import_host {
-    name: "dagger2-auto-common",
-    jars: ["lib/auto-common-0.10.jar"],
-}
-
-java_import_host {
-    name: "dagger2-auto-factory-jar",
-    jars: ["lib/auto-factory-1.0-beta6.jar"],
-}
-
-java_plugin {
-    name: "dagger2-auto-factory",
-    processor_class: "com.google.auto.factory.processor.AutoFactoryProcessor",
-    static_libs: [
-        "dagger2-auto-factory-jar",
-        "dagger2-auto-common",
-        "guava",
-        "javapoet",
-        "dagger2-google-java-format",
-    ],
-}
-
-java_import_host {
-    name: "dagger2-auto-service-jar",
-    jars: ["lib/auto-service-1.0-rc5.jar"],
-}
-
-java_import_host {
-    name: "dagger2-auto-service-annotations",
-    jars: ["lib/auto-service-annotations-1.0-rc5.jar"],
-}
-
-java_plugin {
-    name: "dagger2-auto-service",
-    processor_class: "com.google.auto.service.processor.AutoServiceProcessor",
-    static_libs: [
-        "dagger2-auto-common",
-        "dagger2-auto-service-jar",
-        "dagger2-auto-service-annotations",
-        "guava",
-    ],
-}
-
-java_import_host {
-    name: "dagger2-auto-value-jar",
-    jars: ["lib/auto-value-1.6.5.jar"],
-}
-
-java_import_host {
-    name: "dagger2-auto-value-annotations",
-    jars: ["lib/auto-value-annotations-1.6.5.jar"],
-}
-
-java_plugin {
-    name: "dagger2-auto-value",
-    processor_class: "com.google.auto.value.processor.AutoValueProcessor",
-    static_libs: [
-        "dagger2-auto-value-jar",
-        "dagger2-auto-value-annotations",
-    ],
-}
-
-java_plugin {
-    name: "dagger2-auto-annotation",
-    processor_class: "com.google.auto.value.processor.AutoAnnotationProcessor",
-    static_libs: ["dagger2-auto-value-jar"],
-}
-
-java_import_host {
-    name: "dagger2-google-java-format",
-    jars: ["lib/google-java-format-1.7-all-deps.jar"],
-}
-
-java_import_host {
-    name: "dagger2-inject",
-    jars: ["lib/javax.inject-1.jar"],
-}
-
-java_import_host {
     name: "dagger2-bootstrap-compiler-jar",
     jars: ["java/dagger/internal/codegen/bootstrap_compiler_deploy.jar"],
 }
@@ -102,8 +24,9 @@ java_plugin {
     static_libs: ["dagger2-bootstrap-compiler-jar"],
 }
 
-java_library_host {
+java_library {
     name: "dagger2",
+    host_supported: true,
 
     srcs: [
         "java/dagger/*.java",
@@ -113,23 +36,25 @@ java_library_host {
     ],
     exclude_srcs: ["java/dagger/android/**/*.java"],
 
-    static_libs: ["dagger2-inject"],
-
-    libs: ["guava"],
+    libs: [
+        "guava",
+        "jsr330",
+    ],
 
     java_version: "1.8",
+    sdk_version: "core_current",
 }
 
 // build dagger2 producers library
 // ============================================================
 
-java_library_host {
+java_library {
     name: "dagger2-producers",
+    host_supported: true,
 
     srcs: ["java/dagger/producers/**/*.java"],
 
     static_libs: [
-        "dagger2-inject",
         "error_prone_annotations",
     ],
 
@@ -137,9 +62,11 @@ java_library_host {
         "dagger2",
         "dagger2-android-annotation-stubs",
         "guava",
+        "jsr330",
     ],
 
     java_version: "1.8",
+    sdk_version: "core_current",
 }
 
 // build dagger2 compiler plugin
@@ -169,30 +96,32 @@ java_plugin {
     java_resource_dirs: ["resources"],
 
     static_libs: [
+        "auto_common",
         "dagger2",
-        "dagger2-auto-common",
-        "dagger2-auto-factory",
-        "dagger2-auto-service",
-        "dagger2-auto-value",
-        "dagger2-google-java-format",
-        "dagger2-inject",
         "dagger2-producers",
+        "google_java_format",
         "guava",
         "javapoet",
+        "jsr330",
     ],
 
     // shade guava to avoid conflicts with guava embedded in Error Prone.
     jarjar_rules: "jarjar-rules.txt",
 
     libs: [
+        "auto_factory_annotations",
+        "auto_service_annotations",
+        "auto_value_annotations",
+        "auto_value_memoized_extension_annotations",
         "dagger2-android-annotation-stubs",
     ],
 
     plugins: [
-        "dagger2-auto-factory",
-        "dagger2-auto-service",
-        "dagger2-auto-value",
-        "dagger2-auto-annotation",
+        "auto_factory_plugin",
+        "auto_service_plugin",
+        "auto_value_plugin",
+        "auto_value_memoized_extension_plugin",
+        "auto_annotation_plugin",
         "dagger2-bootstrap-compiler",
     ],
 
