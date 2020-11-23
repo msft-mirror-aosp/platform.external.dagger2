@@ -20,7 +20,7 @@ import static com.google.testing.compile.CompilationSubject.assertThat;
 import static dagger.internal.codegen.CompilerMode.DEFAULT_MODE;
 import static dagger.internal.codegen.CompilerMode.FAST_INIT_MODE;
 import static dagger.internal.codegen.Compilers.daggerCompiler;
-import static dagger.internal.codegen.GeneratedLines.GENERATED_ANNOTATION;
+import static dagger.internal.codegen.GeneratedLines.GENERATED_CODE_ANNOTATIONS;
 
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.CompilationSubject;
@@ -144,14 +144,14 @@ public class DelegateBindingExpressionTest {
                 .addLines(
                     "package test;",
                     "",
-                    GENERATED_ANNOTATION,
+                    GENERATED_CODE_ANNOTATIONS,
                     "final class DaggerTestComponent implements TestComponent {")
                 .addLinesIn(
                     FAST_INIT_MODE,
                     "  private volatile Object regularScoped = new MemoizedSentinel();",
                     "  private volatile ReusableScoped reusableScoped;",
                     "",
-                    "  private RegularScoped getRegularScoped() {",
+                    "  private RegularScoped regularScoped() {",
                     "    Object local = regularScoped;",
                     "    if (local instanceof MemoizedSentinel) {",
                     "      synchronized (local) {",
@@ -165,7 +165,7 @@ public class DelegateBindingExpressionTest {
                     "    return (RegularScoped) local;",
                     "  }",
                     "",
-                    "  private ReusableScoped getReusableScoped() {",
+                    "  private ReusableScoped reusableScoped() {",
                     "    Object local = reusableScoped;",
                     "    if (local == null) {",
                     "      local = new ReusableScoped();",
@@ -223,14 +223,14 @@ public class DelegateBindingExpressionTest {
                 .addLines(
                     "package test;",
                     "",
-                    GENERATED_ANNOTATION,
+                    GENERATED_CODE_ANNOTATIONS,
                     "final class DaggerTestComponent implements TestComponent {")
                 .addLinesIn(
                     FAST_INIT_MODE,
                     "  private volatile Object regularScoped = new MemoizedSentinel();",
                     "  private volatile ReusableScoped reusableScoped;",
                     "",
-                    "  private RegularScoped getRegularScoped() {",
+                    "  private RegularScoped regularScoped() {",
                     "    Object local = regularScoped;",
                     "    if (local instanceof MemoizedSentinel) {",
                     "      synchronized (local) {",
@@ -244,7 +244,7 @@ public class DelegateBindingExpressionTest {
                     "    return (RegularScoped) local;",
                     "  }",
                     "",
-                    "  private ReusableScoped getReusableScoped() {",
+                    "  private ReusableScoped reusableScoped() {",
                     "    Object local = reusableScoped;",
                     "    if (local == null) {",
                     "      local = new ReusableScoped();",
@@ -299,14 +299,14 @@ public class DelegateBindingExpressionTest {
                 .addLines(
                     "package test;",
                     "",
-                    GENERATED_ANNOTATION,
+                    GENERATED_CODE_ANNOTATIONS,
                     "final class DaggerTestComponent implements TestComponent {")
                 .addLinesIn(
                     FAST_INIT_MODE,
                     "  private volatile Object regularScoped = new MemoizedSentinel();",
                     "  private volatile ReusableScoped reusableScoped;",
                     "",
-                    "  private RegularScoped getRegularScoped() {",
+                    "  private RegularScoped regularScoped() {",
                     "    Object local = regularScoped;",
                     "    if (local instanceof MemoizedSentinel) {",
                     "      synchronized (local) {",
@@ -320,7 +320,7 @@ public class DelegateBindingExpressionTest {
                     "    return (RegularScoped) local;",
                     "  }",
                     "",
-                    "  private ReusableScoped getReusableScoped() {",
+                    "  private ReusableScoped reusableScoped() {",
                     "    Object local = reusableScoped;",
                     "    if (local == null) {",
                     "      local = new ReusableScoped();",
@@ -402,7 +402,7 @@ public class DelegateBindingExpressionTest {
                 .addLines(
                     "package test;",
                     "",
-                    GENERATED_ANNOTATION,
+                    GENERATED_CODE_ANNOTATIONS,
                     "final class DaggerTestComponent implements TestComponent {")
                 .addLinesIn(
                     DEFAULT_MODE,
@@ -422,7 +422,7 @@ public class DelegateBindingExpressionTest {
                     FAST_INIT_MODE,
                     "  private volatile Object subtype = new MemoizedSentinel();",
                     "",
-                    "  private Object getSubtype() {",
+                    "  private Object subtype() {",
                     "    Object local = subtype;",
                     "    if (local instanceof MemoizedSentinel) {",
                     "      synchronized (local) {",
@@ -438,7 +438,7 @@ public class DelegateBindingExpressionTest {
                     "",
                     "  @Override",
                     "  public Supertype supertype() {",
-                    "    return (Supertype) getSubtype();",
+                    "    return (Supertype) subtype();",
                     "  }")
                 .build());
   }
@@ -511,7 +511,7 @@ public class DelegateBindingExpressionTest {
                 .addLines(
                     "package test;",
                     "",
-                    GENERATED_ANNOTATION,
+                    GENERATED_CODE_ANNOTATIONS,
                     "final class DaggerTestComponent implements TestComponent {")
                 .addLinesIn(
                     DEFAULT_MODE,
@@ -528,7 +528,7 @@ public class DelegateBindingExpressionTest {
                     FAST_INIT_MODE,
                     "  private volatile Object subtype = new MemoizedSentinel();",
                     "",
-                    "  private Object getSubtype() {",
+                    "  private Object subtype() {",
                     "    Object local = subtype;",
                     "    if (local instanceof MemoizedSentinel) {",
                     "      synchronized (local) {",
@@ -544,7 +544,7 @@ public class DelegateBindingExpressionTest {
                     "",
                     "  @Override",
                     "  public UsesSupertype usesSupertype() {",
-                    "    return UsesSupertype_Factory.newInstance(getSubtype());",
+                    "    return UsesSupertype_Factory.newInstance(subtype());",
                     "  }")
                 .build());
   }
@@ -602,7 +602,7 @@ public class DelegateBindingExpressionTest {
                 .addLines(
                     "package test;",
                     "",
-                    GENERATED_ANNOTATION,
+                    GENERATED_CODE_ANNOTATIONS,
                     "final class DaggerTestComponent implements TestComponent {")
                 .addLinesIn(
                     DEFAULT_MODE,
@@ -620,7 +620,7 @@ public class DelegateBindingExpressionTest {
                     FAST_INIT_MODE,
                     "  private volatile Provider<String> provideStringProvider;",
                     "",
-                    "  private Provider<String> getStringProvider() {",
+                    "  private Provider<String> stringProvider() {",
                     "    Object local = provideStringProvider;",
                     "    if (local == null) {",
                     "      local = new SwitchingProvider<>(0);",
@@ -631,12 +631,12 @@ public class DelegateBindingExpressionTest {
                     "",
                     "  @Override",
                     "  public Provider<CharSequence> charSequence() {",
-                    "    return (Provider) getStringProvider();",
+                    "    return (Provider) stringProvider();",
                     "  }",
                     "",
                     "  @Override",
                     "  public Provider<String> namedString() {",
-                    "    return getStringProvider();",
+                    "    return stringProvider();",
                     "  }",
                     "",
                     "  private final class SwitchingProvider<T> implements Provider<T> {",
@@ -704,7 +704,7 @@ public class DelegateBindingExpressionTest {
                 .addLines(
                     "package test;",
                     "",
-                    GENERATED_ANNOTATION,
+                    GENERATED_CODE_ANNOTATIONS,
                     "final class DaggerTestComponent implements TestComponent {")
                 .addLinesIn(
                     DEFAULT_MODE,
@@ -721,7 +721,7 @@ public class DelegateBindingExpressionTest {
                     FAST_INIT_MODE,
                     "  private volatile Provider<String> provideStringProvider;",
                     "",
-                    "  private Provider<String> getStringProvider() {",
+                    "  private Provider<String> stringProvider() {",
                     "    Object local = provideStringProvider;",
                     "    if (local == null) {",
                     "      local = new SwitchingProvider<>(0);",
@@ -732,12 +732,12 @@ public class DelegateBindingExpressionTest {
                     "",
                     "  @Override",
                     "  public Provider<CharSequence> charSequence() {",
-                    "    return (Provider) getStringProvider();",
+                    "    return (Provider) stringProvider();",
                     "  }",
                     "",
                     "  @Override",
                     "  public Provider<Object> object() {",
-                    "    return (Provider) getStringProvider();",
+                    "    return (Provider) stringProvider();",
                     "  }",
                     "",
                     "  private final class SwitchingProvider<T> implements Provider<T> {",
@@ -810,7 +810,7 @@ public class DelegateBindingExpressionTest {
                 .addLines(
                     "package test;",
                     "",
-                    GENERATED_ANNOTATION,
+                    GENERATED_CODE_ANNOTATIONS,
                     "final class DaggerRequestsSubtypeAsProvider",
                     "    implements RequestsSubtypeAsProvider {")
                 .addLinesIn(
@@ -824,7 +824,7 @@ public class DelegateBindingExpressionTest {
                     FAST_INIT_MODE,
                     "  private volatile Provider subtypeProvider;",
                     "",
-                    "  private Provider getSubtypeProvider() {",
+                    "  private Provider subtypeProvider() {",
                     "    Object local = subtypeProvider;",
                     "    if (local == null) {",
                     "      local = new SwitchingProvider<>(0);",
@@ -835,7 +835,7 @@ public class DelegateBindingExpressionTest {
                     "",
                     "  @Override",
                     "  public Provider<Supertype> supertypeProvider() {",
-                    "    return getSubtypeProvider();",
+                    "    return subtypeProvider();",
                     "  }",
                     "",
                     "  private final class SwitchingProvider<T> implements Provider<T> {",
@@ -888,7 +888,7 @@ public class DelegateBindingExpressionTest {
             "@Singleton",
             "@Component(modules = TestModule.class)",
             "interface TestComponent {",
-            "  Provider<Object> getObject();",
+            "  Provider<Object> object();",
             "}");
 
     Compilation compilation = daggerCompiler()
@@ -903,7 +903,7 @@ public class DelegateBindingExpressionTest {
                 .addLines(
                     "package test;",
                     "",
-                    GENERATED_ANNOTATION,
+                    GENERATED_CODE_ANNOTATIONS,
                     "final class DaggerTestComponent implements TestComponent {")
                 .addLinesIn(
                     DEFAULT_MODE,
@@ -919,7 +919,7 @@ public class DelegateBindingExpressionTest {
                     "  }",
                     "",
                     "  @Override",
-                    "  public Provider<Object> getObject() {",
+                    "  public Provider<Object> object() {",
                     "    return bindStringProvider;",
                     "  }",
                     "}")
@@ -929,7 +929,7 @@ public class DelegateBindingExpressionTest {
                     "  private volatile Object object = new MemoizedSentinel();",
                     "  private volatile Provider<Object> bindStringProvider;",
                     "",
-                    "  private String getString() {",
+                    "  private String string() {",
                     "    Object local = string;",
                     "    if (local == null) {",
                     "      local = TestModule_ProvideStringFactory.provideString();",
@@ -938,13 +938,13 @@ public class DelegateBindingExpressionTest {
                     "    return (String) local;",
                     "  }",
                     "",
-                    "  private Object getObject2() {",
+                    "  private Object object2() {",
                     "    Object local = object;",
                     "    if (local instanceof MemoizedSentinel) {",
                     "      synchronized (local) {",
                     "        local = object;",
                     "        if (local instanceof MemoizedSentinel) {",
-                    "          local = getString();",
+                    "          local = string();",
                     "          object = DoubleCheck.reentrantCheck(object, local);",
                     "        }",
                     "      }",
@@ -953,7 +953,7 @@ public class DelegateBindingExpressionTest {
                     "  }",
                     "",
                     "  @Override",
-                    "  public Provider<Object> getObject() {",
+                    "  public Provider<Object> object() {",
                     "    Object local = bindStringProvider;",
                     "    if (local == null) {",
                     "      local = new SwitchingProvider<>(0);",
@@ -967,7 +967,7 @@ public class DelegateBindingExpressionTest {
                     "    @Override",
                     "    public T get() {",
                     "      switch (id) {",
-                    "        case 0: return (T) DaggerTestComponent.this.getObject2();",
+                    "        case 0: return (T) DaggerTestComponent.this.object2();",
                     "        default: throw new AssertionError(id);",
                     "      }",
                     "    }",

@@ -18,7 +18,7 @@ package dagger.internal.codegen;
 
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static dagger.internal.codegen.Compilers.daggerCompiler;
-import static dagger.internal.codegen.GeneratedLines.GENERATED_ANNOTATION;
+import static dagger.internal.codegen.GeneratedLines.GENERATED_CODE_ANNOTATIONS;
 import static dagger.internal.codegen.GeneratedLines.IMPORT_GENERATED_ANNOTATION;
 
 import com.google.testing.compile.Compilation;
@@ -99,7 +99,7 @@ public class SetBindingRequestFulfillmentWithGuavaTest {
             "",
             "import com.google.common.collect.ImmutableSet;",
             "",
-            GENERATED_ANNOTATION,
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerTestComponent implements TestComponent {",
             "  @Override",
             "  public Set<String> strings() {",
@@ -203,9 +203,9 @@ public class SetBindingRequestFulfillmentWithGuavaTest {
             "import other.UsesInaccessible;",
             "import other.UsesInaccessible_Factory;",
             "",
-            GENERATED_ANNOTATION,
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerTestComponent implements TestComponent {",
-            "  private Set getSetOfInaccessible2() {",
+            "  private Set setOfInaccessible2() {",
             "    return ImmutableSet.copyOf(TestModule_EmptySetFactory.emptySet());",
             "  }",
             "",
@@ -213,7 +213,7 @@ public class SetBindingRequestFulfillmentWithGuavaTest {
             "  public UsesInaccessible usesInaccessible() {",
             "    return UsesInaccessible_Factory.newInstance(",
             "        (Set) ImmutableSet.of(),",
-            "        (Set) getSetOfInaccessible2());",
+            "        (Set) setOfInaccessible2());",
             "  }",
             "}");
     Compilation compilation =
@@ -274,7 +274,7 @@ public class SetBindingRequestFulfillmentWithGuavaTest {
             "",
             "import com.google.common.collect.ImmutableSet;",
             "",
-            GENERATED_ANNOTATION,
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerParent implements Parent {",
             "  private final class ChildImpl implements Child {",
             "    @Override",
@@ -333,7 +333,7 @@ public class SetBindingRequestFulfillmentWithGuavaTest {
             "import java.util.Set;",
             IMPORT_GENERATED_ANNOTATION,
             "",
-            GENERATED_ANNOTATION,
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerTestComponent implements TestComponent, "
                 + "CancellationListener {",
             "  private DaggerTestComponent() {}",
@@ -346,14 +346,14 @@ public class SetBindingRequestFulfillmentWithGuavaTest {
             "    return new Builder().build();",
             "  }",
             "",
-            "  private Set<String> getSetOfString() {",
+            "  private Set<String> setOfString() {",
             "    return ImmutableSet.<String>copyOf(",
             "        EmptySetModule_EmptySetFactory.emptySet());",
             "  }",
             "",
             "  @Override",
             "  public ListenableFuture<Set<String>> strings() {",
-            "    return Futures.immediateFuture(getSetOfString());",
+            "    return Futures.immediateFuture(setOfString());",
             "  }",
             "",
             "  @Override",
