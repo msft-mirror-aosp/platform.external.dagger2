@@ -56,6 +56,7 @@ public class MissingBindingValidationTest {
         "interface Bar {}");
     Compilation compilation = daggerCompiler().compile(component, injectable, nonInjectable);
     assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
     assertThat(compilation)
         .hadErrorContaining("test.Bar cannot be provided without an @Provides-annotated method.")
         .inFile(component)
@@ -81,6 +82,7 @@ public class MissingBindingValidationTest {
             "}");
     Compilation compilation = daggerCompiler().compile(component);
     assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
     assertThat(compilation)
         .hadErrorContaining(
             "[Dagger/MissingBinding] test.TestClass.A cannot be provided "
@@ -110,6 +112,7 @@ public class MissingBindingValidationTest {
             "}");
     Compilation compilation = daggerCompiler().compile(component);
     assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
     assertThat(compilation)
         .hadErrorContaining(
             "[Dagger/MissingBinding] @test.TestClass.Q test.TestClass.A cannot be provided "
@@ -140,6 +143,7 @@ public class MissingBindingValidationTest {
 
     Compilation compilation = daggerCompiler().compile(component);
     assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
     assertThat(compilation)
         .hadErrorContaining(
             "test.TestClass.A cannot be provided without an @Inject constructor or an "
@@ -174,6 +178,7 @@ public class MissingBindingValidationTest {
 
     Compilation compilation = daggerCompiler().compile(component);
     assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
     assertThat(compilation)
         .hadErrorContaining(
             "test.TestClass.B cannot be provided without an @Inject constructor or an "
@@ -210,6 +215,7 @@ public class MissingBindingValidationTest {
 
     Compilation compilation = daggerCompiler().compile(self, component);
     assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
     assertThat(compilation)
         .hadErrorContaining("test.Self cannot be provided without an @Inject constructor")
         .inFile(component)
@@ -241,6 +247,7 @@ public class MissingBindingValidationTest {
             "}");
     Compilation compilation = daggerCompiler().compile(component, foo);
     assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
     assertThat(compilation)
         .hadErrorContaining(
             "test.Foo<? extends java.lang.Number> cannot be provided "
@@ -300,6 +307,7 @@ public class MissingBindingValidationTest {
 
     Compilation compilation = daggerCompiler().compile(component);
     assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
     assertThat(compilation)
         .hadErrorContaining(
             message(
@@ -354,6 +362,7 @@ public class MissingBindingValidationTest {
     Compilation compilation =
         daggerCompiler().compile(component, module, interfaceFile, implementationFile);
     assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
     assertThat(compilation)
         .hadErrorContaining(
             message(
@@ -363,7 +372,7 @@ public class MissingBindingValidationTest {
                 "        TestImplementation(missingBinding)",
                 "    TestImplementation is injected at",
                 "        TestModule.bindTestInterface(implementation)",
-                "    TestInterface is provided at",
+                "    TestInterface is requested at",
                 "        TestComponent.testInterface()"))
         .inFile(component)
         .onLineContaining("interface TestComponent");
@@ -408,6 +417,7 @@ public class MissingBindingValidationTest {
 
     Compilation compilation = daggerCompiler().compile(generic, testClass, usesTest, component);
     assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
     assertThat(compilation)
         .hadErrorContaining(
             message(
@@ -418,7 +428,7 @@ public class MissingBindingValidationTest {
                 "        test.Generic(t)",
                 "    test.Generic<test.TestClass> is injected at",
                 "        test.UsesTest(genericTestClass)",
-                "    test.UsesTest is provided at",
+                "    test.UsesTest is requested at",
                 "        test.TestComponent.usesTest()"));
   }
 
@@ -462,6 +472,7 @@ public class MissingBindingValidationTest {
 
     Compilation compilation = daggerCompiler().compile(generic, testClass, usesTest, component);
     assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
     assertThat(compilation)
         .hadErrorContaining(
             message(
@@ -472,7 +483,7 @@ public class MissingBindingValidationTest {
                 "        test.Generic.t",
                 "    test.Generic<test.TestClass> is injected at",
                 "        test.UsesTest(genericTestClass)",
-                "    test.UsesTest is provided at",
+                "    test.UsesTest is requested at",
                 "        test.TestComponent.usesTest()"));
   }
 
@@ -524,6 +535,7 @@ public class MissingBindingValidationTest {
 
     Compilation compilation = daggerCompiler().compile(parent, parentModule, child, childModule);
     assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
     assertThat(compilation)
         .hadErrorContainingMatch(
             "(?s)\\Qjava.lang.String cannot be provided\\E.*\\QChild.needsString()\\E")
@@ -599,6 +611,7 @@ public class MissingBindingValidationTest {
     Compilation compilation =
         daggerCompiler().compile(parent, parentModule, child, childModule, grandchild);
     assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
     assertThat(compilation)
         .hadErrorContainingMatch(
             "(?s)\\Qjava.lang.Double cannot be provided\\E.*"
@@ -646,6 +659,7 @@ public class MissingBindingValidationTest {
             "interface NotBound {}");
     Compilation compilation = daggerCompiler().compile(component, module, notBound);
     assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
     assertThat(compilation)
         .hadErrorContaining(
             message(
@@ -653,7 +667,7 @@ public class MissingBindingValidationTest {
                     + "test.NotBound cannot be provided without an @Provides-annotated method.",
                 "    test.NotBound is injected at",
                 "        test.TestModule.object(notBound)",
-                "    java.lang.Object is provided at",
+                "    java.lang.Object is requested at",
                 "        test.TestComponent.object()",
                 "It is also requested at:",
                 "    test.TestModule.string(notBound, …)",
@@ -705,12 +719,13 @@ public class MissingBindingValidationTest {
 
     Compilation compilation = daggerCompiler().compile(foo, component);
     assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
     assertThat(compilation)
         .hadErrorContaining(
             message(
                 "[Dagger/MissingBinding] java.lang.String cannot be provided without an @Inject "
                     + "constructor or an @Provides-annotated method.",
-                "    java.lang.String is provided at",
+                "    java.lang.String is requested at",
                 "        test.TestComponent.string()",
                 "It is also requested at:",
                 "    test.Foo(one, …)",
@@ -755,12 +770,13 @@ public class MissingBindingValidationTest {
 
     Compilation compilation = daggerCompiler().compile(component);
     assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
     assertThat(compilation)
         .hadErrorContaining(
             message(
                 "[Dagger/MissingBinding] java.lang.String cannot be provided without an @Inject "
                     + "constructor or an @Provides-annotated method.",
-                "    java.lang.String is provided at",
+                "    java.lang.String is requested at",
                 "        test.TestComponent.string1()",
                 "The following other entry points also depend on it:",
                 "    test.TestComponent.string2()",
@@ -777,4 +793,139 @@ public class MissingBindingValidationTest {
         .inFile(component)
         .onLineContaining("interface TestComponent");
   }
+
+  @Test
+  public void missingBindingInAllComponentsAndEntryPoints() {
+    JavaFileObject parent =
+        JavaFileObjects.forSourceLines(
+            "Parent",
+            "import dagger.Component;",
+            "",
+            "@Component",
+            "interface Parent {",
+            "  Foo foo();",
+            "  Bar bar();",
+            "  Child child();",
+            "}");
+    JavaFileObject child =
+        JavaFileObjects.forSourceLines(
+            "Child",
+            "import dagger.Subcomponent;",
+            "",
+            "@Subcomponent",
+            "interface Child {",
+            "  Foo foo();",
+            "  Baz baz();",
+            "}");
+    JavaFileObject foo =
+        JavaFileObjects.forSourceLines(
+            "Foo",
+            "import javax.inject.Inject;",
+            "",
+            "class Foo {",
+            "  @Inject Foo(Bar bar) {}",
+            "}");
+    JavaFileObject bar =
+        JavaFileObjects.forSourceLines(
+            "Bar",
+            "import javax.inject.Inject;",
+            "",
+            "class Bar {",
+            "  @Inject Bar(Baz baz) {}",
+            "}");
+    JavaFileObject baz = JavaFileObjects.forSourceLines("Baz", "class Baz {}");
+
+    Compilation compilation = daggerCompiler().compile(parent, child, foo, bar, baz);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
+    assertThat(compilation)
+        .hadErrorContaining(
+            message(
+                "[Dagger/MissingBinding] Baz cannot be provided without an @Inject constructor or "
+                    + "an @Provides-annotated method.",
+                "    Baz is injected at",
+                "        Bar(baz)",
+                "    Bar is requested at",
+                "        Parent.bar()",
+                "The following other entry points also depend on it:",
+                "    Parent.foo()",
+                "    Child.foo() [Parent → Child]",
+                "    Child.baz() [Parent → Child]"))
+        .inFile(parent)
+        .onLineContaining("interface Parent");
+  }
+
+  // Regression test for b/147423208 where if the same subcomponent was used
+  // in two different parts of the hierarchy and only one side had a missing binding
+  // incorrect caching during binding graph conversion might cause validation to pass
+  // incorrectly.
+  @Test
+  public void sameSubcomponentUsedInDifferentHierarchies() {
+    JavaFileObject parent = JavaFileObjects.forSourceLines("test.Parent",
+        "package test;",
+        "",
+        "import dagger.Component;",
+        "",
+        "@Component",
+        "interface Parent {",
+        "  Child1 getChild1();",
+        "  Child2 getChild2();",
+        "}");
+    JavaFileObject child1 = JavaFileObjects.forSourceLines("test.Child1",
+        "package test;",
+        "",
+        "import dagger.Subcomponent;",
+        "",
+        "@Subcomponent(modules = LongModule.class)",
+        "interface Child1 {",
+        "  RepeatedSub getSub();",
+        "}");
+    JavaFileObject child2 = JavaFileObjects.forSourceLines("test.Child2",
+        "package test;",
+        "",
+        "import dagger.Subcomponent;",
+        "",
+        "@Subcomponent",
+        "interface Child2 {",
+        "  RepeatedSub getSub();",
+        "}");
+    JavaFileObject repeatedSub = JavaFileObjects.forSourceLines("test.RepeatedSub",
+        "package test;",
+        "",
+        "import dagger.Subcomponent;",
+        "",
+        "@Subcomponent",
+        "interface RepeatedSub {",
+        "  Foo getFoo();",
+        "}");
+    JavaFileObject injectable = JavaFileObjects.forSourceLines("test.Foo",
+        "package test;",
+        "",
+        "import javax.inject.Inject;",
+        "",
+        "class Foo {",
+        "  @Inject Foo(Long value) {}",
+        "}");
+    JavaFileObject module = JavaFileObjects.forSourceLines("test.LongModule",
+        "package test;",
+        "",
+        "import dagger.Module;",
+        "import dagger.Provides;",
+        "",
+        "@Module",
+        "interface LongModule {",
+        "  @Provides static Long provideLong() {",
+        "    return 0L;",
+        "  }",
+        "}");
+    Compilation compilation = daggerCompiler().compile(
+        parent, child1, child2, repeatedSub, injectable, module);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
+    assertThat(compilation)
+        .hadErrorContaining("java.lang.Long cannot be provided without an @Inject constructor")
+        .inFile(parent)
+        .onLineContaining("interface Parent");
+  }
+
 }
