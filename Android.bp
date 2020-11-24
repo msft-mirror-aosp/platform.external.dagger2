@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+package {
+    default_visibility: [":__subpackages__"]
+}
+
 java_import_host {
     name: "dagger2-bootstrap-compiler-jar",
     jars: ["java/dagger/internal/codegen/bootstrap/bootstrap_compiler_deploy.jar"],
@@ -27,6 +31,7 @@ java_plugin {
 
 java_library {
     name: "dagger2",
+    visibility: ["//visibility:public"],
     host_supported: true,
 
     srcs: [
@@ -75,6 +80,7 @@ java_library {
 
 java_plugin {
     name: "dagger2-compiler",
+    visibility: ["//visibility:public"],
     processor_class: "dagger.internal.codegen.ComponentProcessor",
     generates_api: true,
     use_tools_jar: true,
