@@ -18,7 +18,7 @@ package dagger.internal.codegen;
 
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static dagger.internal.codegen.Compilers.daggerCompiler;
-import static dagger.internal.codegen.GeneratedLines.GENERATED_ANNOTATION;
+import static dagger.internal.codegen.GeneratedLines.GENERATED_CODE_ANNOTATIONS;
 import static dagger.internal.codegen.GeneratedLines.NPE_FROM_COMPONENT_METHOD;
 
 import com.google.testing.compile.Compilation;
@@ -76,7 +76,7 @@ public class ComponentRequirementFieldTest {
                 "test.DaggerTestComponent",
                 "package test;",
                 "",
-                GENERATED_ANNOTATION,
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  private final Integer i;",
                 "  private final List<String> list;",
@@ -174,7 +174,7 @@ public class ComponentRequirementFieldTest {
             "import other.OtherPackageModule;",
             "import other.OtherPackageModule_LFactory;",
             "",
-            GENERATED_ANNOTATION,
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerTestComponent implements TestComponent {",
             "  private final ParentModule parentModule;",
             "  private final OtherPackageModule otherPackageModule;",
@@ -247,7 +247,7 @@ public class ComponentRequirementFieldTest {
                 "test.DaggerTestComponent",
                 "package test;",
                 "",
-                GENERATED_ANNOTATION,
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  private final Dep dep;",
                 "",
@@ -361,7 +361,7 @@ public class ComponentRequirementFieldTest {
                 "test.DaggerTestComponent",
                 "package test;",
                 "",
-                GENERATED_ANNOTATION,
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  private final ParentModule parentModule;",
                 "",
@@ -370,15 +370,15 @@ public class ComponentRequirementFieldTest {
                 "  }",
                 "",
                 "  private final class TestSubcomponentImpl implements TestSubcomponent {",
-                "    private Set<Object> getSetOfObject() {",
+                "    private Set<Object> setOfObject() {",
                 "      return ImmutableSet.<Object>of(",
                 "          ParentModule_ContributionFactory.contribution(),",
                 "          ChildModule_ContributionFactory.contribution());",
                 "    }",
                 "",
-                "    private Object getObject() {",
+                "    private Object object() {",
                 "      return ParentModule_ReliesOnMultibindingFactory.reliesOnMultibinding(",
-                "          DaggerTestComponent.this.parentModule, getSetOfObject());",
+                "          DaggerTestComponent.this.parentModule, setOfObject());",
                 "    }",
                 "  }",
                 "}");
@@ -389,7 +389,7 @@ public class ComponentRequirementFieldTest {
                 "test.DaggerTestComponent",
                 "package test;",
                 "",
-                GENERATED_ANNOTATION,
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  private final ParentModule parentModule;",
                 "",
