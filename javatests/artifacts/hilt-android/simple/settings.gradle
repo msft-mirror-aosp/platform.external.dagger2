@@ -1,0 +1,4 @@
+rootProject.name='Simple Hilt Android'
+include ':app'
+include ':feature'
+include ':lib'

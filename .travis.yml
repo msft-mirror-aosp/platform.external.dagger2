@@ -19,8 +19,8 @@ android:
   components:
     - tools
     - tools # Duplicated as per https://github.com/travis-ci/travis-ci/issues/6040#issuecomment-219367943
-    - build-tools-26.0.2
-    - android-26
+    - build-tools-29.0.2
+    - android-29
     - platform-tools
     - extra-android-m2repository
 
@@ -28,23 +28,23 @@ before_install:
   - wget https://github.com/bazelbuild/bazel/releases/download/"${BAZEL_VERSION}"/bazel_"${BAZEL_VERSION}"-linux-x86_64.deb
   - sudo dpkg -i bazel_"${BAZEL_VERSION}"-linux-x86_64.deb
   - sudo rm -f /etc/mavenrc
-  - wget http://www.us.apache.org/dist/maven/maven-3/3.1.1/binaries/apache-maven-3.1.1-bin.tar.gz
-  - tar -zxf apache-maven-3.1.1-bin.tar.gz
-  - export PATH="$PWD/apache-maven-3.1.1/bin:$PATH"
+  - wget http://www.us.apache.org/dist/maven/maven-3/3.6.3/binaries/apache-maven-3.6.3-bin.tar.gz
+  - tar -zxf apache-maven-3.6.3-bin.tar.gz
+  - export PATH="$PWD/apache-maven-3.6.3/bin:$PATH"
   - mkdir travis_bin
   - ln -s $(which gcc-4.8) travis_bin/gcc
   - ln -s $(which g++-4.8) travis_bin/g++
   - export PATH="${PWD}/travis_bin:${PATH}"
 
 script:
-  - bazel test --test_output errors //...
-  - pushd examples && mvn compile && popd
+  - util/run-local-tests.sh --test_output=errors
 
 env:
   global:
     # Encrypted credentials for deploying snapshots.
-    - secure: eGc3LHBRIPmTnXLM1YoIqG1do9BkpFI2pJm3fz5Cd8UaXtf7Oefa+Ts3rcn4ipee5A+lf8kEouPshSoaQs81KZ2/qf8rSTCIqeFjHR8hzmOVYo/0zRfS/VSUT0yqN+jeRhuNk3+A49RTPlcfJqPv3tyddtrM1vF7axhCJPQIRJM=
-    - secure: LTzrlqcSNeZTOV52D3ibY9RBdxY4Yu8dUOYhAonrWLE+eDTzuoyCzcPw8pEcYVNUi1rG6Q7v3QBDTnBztsPoCbcN5tEGjw5cQEbfEzSTkWaNCFjncWn36cLwx9lgbF+5Db/L0mYJ36unDKUpKVC8AgOtxQibfv/ffugfxxj8ohY=
+    - secure: SV7y/nx47vwCCFJgyhZjlyC9tUneUpwe5XhEMLlj9oOpQRr4eqDumybZtKpKaxdtv13NMQ5rI9coWdO9L4TVjrJXAfG2rWoi7nXh8z0gDESVZLmCtiLPlC5zkAAur9X/6gIau5IizyliDVp7jrAI0f6Ywdd4FHcXl7t8laUzVWg=
+    - secure: P53TirBuYomoOqVTVnDb5Z7xc5qa5KICbkDCAdlo+Nwyb6be6Mr3rxJ0ozR201UpmCdOhGvvVpILTkakC0iF6nJc4gYjOoR95u9gNKWAsRE1tlvR4FX7o7n7aDyizaAyQXUFo5wWtLANHDvLUuf5du3xryMKJw1r9/oOpLxs+T0=
+
 
     # Encrypted GitHub access token to allow util/generate-latest-docs.sh to
     # push Javadoc to gh-pages.
@@ -53,7 +53,7 @@ env:
     # permission to push to the repo.
     - secure: "UpTUhCQzAGbr5JetRg2GZxp/dPDep/7Il3yGeyDECopciWdx41OPk/QNqAXBhNtKuEaMVsmASyoteuhgaTryQdV4qUIGVOMhES6kbOlYy3nwK44VdsNeeepwVospyDyZbxMtXq5LuHWuTADmAl1mdjNPNoziXc523zjnUzUx/EQ="
     - JDK_FOR_PUBLISHING: *jdk_for_publishing
-    - BAZEL_VERSION="0.24.1"
+    - BAZEL_VERSION="2.2.0"
 
 after_success:
   - util/generate-latest-docs.sh

@@ -12,9 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+package {
+    default_visibility: [":__subpackages__"]
+}
+
 java_import_host {
     name: "dagger2-bootstrap-compiler-jar",
-    jars: ["java/dagger/internal/codegen/bootstrap_compiler_deploy.jar"],
+    jars: ["java/dagger/internal/codegen/bootstrap/bootstrap_compiler_deploy.jar"],
 }
 
 java_plugin {
@@ -22,10 +26,12 @@ java_plugin {
     processor_class: "dagger.internal.codegen.ComponentProcessor",
     generates_api: true,
     static_libs: ["dagger2-bootstrap-compiler-jar"],
+    jarjar_rules: "jarjar-rules.txt",
 }
 
 java_library {
     name: "dagger2",
+    visibility: ["//visibility:public"],
     host_supported: true,
 
     srcs: [
@@ -74,6 +80,7 @@ java_library {
 
 java_plugin {
     name: "dagger2-compiler",
+    visibility: ["//visibility:public"],
     processor_class: "dagger.internal.codegen.ComponentProcessor",
     generates_api: true,
     use_tools_jar: true,
@@ -88,7 +95,7 @@ java_plugin {
 
     exclude_srcs: [
         "java/dagger/internal/codegen/BindingGraphStatisticsCollector.java",
-        "java/dagger/internal/codegen/DaggerKythePlugin.java",
+        "java/dagger/internal/codegen/kythe/DaggerKythePlugin.java",
     ],
 
     // Manually include META-INF/services/javax.annotation.processing.Processor
@@ -103,6 +110,8 @@ java_plugin {
         "guava",
         "javapoet",
         "jsr330",
+        "kotlin-stdlib",
+        "kotlinx_metadata_jvm",
     ],
 
     // shade guava to avoid conflicts with guava embedded in Error Prone.
