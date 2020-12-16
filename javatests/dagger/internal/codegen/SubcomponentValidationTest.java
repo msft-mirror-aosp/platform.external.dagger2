@@ -20,7 +20,7 @@ import static com.google.testing.compile.CompilationSubject.assertThat;
 import static dagger.internal.codegen.CompilerMode.DEFAULT_MODE;
 import static dagger.internal.codegen.CompilerMode.FAST_INIT_MODE;
 import static dagger.internal.codegen.Compilers.daggerCompiler;
-import static dagger.internal.codegen.GeneratedLines.GENERATED_ANNOTATION;
+import static dagger.internal.codegen.GeneratedLines.GENERATED_CODE_ANNOTATIONS;
 import static dagger.internal.codegen.GeneratedLines.IMPORT_GENERATED_ANNOTATION;
 
 import com.google.testing.compile.Compilation;
@@ -300,7 +300,7 @@ public class SubcomponentValidationTest {
         "",
         "@Subcomponent(modules = TestModule.class)",
         "interface ChildComponent {",
-        "  String getString();",
+        "  String string();",
         "}");
     Compilation compilation =
         daggerCompiler()
@@ -348,7 +348,7 @@ public class SubcomponentValidationTest {
         "",
         "@Subcomponent(modules = ChildModule.class)",
         "interface ChildComponent {",
-        "  Object getObject();",
+        "  Object object();",
         "}");
     JavaFileObject moduleFile = JavaFileObjects.forSourceLines("test.ChildModule",
         "package test;",
@@ -383,8 +383,8 @@ public class SubcomponentValidationTest {
             "@Component",
             "interface ParentComponent {",
             "  ChildComponent childComponent();",
-            "  Dep1 getDep1();",
-            "  Dep2 getDep2();",
+            "  Dep1 dep1();",
+            "  Dep2 dep2();",
             "}");
     JavaFileObject childComponentFile =
         JavaFileObjects.forSourceLines(
@@ -395,7 +395,7 @@ public class SubcomponentValidationTest {
             "",
             "@Subcomponent(modules = ChildModule.class)",
             "interface ChildComponent {",
-            "  Object getObject();",
+            "  Object object();",
             "}");
     JavaFileObject childModuleFile =
         JavaFileObjects.forSourceLines(
@@ -463,7 +463,7 @@ public class SubcomponentValidationTest {
             .addLines(
                 "package test;",
                 "",
-                GENERATED_ANNOTATION,
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerParentComponent implements ParentComponent {")
             .addLinesIn(
                 DEFAULT_MODE,
@@ -475,7 +475,7 @@ public class SubcomponentValidationTest {
                 "")
             .addLines(
                 "  @Override", //
-                "  public Dep1 getDep1() {")
+                "  public Dep1 dep1() {")
             .addLinesIn(
                 FAST_INIT_MODE,
                 "   Object local = dep1;",
@@ -496,7 +496,7 @@ public class SubcomponentValidationTest {
                 "  }", //
                 "",
                 "  @Override",
-                "  public Dep2 getDep2() {")
+                "  public Dep2 dep2() {")
             .addLinesIn(
                 FAST_INIT_MODE,
                 "   Object local = dep2;",
@@ -545,34 +545,34 @@ public class SubcomponentValidationTest {
                 "")
             .addLinesIn(
                 DEFAULT_MODE,
-                "    private NeedsDep1 getNeedsDep1() {",
+                "    private NeedsDep1 needsDep1() {",
                 "      return new NeedsDep1(DaggerParentComponent.this.dep1Provider.get());",
                 "    }")
             .addLinesIn(
                 FAST_INIT_MODE,
-                "    private NeedsDep1 getNeedsDep1() {",
-                "      return new NeedsDep1(DaggerParentComponent.this.getDep1());",
+                "    private NeedsDep1 needsDep1() {",
+                "      return new NeedsDep1(DaggerParentComponent.this.dep1());",
                 "    }")
             .addLines(
-                "    private A getA() {",
+                "    private A a() {",
                 "      return injectA(",
                 "          A_Factory.newInstance(",
-                "              getNeedsDep1(),")
+                "              needsDep1(),")
             .addLinesIn(
                 DEFAULT_MODE,
                 "              DaggerParentComponent.this.dep1Provider.get(),",
                 "              DaggerParentComponent.this.dep2Provider.get()));")
             .addLinesIn(
                 FAST_INIT_MODE,
-                "              DaggerParentComponent.this.getDep1(),",
-                "              DaggerParentComponent.this.getDep2()));")
+                "              DaggerParentComponent.this.dep1(),",
+                "              DaggerParentComponent.this.dep2()));")
             .addLines(
                 "    }",
                 "",
                 "    @Override",
-                "    public Object getObject() {",
+                "    public Object object() {",
                 "      return ChildModule_ProvideObjectFactory.provideObject(",
-                "          childModule, getA());",
+                "          childModule, a());",
                 "    }",
                 "",
                 "    @CanIgnoreReturnValue",
@@ -663,7 +663,7 @@ public class SubcomponentValidationTest {
             "",
             "import test.subpackage.Sub;",
             "",
-            GENERATED_ANNOTATION,
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerParentComponent implements ParentComponent {",
             "  @Override",
             "  public Foo.Sub newInstanceSubcomponent() {",
@@ -746,7 +746,7 @@ public class SubcomponentValidationTest {
             "test.DaggerParentComponent",
             "package test;",
             "",
-            GENERATED_ANNOTATION,
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerParentComponent implements ParentComponent {",
             "  @Override",
             "  public Sub newSubcomponent() {",
@@ -811,7 +811,7 @@ public class SubcomponentValidationTest {
         JavaFileObjects.forSourceLines(
             "DaggerParentComponent",
             "",
-            GENERATED_ANNOTATION,
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerParentComponent implements ParentComponent {",
             "  @Override",
             "  public Sub newSubcomponent() {",
@@ -888,7 +888,7 @@ public class SubcomponentValidationTest {
             "",
             "import top1.a.b.c.d.E;",
             "",
-            GENERATED_ANNOTATION,
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerParentComponent implements ParentComponent {",
             "  @Override",
             "  public E.F.Sub top1() {",
@@ -945,7 +945,7 @@ public class SubcomponentValidationTest {
             "test.DaggerC",
             "package test;",
             "",
-            GENERATED_ANNOTATION,
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerC implements C {",
             "  @Override",
             "  public Foo.C newInstanceC() {",
@@ -1007,7 +1007,7 @@ public class SubcomponentValidationTest {
             "",
             IMPORT_GENERATED_ANNOTATION,
             "",
-            GENERATED_ANNOTATION,
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerC implements C {",
             "  @Override",
             "  public C.Foo.Sub.Builder fooBuilder() {",
@@ -1019,7 +1019,7 @@ public class SubcomponentValidationTest {
             "    return new B_SubBuilder();",
             "  }",
             "",
-            // TODO(user): Reverse the order of subcomponent and builder so that subcomponent
+            // TODO(bcorso): Reverse the order of subcomponent and builder so that subcomponent
             // comes first.
             "  private final class F_SubBuilder implements C.Foo.Sub.Builder {",
             "    @Override",
