@@ -13,5 +13,5 @@ third_party {
   }
   version: "dagger-2.19.1"
   last_upgrade_date { year: 2020 month: 11 day: 18 }
-  license_type: PERMISSIVE
+  license_type: NOTICE
 }
