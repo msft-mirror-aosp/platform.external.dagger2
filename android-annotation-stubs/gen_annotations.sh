@@ -59,6 +59,7 @@ cat > ${f} <<EOF
 
 package net.ltgt.gradle.incap;
 public enum IncrementalAnnotationProcessorType {
+  AGGREGATING,
   DYNAMIC,
   ISOLATING
 }
