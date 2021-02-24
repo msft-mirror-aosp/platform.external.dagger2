@@ -22,11 +22,13 @@ android_library(
     srcs = [
         "ActivityComponent.java",
         "ActivityRetainedComponent.java",
-        "ApplicationComponent.java",
         "FragmentComponent.java",
         "ServiceComponent.java",
         "ViewComponent.java",
         "ViewWithFragmentComponent.java",
+    ],
+    exports = [
+        "//java/dagger/hilt/components",
     ],
     deps = [
         ":package_info",
@@ -35,6 +37,17 @@ android_library(
         "//java/dagger/hilt/android/scopes:activity_retained_scoped",
         "//java/dagger/hilt/components",
         "@google_bazel_common//third_party/java/jsr330_inject",
+    ],
+)
+
+android_library(
+    name = "view_model_component",
+    srcs = ["ViewModelComponent.java"],
+    deps = [
+        ":components",
+        ":package_info",
+        "//java/dagger/hilt:define_component",
+        "//java/dagger/hilt/android/scopes:view_model_scoped",
     ],
 )
 
