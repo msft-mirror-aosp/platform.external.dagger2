@@ -17,6 +17,7 @@
 package dagger.internal.codegen;
 
 import static com.google.testing.compile.CompilationSubject.assertThat;
+import static dagger.internal.codegen.Compilers.compilerWithOptions;
 import static dagger.internal.codegen.Compilers.daggerCompiler;
 import static dagger.internal.codegen.TestUtils.message;
 
@@ -66,20 +67,19 @@ public class MapMultibindingValidationTest {
     assertThat(compilation)
         .hadErrorContaining(
             "The same map key is bound more than once for "
-                + "java.util.Map<java.lang.String,java.lang.Object>");
+                + "Map<String,Object>");
     assertThat(compilation).hadErrorContaining("provideObjectForAKey()");
     assertThat(compilation).hadErrorContaining("provideObjectForAKeyAgain()");
     assertThat(compilation).hadErrorCount(1);
 
     compilation =
-        daggerCompiler()
-            .withOptions("-Adagger.fullBindingGraphValidation=ERROR")
+        compilerWithOptions("-Adagger.fullBindingGraphValidation=ERROR")
             .compile(module);
     assertThat(compilation).failed();
     assertThat(compilation)
         .hadErrorContaining(
             "The same map key is bound more than once for "
-                + "java.util.Map<java.lang.String,javax.inject.Provider<java.lang.Object>>")
+                + "Map<String,Provider<Object>>")
         .inFile(module)
         .onLineContaining("class MapModule");
     assertThat(compilation).hadErrorContaining("provideObjectForAKey()");
@@ -98,7 +98,7 @@ public class MapMultibindingValidationTest {
     assertThat(compilation)
         .hadErrorContaining(
             "The same map key is bound more than once for "
-                + "java.util.Map<java.lang.String,java.lang.Object>");
+                + "Map<String,Object>");
     assertThat(compilation).hadErrorCount(1);
 
     // If there's Map<K, V> and Map<K, Producer<V>>, report only Map<K, V>.
@@ -113,7 +113,7 @@ public class MapMultibindingValidationTest {
     assertThat(compilation)
         .hadErrorContaining(
             "The same map key is bound more than once for "
-                + "java.util.Map<java.lang.String,java.lang.Object>");
+                + "Map<String,Object>");
     assertThat(compilation).hadErrorCount(1);
 
     // If there's Map<K, Provider<V>> and Map<K, Producer<V>>, report only Map<K, Provider<V>>.
@@ -128,7 +128,7 @@ public class MapMultibindingValidationTest {
     assertThat(compilation)
         .hadErrorContaining(
             "The same map key is bound more than once for "
-                + "java.util.Map<java.lang.String,javax.inject.Provider<java.lang.Object>>");
+                + "Map<String,Provider<Object>>");
     assertThat(compilation).hadErrorCount(1);
 
     compilation = daggerCompiler().compile(module, component("Map<String, Object> objects();"));
@@ -136,7 +136,7 @@ public class MapMultibindingValidationTest {
     assertThat(compilation)
         .hadErrorContaining(
             "The same map key is bound more than once for "
-                + "java.util.Map<java.lang.String,java.lang.Object>");
+                + "Map<String,Object>");
     assertThat(compilation).hadErrorCount(1);
 
     compilation =
@@ -146,7 +146,7 @@ public class MapMultibindingValidationTest {
     assertThat(compilation)
         .hadErrorContaining(
             "The same map key is bound more than once for "
-                + "java.util.Map<java.lang.String,javax.inject.Provider<java.lang.Object>>");
+                + "Map<String,Provider<Object>>");
     assertThat(compilation).hadErrorCount(1);
 
     compilation =
@@ -157,7 +157,7 @@ public class MapMultibindingValidationTest {
     assertThat(compilation)
         .hadErrorContaining(
             "The same map key is bound more than once for "
-                + "java.util.Map<java.lang.String,dagger.producers.Producer<java.lang.Object>>");
+                + "Map<String,Producer<Object>>");
     assertThat(compilation).hadErrorCount(1);
   }
 
@@ -199,12 +199,12 @@ public class MapMultibindingValidationTest {
     assertThat(compilation)
         .hadErrorContaining(
             message(
-                "[Dagger/MapKeys] The same map key is bound more than once for "
-                    + "java.util.Map<test.MapModule.WrappedMapKey,java.lang.String>",
-                "    @Provides @IntoMap @test.MapModule.WrappedMapKey(\"foo\") String "
-                    + "test.MapModule.stringMapEntry1()",
-                "    @Provides @IntoMap @test.MapModule.WrappedMapKey(\"foo\") String "
-                    + "test.MapModule.stringMapEntry2()"))
+                "\033[1;31m[Dagger/MapKeys]\033[0m The same map key is bound more than once for "
+                    + "Map<MapModule.WrappedMapKey,String>",
+                "    @Provides @IntoMap @MapModule.WrappedMapKey(\"foo\") String "
+                    + "MapModule.stringMapEntry1()",
+                "    @Provides @IntoMap @MapModule.WrappedMapKey(\"foo\") String "
+                    + "MapModule.stringMapEntry2()"))
         .inFile(component)
         .onLineContaining("interface TestComponent");
   }
@@ -256,20 +256,19 @@ public class MapMultibindingValidationTest {
     assertThat(compilation).failed();
     assertThat(compilation)
         .hadErrorContaining(
-            "java.util.Map<java.lang.String,java.lang.Object>"
+            "Map<String,Object>"
                 + " uses more than one @MapKey annotation type");
     assertThat(compilation).hadErrorContaining("provideObjectForAKey()");
     assertThat(compilation).hadErrorContaining("provideObjectForBKey()");
     assertThat(compilation).hadErrorCount(1);
 
     compilation =
-        daggerCompiler()
-            .withOptions("-Adagger.fullBindingGraphValidation=ERROR")
+        compilerWithOptions("-Adagger.fullBindingGraphValidation=ERROR")
             .compile(module, stringKeyTwoFile);
     assertThat(compilation).failed();
     assertThat(compilation)
         .hadErrorContaining(
-            "java.util.Map<java.lang.String,javax.inject.Provider<java.lang.Object>>"
+            "Map<String,Provider<Object>>"
                 + " uses more than one @MapKey annotation type")
         .inFile(module)
         .onLineContaining("class MapModule");
@@ -289,7 +288,7 @@ public class MapMultibindingValidationTest {
     assertThat(compilation).failed();
     assertThat(compilation)
         .hadErrorContaining(
-            "java.util.Map<java.lang.String,java.lang.Object>"
+            "Map<String,Object>"
                 + " uses more than one @MapKey annotation type");
     assertThat(compilation).hadErrorCount(1);
 
@@ -305,7 +304,7 @@ public class MapMultibindingValidationTest {
     assertThat(compilation).failed();
     assertThat(compilation)
         .hadErrorContaining(
-            "java.util.Map<java.lang.String,java.lang.Object>"
+            "Map<String,Object>"
                 + " uses more than one @MapKey annotation type");
     assertThat(compilation).hadErrorCount(1);
 
@@ -321,7 +320,7 @@ public class MapMultibindingValidationTest {
     assertThat(compilation).failed();
     assertThat(compilation)
         .hadErrorContaining(
-            "java.util.Map<java.lang.String,javax.inject.Provider<java.lang.Object>>"
+            "Map<String,Provider<Object>>"
                 + " uses more than one @MapKey annotation type");
     assertThat(compilation).hadErrorCount(1);
 
@@ -331,7 +330,7 @@ public class MapMultibindingValidationTest {
     assertThat(compilation).failed();
     assertThat(compilation)
         .hadErrorContaining(
-            "java.util.Map<java.lang.String,java.lang.Object>"
+            "Map<String,Object>"
                 + " uses more than one @MapKey annotation type");
     assertThat(compilation).hadErrorCount(1);
 
@@ -344,7 +343,7 @@ public class MapMultibindingValidationTest {
     assertThat(compilation).failed();
     assertThat(compilation)
         .hadErrorContaining(
-            "java.util.Map<java.lang.String,javax.inject.Provider<java.lang.Object>>"
+            "Map<String,Provider<Object>>"
                 + " uses more than one @MapKey annotation type");
     assertThat(compilation).hadErrorCount(1);
 
@@ -357,7 +356,7 @@ public class MapMultibindingValidationTest {
     assertThat(compilation).failed();
     assertThat(compilation)
         .hadErrorContaining(
-            "java.util.Map<java.lang.String,dagger.producers.Producer<java.lang.Object>>"
+            "Map<String,Producer<Object>>"
                 + " uses more than one @MapKey annotation type");
     assertThat(compilation).hadErrorCount(1);
   }

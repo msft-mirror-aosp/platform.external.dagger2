@@ -18,12 +18,12 @@ package(default_visibility = ["//:src"])
 
 java_library(
     name = "android_compilers",
-    testonly = 1,
     srcs = ["AndroidCompilers.java"],
     deps = [
         "//java/dagger/hilt/android/processor/internal/androidentrypoint:processor_lib",
         "//java/dagger/hilt/android/processor/internal/customtestapplication:processor_lib",
         "//java/dagger/hilt/android/processor/internal/uninstallmodules:processor_lib",
+        "//java/dagger/hilt/android/processor/internal/viewmodel:processor_lib",
         "//java/dagger/hilt/processor/internal/aggregateddeps:processor_lib",
         "//java/dagger/hilt/processor/internal/definecomponent:processor_lib",
         "//java/dagger/hilt/processor/internal/generatesrootinput:processor_lib",
@@ -35,9 +35,4 @@ java_library(
         "@google_bazel_common//third_party/java/compile_testing",
         "@maven//:com_github_tschuchortdev_kotlin_compile_testing",
     ],
-)
-
-filegroup(
-    name = "srcs_filegroup",
-    srcs = glob(["*"]),
 )
