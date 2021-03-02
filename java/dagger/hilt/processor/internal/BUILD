@@ -54,16 +54,20 @@ java_library(
     name = "processors",
     srcs = [
         "AnnotationValues.java",
-        "KotlinMetadata.java",
         "Processors.java",
     ],
     deps = [
         ":classnames",
+        ":kotlin",
         ":processor_errors",
         "//java/dagger/internal/codegen/extension",
+        "//java/dagger/internal/codegen/kotlin",
+        "//java/dagger/internal/codegen/langmodel",
         "//java/dagger/internal/guava:base",
         "//java/dagger/internal/guava:collect",
         "@google_bazel_common//third_party/java/javapoet",
+        "@google_bazel_common//third_party/java/jsr305_annotations",
+        "@google_bazel_common//third_party/java/jsr330_inject",
         "@maven//:com_google_auto_auto_common",
         "@maven//:org_jetbrains_kotlin_kotlin_stdlib",
         "@maven//:org_jetbrains_kotlinx_kotlinx_metadata_jvm",
@@ -118,6 +122,7 @@ java_library(
     deps = [
         ":classnames",
         ":component_descriptor",
+        ":kotlin",
         ":processor_errors",
         ":processors",
         "//java/dagger/hilt/processor/internal/definecomponent:define_components",
@@ -125,6 +130,16 @@ java_library(
         "//java/dagger/internal/guava:base",
         "//java/dagger/internal/guava:collect",
         "@google_bazel_common//third_party/java/javapoet",
+        "@maven//:com_google_auto_auto_common",
+    ],
+)
+
+java_library(
+    name = "kotlin",
+    srcs = ["KotlinMetadataUtils.java"],
+    deps = [
+        "//:dagger_with_compiler",
+        "//java/dagger/internal/codegen/kotlin",
     ],
 )
 

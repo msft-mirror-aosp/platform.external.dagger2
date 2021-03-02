@@ -17,9 +17,8 @@
 package dagger.internal.codegen;
 
 import static com.google.testing.compile.CompilationSubject.assertThat;
-import static dagger.internal.codegen.Compilers.daggerCompiler;
+import static dagger.internal.codegen.Compilers.compilerWithOptions;
 import static dagger.internal.codegen.GeneratedLines.GENERATED_CODE_ANNOTATIONS;
-import static dagger.internal.codegen.GeneratedLines.NPE_FROM_COMPONENT_METHOD;
 
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
@@ -67,7 +66,7 @@ public class ComponentRequirementFieldTest {
             "  }",
             "}");
     Compilation compilation =
-        daggerCompiler().withOptions(compilerMode.javacopts()).compile(component);
+        compilerWithOptions(compilerMode.javacopts()).compile(component);
     assertThat(compilation).succeeded();
     assertThat(compilation)
         .generatedSourceFile("test.DaggerTestComponent")
@@ -162,8 +161,7 @@ public class ComponentRequirementFieldTest {
             "  long l();",
             "}");
     Compilation compilation =
-        daggerCompiler()
-            .withOptions(compilerMode.javacopts())
+        compilerWithOptions(compilerMode.javacopts())
             .compile(module, otherPackageModule, component);
     assertThat(compilation).succeeded();
     JavaFileObject generatedComponent =
@@ -236,8 +234,7 @@ public class ComponentRequirementFieldTest {
             "}");
 
     Compilation compilation =
-        daggerCompiler()
-            .withOptions(compilerMode.javacopts())
+        compilerWithOptions(compilerMode.javacopts())
             .compile(dependency, component, subcomponent);
     assertThat(compilation).succeeded();
     assertThat(compilation)
@@ -267,14 +264,13 @@ public class ComponentRequirementFieldTest {
                 "",
                 "  @Override",
                 "  public String methodOnDep() {",
-                "    return Preconditions.checkNotNull(",
-                "        dep.string(), " + NPE_FROM_COMPONENT_METHOD + " );",
+                "    return Preconditions.checkNotNullFromComponent(",
+                "        dep.string());",
                 "  }",
                 "",
                 "  @Override",
                 "  public Object otherMethodOnDep() {",
-                "    return Preconditions.checkNotNull(",
-                "        dep.object(), " + NPE_FROM_COMPONENT_METHOD + " );",
+                "    return Preconditions.checkNotNullFromComponent(dep.object());",
                 "  }",
                 "",
                 "  private final class TestSubcomponentImpl implements TestSubcomponent {",
@@ -425,8 +421,7 @@ public class ComponentRequirementFieldTest {
                 "}");
     }
     Compilation compilation =
-        daggerCompiler()
-            .withOptions(compilerMode.javacopts())
+        compilerWithOptions(compilerMode.javacopts())
             .compile(parentModule, childModule, component, subcomponent);
     assertThat(compilation).succeeded();
     assertThat(compilation)

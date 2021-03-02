@@ -30,7 +30,6 @@ android_library(
         "//java/dagger/hilt/android/internal/testing:test_application_component_manager",
         "//java/dagger/hilt/android/internal/testing:test_application_component_manager_holder",
         "//java/dagger/hilt/internal:component_manager",
-        "@google_bazel_common//third_party/java/jsr250_annotations",
     ],
     deps = [
         ":package_info",
@@ -45,6 +44,7 @@ android_library(
     exported_plugins = [
         "//java/dagger/hilt/processor/internal/root:plugin",
         "//java/dagger/hilt/android/processor/internal/androidentrypoint:plugin",
+        "//java/dagger/hilt/android/processor/internal/viewmodel:validation_plugin",
     ],
     exports = [
         ":hilt_android_rule",
@@ -171,6 +171,7 @@ android_library(
         ":package_info",
         ":uninstall_modules",
         "//java/dagger/hilt/android:artifact-lib",
+        "//java/dagger/hilt/testing:test_install_in",
     ],
 )
 
@@ -193,6 +194,8 @@ gen_maven_artifact(
         "//java/dagger/hilt/android/testing:hilt_test_application",
         "//java/dagger/hilt/android/testing:on_component_ready_runner",
         "//java/dagger/hilt/android/testing:package_info",
+        "//java/dagger/hilt/testing:test_install_in",
+        "//java/dagger/hilt/testing:package_info",
         "//java/dagger/hilt/android/testing:uninstall_modules",
     ],
     artifact_target_maven_deps = [
@@ -200,19 +203,20 @@ gen_maven_artifact(
         "androidx.annotation:annotation",
         "androidx.fragment:fragment",
         "androidx.lifecycle:lifecycle-viewmodel",
+        "androidx.lifecycle:lifecycle-viewmodel-savedstate",
         "androidx.multidex:multidex",
         "androidx.test:core",
         "com.google.code.findbugs:jsr305",
         "com.google.dagger:dagger",
         "com.google.dagger:hilt-android",
-        "javax.annotation:jsr250-api",
         "javax.inject:javax.inject",
         "junit:junit",
     ],
     artifact_target_maven_deps_banned = [
         "com.google.guava:guava",
+        "javax.annotation:jsr250-api",
     ],
-    javadoc_android_api_level = 29,
+    javadoc_android_api_level = 30,
     javadoc_exclude_packages = [
         "dagger.hilt.internal",
         "dagger.hilt.android.internal",
@@ -222,6 +226,7 @@ gen_maven_artifact(
     ],
     javadoc_srcs = [
         "//java/dagger/hilt:hilt_android_testing_filegroup",
+        "//java/dagger/hilt:hilt_testing_filegroup",
     ],
     manifest = "AndroidManifest.xml",
     packaging = "aar",
