@@ -25,15 +25,17 @@ import static java.util.stream.Collectors.joining;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import dagger.internal.codegen.base.ClearableCache;
 import java.lang.annotation.Annotation;
 import java.util.HashMap;
 import java.util.Map;
 import javax.inject.Inject;
+import javax.inject.Singleton;
 import javax.lang.model.element.ExecutableElement;
 
 /** Validates any binding method. */
-final class AnyBindingMethodValidator {
-
+@Singleton
+public final class AnyBindingMethodValidator implements ClearableCache {
   private final ImmutableMap<Class<? extends Annotation>, BindingMethodValidator> validators;
   private final Map<ExecutableElement, ValidationReport<ExecutableElement>> reports =
       new HashMap<>();
@@ -42,6 +44,11 @@ final class AnyBindingMethodValidator {
   AnyBindingMethodValidator(
       ImmutableMap<Class<? extends Annotation>, BindingMethodValidator> validators) {
     this.validators = validators;
+  }
+
+  @Override
+  public void clearCache() {
+    reports.clear();
   }
 
   /** Returns the binding method annotations considered by this validator. */
