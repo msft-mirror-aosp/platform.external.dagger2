@@ -22,8 +22,10 @@ import dagger.internal.codegen.base.ClearableCache;
 import dagger.internal.codegen.binding.BindingGraphFactory;
 import dagger.internal.codegen.binding.ModuleDescriptor;
 import dagger.internal.codegen.kotlin.KotlinMetadataFactory;
+import dagger.internal.codegen.validation.AnyBindingMethodValidator;
 import dagger.internal.codegen.validation.ComponentCreatorValidator;
 import dagger.internal.codegen.validation.ComponentValidator;
+import dagger.internal.codegen.validation.InjectValidator;
 import dagger.multibindings.IntoSet;
 
 /**
@@ -32,6 +34,14 @@ import dagger.multibindings.IntoSet;
  */
 @Module
 interface ProcessingRoundCacheModule {
+  @Binds
+  @IntoSet
+  ClearableCache anyBindingMethodValidator(AnyBindingMethodValidator cache);
+
+  @Binds
+  @IntoSet
+  ClearableCache injectValidator(InjectValidator cache);
+
   @Binds
   @IntoSet
   ClearableCache moduleDescriptorFactory(ModuleDescriptor.Factory cache);

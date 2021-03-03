@@ -16,16 +16,17 @@
 
 package dagger.internal.codegen.binding;
 
+import static com.google.auto.common.MoreTypes.asTypeElement;
 import static com.google.auto.common.MoreTypes.isType;
 import static com.google.auto.common.MoreTypes.isTypeOf;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.collect.Iterables.isEmpty;
 import static dagger.internal.codegen.base.RequestKinds.getRequestKind;
 import static dagger.internal.codegen.base.Util.reentrantComputeIfAbsent;
+import static dagger.internal.codegen.binding.AssistedInjectionAnnotations.isAssistedFactoryType;
 import static dagger.internal.codegen.binding.ComponentDescriptor.isComponentContributionMethod;
 import static dagger.internal.codegen.binding.SourceFiles.generatedMonitoringModuleName;
-import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
+import static dagger.model.BindingKind.ASSISTED_INJECTION;
 import static dagger.model.BindingKind.DELEGATE;
 import static dagger.model.BindingKind.INJECTION;
 import static dagger.model.BindingKind.OPTIONAL;
@@ -42,7 +43,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimaps;
-import com.google.common.collect.Sets;
 import dagger.MembersInjector;
 import dagger.Reusable;
 import dagger.internal.codegen.base.ClearableCache;
@@ -58,7 +58,6 @@ import dagger.producers.Produced;
 import dagger.producers.Producer;
 import dagger.producers.internal.ProductionExecutorModule;
 import java.util.ArrayDeque;
-import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -69,16 +68,17 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
-import java.util.function.Function;
 import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Singleton;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.TypeKind;
 
 /** A factory for {@link BindingGraph} objects. */
 @Singleton
 public final class BindingGraphFactory implements ClearableCache {
+
   private final DaggerElements elements;
   private final InjectBindingRegistry injectBindingRegistry;
   private final KeyFactory keyFactory;
@@ -115,7 +115,8 @@ public final class BindingGraphFactory implements ClearableCache {
   public BindingGraph create(
       ComponentDescriptor componentDescriptor, boolean createFullBindingGraph) {
     return bindingGraphConverter.convert(
-        createLegacyBindingGraph(Optional.empty(), componentDescriptor, createFullBindingGraph));
+        createLegacyBindingGraph(Optional.empty(), componentDescriptor, createFullBindingGraph),
+        createFullBindingGraph);
   }
 
   private LegacyBindingGraph createLegacyBindingGraph(
@@ -242,14 +243,11 @@ public final class BindingGraphFactory implements ClearableCache {
       }
     }
 
-    return LegacyBindingGraph.create(
+    return new LegacyBindingGraph(
         componentDescriptor,
-        requestResolver.getResolvedContributionBindings(),
-        requestResolver.getResolvedMembersInjectionBindings(),
-        subgraphs.build(),
-        requestResolver.getOwnedModules(),
-        requestResolver.getFactoryMethod(),
-        createFullBindingGraph);
+        ImmutableMap.copyOf(requestResolver.getResolvedContributionBindings()),
+        ImmutableMap.copyOf(requestResolver.getResolvedMembersInjectionBindings()),
+        ImmutableList.copyOf(subgraphs.build()));
   }
 
   /**
@@ -350,15 +348,6 @@ public final class BindingGraphFactory implements ClearableCache {
           componentDescriptor.childComponentsDeclaredByBuilderEntryPoints().values());
     }
 
-    /** Returns the optional factory method for this component. */
-    Optional<ExecutableElement> getFactoryMethod() {
-      return parentResolver
-          .flatMap(
-              parent ->
-                  parent.componentDescriptor.getFactoryMethodForChildComponent(componentDescriptor))
-          .map(method -> method.methodElement());
-    }
-
     /**
      * Returns the resolved contribution bindings for the given {@link Key}:
      *
@@ -376,65 +365,100 @@ public final class BindingGraphFactory implements ClearableCache {
      */
     ResolvedBindings lookUpBindings(Key requestKey) {
       Set<ContributionBinding> bindings = new LinkedHashSet<>();
-      bindings.addAll(getExplicitBindings(requestKey));
+      Set<ContributionBinding> multibindingContributions = new LinkedHashSet<>();
+      Set<MultibindingDeclaration> multibindingDeclarations = new LinkedHashSet<>();
+      Set<OptionalBindingDeclaration> optionalBindingDeclarations = new LinkedHashSet<>();
+      Set<SubcomponentDeclaration> subcomponentDeclarations = new LinkedHashSet<>();
 
-      ImmutableSet<ContributionBinding> multibindingContributions =
-          getAllMatchingBindingDeclarations(requestKey, this::getExplicitMultibindings);
-      ImmutableSet<MultibindingDeclaration> multibindingDeclarations =
-          getAllMatchingBindingDeclarations(requestKey, this::getMultibindingDeclarations);
+      // Gather all bindings, multibindings, optional, and subcomponent declarations/contributions.
+      ImmutableSet<Key> keysMatchingRequest = keysMatchingRequest(requestKey);
+      for (Resolver resolver : getResolverLineage()) {
+        bindings.addAll(resolver.getLocalExplicitBindings(requestKey));
 
-      syntheticMultibinding(requestKey, multibindingContributions, multibindingDeclarations)
-          .ifPresent(bindings::add);
+        for (Key key : keysMatchingRequest) {
+          multibindingContributions.addAll(resolver.getLocalExplicitMultibindings(key));
+          multibindingDeclarations.addAll(resolver.multibindingDeclarations.get(key));
+          subcomponentDeclarations.addAll(resolver.subcomponentDeclarations.get(key));
+          // The optional binding declarations are keyed by the unwrapped type.
+          keyFactory.unwrapOptional(key)
+              .map(resolver.optionalBindingDeclarations::get)
+              .ifPresent(optionalBindingDeclarations::addAll);
+        }
+      }
 
-      ImmutableSet<OptionalBindingDeclaration> optionalBindingDeclarations =
-          getAllMatchingBindingDeclarations(requestKey, this::getOptionalBindingDeclarations);
-      syntheticOptionalBinding(requestKey, optionalBindingDeclarations).ifPresent(bindings::add);
+      // Add synthetic multibinding
+      if (!multibindingContributions.isEmpty() || !multibindingDeclarations.isEmpty()) {
+        bindings.add(bindingFactory.syntheticMultibinding(requestKey, multibindingContributions));
+      }
 
-      ImmutableSet<SubcomponentDeclaration> subcomponentDeclarations =
-          getSubcomponentDeclarations(requestKey);
-      syntheticSubcomponentBuilderBinding(subcomponentDeclarations)
-          .ifPresent(
-              binding -> {
-                bindings.add(binding);
-                addSubcomponentToOwningResolver(binding);
-              });
+      // Add synthetic optional binding
+      if (!optionalBindingDeclarations.isEmpty()) {
+        bindings.add(
+            bindingFactory.syntheticOptionalBinding(
+                requestKey,
+                getRequestKind(OptionalType.from(requestKey).valueType()),
+                lookUpBindings(keyFactory.unwrapOptional(requestKey).get()).bindings()));
+      }
 
+      // Add subcomponent creator binding
+      if (!subcomponentDeclarations.isEmpty()) {
+        ProvisionBinding binding =
+            bindingFactory.subcomponentCreatorBinding(
+                ImmutableSet.copyOf(subcomponentDeclarations));
+        bindings.add(binding);
+        addSubcomponentToOwningResolver(binding);
+      }
+
+      // Add members injector binding
       if (isType(requestKey.type()) && isTypeOf(MembersInjector.class, requestKey.type())) {
         injectBindingRegistry
             .getOrFindMembersInjectorProvisionBinding(requestKey)
             .ifPresent(bindings::add);
       }
 
+      // Add Assisted Factory binding
+      if (isType(requestKey.type())
+          && requestKey.type().getKind() == TypeKind.DECLARED
+          && isAssistedFactoryType(asTypeElement(requestKey.type()))) {
+        bindings.add(
+            bindingFactory.assistedFactoryBinding(
+                asTypeElement(requestKey.type()), Optional.of(requestKey.type())));
+      }
+
       // If there are no bindings, add the implicit @Inject-constructed binding if there is one.
       if (bindings.isEmpty()) {
-        injectBindingRegistry.getOrFindProvisionBinding(requestKey)
-            .filter(binding -> !isIncorrectlyScopedInPartialGraph(binding))
+        injectBindingRegistry
+            .getOrFindProvisionBinding(requestKey)
+            .filter(this::isCorrectlyScopedInSubcomponent)
             .ifPresent(bindings::add);
       }
 
       return ResolvedBindings.forContributionBindings(
           requestKey,
-          indexBindingsByOwningComponent(requestKey, ImmutableSet.copyOf(bindings)),
+          Multimaps.index(bindings, binding -> getOwningComponent(requestKey, binding)),
           multibindingDeclarations,
           subcomponentDeclarations,
           optionalBindingDeclarations);
     }
 
     /**
-     * Returns true if this binding graph resolution is for a partial graph and the {@code @Inject}
-     * binding's scope doesn't match any of the components in the current component ancestry. If so,
-     * the binding is not owned by any of the currently known components, and will be owned by a
-     * future ancestor (or, if never owned, will result in an incompatibly scoped binding error at
-     * the root component).
+     * Returns true if this binding graph resolution is for a subcomponent and the {@code @Inject}
+     * binding's scope correctly matches one of the components in the current component ancestry.
+     * If not, it means the binding is not owned by any of the currently known components, and will
+     * be owned by a future ancestor (or, if never owned, will result in an incompatibly scoped
+     * binding error at the root component).
      */
-    private boolean isIncorrectlyScopedInPartialGraph(ProvisionBinding binding) {
-      checkArgument(binding.kind().equals(INJECTION));
+    private boolean isCorrectlyScopedInSubcomponent(ProvisionBinding binding) {
+      checkArgument(binding.kind() == INJECTION || binding.kind() == ASSISTED_INJECTION);
+      if (!rootComponent().isSubcomponent()
+          || !binding.scope().isPresent()
+          || binding.scope().get().isReusable()) {
+        return true;
+      }
+
       Resolver owningResolver = getOwningResolver(binding).orElse(this);
       ComponentDescriptor owningComponent = owningResolver.componentDescriptor;
-      return rootComponent().isSubcomponent()
-          && binding.scope().isPresent()
-          && !binding.scope().get().isReusable()
-          && !owningComponent.scopes().contains(binding.scope().get());
+      return owningComponent.scopes().contains(binding.scope().get());
     }
 
     private ComponentDescriptor rootComponent() {
@@ -497,60 +521,6 @@ public final class BindingGraphFactory implements ClearableCache {
       return keys.build();
     }
 
-    /**
-     * Returns a synthetic binding that depends on individual multibinding contributions.
-     *
-     * <p>If there are no {@code multibindingContributions} or {@code multibindingDeclarations},
-     * returns {@link Optional#empty()}.
-     *
-     * <p>If there are production {@code multibindingContributions} or the request is for any of the
-     * following types, returns a {@link ProductionBinding}.
-     *
-     * <ul>
-     *   <li>{@code Set<Produced<T>>}
-     *   <li>{@code Map<K, Producer<V>>}
-     *   <li>{@code Map<K, Produced<V>>}
-     * </ul>
-     *
-     * Otherwise, returns a {@link ProvisionBinding}.
-     */
-    private Optional<ContributionBinding> syntheticMultibinding(
-        Key key,
-        Iterable<ContributionBinding> multibindingContributions,
-        Iterable<MultibindingDeclaration> multibindingDeclarations) {
-      return isEmpty(multibindingContributions) && isEmpty(multibindingDeclarations)
-          ? Optional.empty()
-          : Optional.of(bindingFactory.syntheticMultibinding(key, multibindingContributions));
-    }
-
-    private Optional<ProvisionBinding> syntheticSubcomponentBuilderBinding(
-        ImmutableSet<SubcomponentDeclaration> subcomponentDeclarations) {
-      return subcomponentDeclarations.isEmpty()
-          ? Optional.empty()
-          : Optional.of(bindingFactory.subcomponentCreatorBinding(subcomponentDeclarations));
-    }
-
-    /**
-     * Returns a synthetic binding for {@code @Qualifier Optional<Type>} if there are any {@code
-     * optionalBindingDeclarations}.
-     *
-     * <p>If there are no bindings for the underlying key (the key for dependency requests for
-     * {@code Type}), returns a provision binding that always returns {@link Optional#empty()}.
-     *
-     * <p>If there are any production bindings for the underlying key, returns a production binding.
-     * Otherwise returns a provision binding.
-     */
-    private Optional<ContributionBinding> syntheticOptionalBinding(
-        Key key, ImmutableSet<OptionalBindingDeclaration> optionalBindingDeclarations) {
-      return optionalBindingDeclarations.isEmpty()
-          ? Optional.empty()
-          : Optional.of(
-              bindingFactory.syntheticOptionalBinding(
-                  key,
-                  getRequestKind(OptionalType.from(key).valueType()),
-                  lookUpBindings(keyFactory.unwrapOptional(key).get())));
-    }
-
     private ImmutableSet<ContributionBinding> createDelegateBindings(
         ImmutableSet<DelegateDeclaration> delegateDeclarations) {
       ImmutableSet.Builder<ContributionBinding> builder = ImmutableSet.builder();
@@ -595,20 +565,6 @@ public final class BindingGraphFactory implements ClearableCache {
       ContributionBinding explicitDelegate =
           resolvedDelegate.contributionBindings().iterator().next();
       return bindingFactory.delegateBinding(delegateDeclaration, explicitDelegate);
-    }
-
-    // TODO(dpb,ronshapiro): requestKey appears to be interchangeable with each binding's .key(),
-    // but should it? We're currently conflating the two all over the place and it would be good
-    // to unify, or if it's necessary, clarify why with docs+tests. Specifically, should we also
-    // be checking these for keysMatchingRequest?
-    private ImmutableSetMultimap<TypeElement, ContributionBinding> indexBindingsByOwningComponent(
-        Key requestKey, Iterable<? extends ContributionBinding> bindings) {
-      ImmutableSetMultimap.Builder<TypeElement, ContributionBinding> index =
-          ImmutableSetMultimap.builder();
-      for (ContributionBinding binding : bindings) {
-        index.put(getOwningComponent(requestKey, binding), binding);
-      }
-      return index.build();
     }
 
     /**
@@ -740,30 +696,6 @@ public final class BindingGraphFactory implements ClearableCache {
     }
 
     /**
-     * For all {@linkplain #keysMatchingRequest(Key) keys matching {@code requestKey}}, applies
-     * {@code getDeclarationsPerKey} and collects the values into an {@link ImmutableSet}.
-     */
-    private <T extends BindingDeclaration> ImmutableSet<T> getAllMatchingBindingDeclarations(
-        Key requestKey, Function<Key, Collection<T>> getDeclarationsPerKey) {
-      return keysMatchingRequest(requestKey)
-          .stream()
-          .flatMap(key -> getDeclarationsPerKey.apply(key).stream())
-          .collect(toImmutableSet());
-    }
-
-    /**
-     * Returns the explicit {@link ContributionBinding}s that match the {@code key} from this and
-     * all ancestor resolvers.
-     */
-    private ImmutableSet<ContributionBinding> getExplicitBindings(Key key) {
-      ImmutableSet.Builder<ContributionBinding> bindings = ImmutableSet.builder();
-      for (Resolver resolver : getResolverLineage()) {
-        bindings.addAll(resolver.getLocalExplicitBindings(key));
-      }
-      return bindings.build();
-    }
-
-    /**
      * Returns the explicit {@link ContributionBinding}s that match the {@code key} from this
      * resolver.
      */
@@ -778,18 +710,6 @@ public final class BindingGraphFactory implements ClearableCache {
           .addAll(
               createDelegateBindings(delegateDeclarations.get(keyFactory.unwrapMapValueType(key))))
           .build();
-    }
-
-    /**
-     * Returns the explicit multibinding contributions that contribute to the map or set requested
-     * by {@code key} from this and all ancestor resolvers.
-     */
-    private ImmutableSet<ContributionBinding> getExplicitMultibindings(Key key) {
-      ImmutableSet.Builder<ContributionBinding> multibindings = ImmutableSet.builder();
-      for (Resolver resolver : getResolverLineage()) {
-        multibindings.addAll(resolver.getLocalExplicitMultibindings(key));
-      }
-      return multibindings.build();
     }
 
     /**
@@ -814,31 +734,6 @@ public final class BindingGraphFactory implements ClearableCache {
       return multibindings.build();
     }
 
-    /**
-     * Returns the {@link MultibindingDeclaration}s that match the {@code key} from this and all
-     * ancestor resolvers.
-     */
-    private ImmutableSet<MultibindingDeclaration> getMultibindingDeclarations(Key key) {
-      ImmutableSet.Builder<MultibindingDeclaration> multibindingDeclarations =
-          ImmutableSet.builder();
-      for (Resolver resolver : getResolverLineage()) {
-        multibindingDeclarations.addAll(resolver.multibindingDeclarations.get(key));
-      }
-      return multibindingDeclarations.build();
-    }
-
-    /**
-     * Returns the {@link SubcomponentDeclaration}s that match the {@code key} from this and all
-     * ancestor resolvers.
-     */
-    private ImmutableSet<SubcomponentDeclaration> getSubcomponentDeclarations(Key key) {
-      ImmutableSet.Builder<SubcomponentDeclaration> subcomponentDeclarations =
-          ImmutableSet.builder();
-      for (Resolver resolver : getResolverLineage()) {
-        subcomponentDeclarations.addAll(resolver.subcomponentDeclarations.get(key));
-      }
-      return subcomponentDeclarations.build();
-    }
     /**
      * Returns the {@link OptionalBindingDeclaration}s that match the {@code key} from this and all
      * ancestor resolvers.
@@ -953,19 +848,6 @@ public final class BindingGraphFactory implements ClearableCache {
      */
     ImmutableMap<Key, ResolvedBindings> getResolvedMembersInjectionBindings() {
       return ImmutableMap.copyOf(resolvedMembersInjectionBindings);
-    }
-
-    ImmutableSet<ModuleDescriptor> getInheritedModules() {
-      return parentResolver.isPresent()
-          ? Sets.union(
-                  parentResolver.get().getInheritedModules(),
-                  parentResolver.get().componentDescriptor.modules())
-              .immutableCopy()
-          : ImmutableSet.<ModuleDescriptor>of();
-    }
-
-    ImmutableSet<ModuleDescriptor> getOwnedModules() {
-      return Sets.difference(componentDescriptor.modules(), getInheritedModules()).immutableCopy();
     }
 
     private final class LocalDependencyChecker {

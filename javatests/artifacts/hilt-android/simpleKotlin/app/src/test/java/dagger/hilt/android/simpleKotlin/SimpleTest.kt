@@ -44,9 +44,10 @@ import org.robolectric.annotation.Config
 class SimpleTest {
   @get:Rule val rule = HiltAndroidRule(this)
 
-  @BindValue @JvmField val bindStr = "STRING_BINDING"
+  @BindValue val bindStr = "STRING_BINDING"
 
-  @Inject @JvmField var str: String? = null
+  @Inject @JvmField
+  var str: String? = null
 
   @AndroidEntryPoint
   class TestActivity : AppCompatActivity()
@@ -64,8 +65,8 @@ class SimpleTest {
       scenario.onActivity { activity ->
         assertThat(activity::class.java.getSuperclass()?.getSimpleName())
           .isEqualTo("Hilt_MainActivity")
-        assertThat(activity.model).isNotNull()
-        assertThat(activity.name).isNotNull()
+        assertThat(activity.viewModel.model).isNotNull()
+        assertThat(activity.viewModel.name).isNotNull()
       }
     }
   }
