@@ -23,9 +23,9 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 http_archive(
     name = "google_bazel_common",
-    sha256 = "7e5584a1527390d55c972c246471cffd4c68b4c234d288f6afb52af8619c4560",
-    strip_prefix = "bazel-common-d58641d120c2ad3d0afd77b57fbaa78f3a97d914",
-    urls = ["https://github.com/google/bazel-common/archive/d58641d120c2ad3d0afd77b57fbaa78f3a97d914.zip"],
+    sha256 = "d8aa0ef609248c2a494d5dbdd4c89ef2a527a97c5a87687e5a218eb0b77ff640",
+    strip_prefix = "bazel-common-4a8d451e57fb7e1efecbf9495587a10684a19eb2",
+    urls = ["https://github.com/google/bazel-common/archive/4a8d451e57fb7e1efecbf9495587a10684a19eb2.zip"],
 )
 
 load("@google_bazel_common//:workspace_defs.bzl", "google_common_workspace_rules")
@@ -65,6 +65,37 @@ http_archive(
     urls = ["https://github.com/madler/zlib/archive/v1.2.11.tar.gz"],
 )
 
+RULES_KOTLIN_COMMIT = "2c283821911439e244285b5bfec39148e7d90e21"
+
+RULES_KOTLIN_SHA = "b04cd539e7e3571745179da95069586b6fa76a64306b24bb286154e652010608"
+
+http_archive(
+    name = "io_bazel_rules_kotlin",
+    sha256 = RULES_KOTLIN_SHA,
+    strip_prefix = "rules_kotlin-%s" % RULES_KOTLIN_COMMIT,
+    type = "zip",
+    urls = ["https://github.com/bazelbuild/rules_kotlin/archive/%s.zip" % RULES_KOTLIN_COMMIT],
+)
+
+load("@io_bazel_rules_kotlin//kotlin:dependencies.bzl", "kt_download_local_dev_dependencies")
+
+kt_download_local_dev_dependencies()
+
+load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kotlin_repositories")
+
+KOTLIN_VERSION = "1.4.20"
+
+KOTLINC_RELEASE_SHA = "11db93a4d6789e3406c7f60b9f267eba26d6483dcd771eff9f85bb7e9837011f"
+
+KOTLINC_RELEASE = {
+    "sha256": KOTLINC_RELEASE_SHA,
+    "urls": ["https://github.com/JetBrains/kotlin/releases/download/v{v}/kotlin-compiler-{v}.zip".format(v = KOTLIN_VERSION)],
+}
+
+kotlin_repositories(compiler_release = KOTLINC_RELEASE)
+
+register_toolchains("//:kotlin_toolchain")
+
 load("@rules_jvm_external//:defs.bzl", "maven_install")
 
 ANDROID_LINT_VERSION = "26.6.2"
@@ -72,11 +103,13 @@ ANDROID_LINT_VERSION = "26.6.2"
 maven_install(
     artifacts = [
         "androidx.annotation:annotation:1.1.0",
-        "androidx.appcompat:appcompat:1.1.0",
+        "androidx.appcompat:appcompat:1.2.0",
         "androidx.activity:activity:1.1.0",
-        "androidx.fragment:fragment:1.2.0",
+        "androidx.fragment:fragment:1.2.5",
         "androidx.lifecycle:lifecycle-viewmodel:2.2.0",
+        "androidx.lifecycle:lifecycle-viewmodel-savedstate:2.2.0",
         "androidx.multidex:multidex:2.0.1",
+        "androidx.savedstate:savedstate:1.0.0",
         "androidx.test:monitor:1.1.1",
         "androidx.test:core:1.1.0",
         "com.google.auto:auto-common:0.11",
@@ -93,7 +126,7 @@ maven_install(
         "com.android.tools:testutils:%s" % ANDROID_LINT_VERSION,
         "com.github.tschuchortdev:kotlin-compile-testing:1.2.8",
         "com.google.guava:guava:27.1-android",
-        "org.jetbrains.kotlin:kotlin-stdlib:1.3.50",
+        "org.jetbrains.kotlin:kotlin-stdlib:%s" % KOTLIN_VERSION,
         "org.jetbrains.kotlinx:kotlinx-metadata-jvm:0.1.0",
         "org.robolectric:robolectric:4.3.1",
     ],
@@ -103,25 +136,6 @@ maven_install(
         "https://jcenter.bintray.com/",  # Lint has one trove4j dependency in jCenter
     ],
 )
-
-# TODO(user): Remove once Google publishes internal Kotlin rules.
-RULES_KOTLIN_VERSION = "186c1e1e27d699a8953b75461f2de7c295987cfb"
-
-RULES_KOTLIN_SHA = "ef2f9cfb724b1f1eaf0ede2636515969eb4c6e10b75a71d1850f6e692a7d5f06"
-
-http_archive(
-    name = "io_bazel_rules_kotlin",
-    sha256 = RULES_KOTLIN_SHA,
-    strip_prefix = "rules_kotlin-%s" % RULES_KOTLIN_VERSION,
-    type = "zip",
-    urls = ["https://github.com/bazelbuild/rules_kotlin/archive/%s.zip" % RULES_KOTLIN_VERSION],
-)
-
-load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kotlin_repositories", "kt_register_toolchains")
-
-kotlin_repositories()
-
-kt_register_toolchains()
 
 BAZEL_SKYLIB_VERSION = "1.0.2"
 

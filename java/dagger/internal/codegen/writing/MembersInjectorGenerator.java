@@ -20,6 +20,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.squareup.javapoet.MethodSpec.constructorBuilder;
 import static com.squareup.javapoet.MethodSpec.methodBuilder;
 import static com.squareup.javapoet.TypeSpec.classBuilder;
+import static dagger.internal.codegen.binding.AssistedInjectionAnnotations.assistedInjectedConstructors;
 import static dagger.internal.codegen.binding.InjectionAnnotations.injectedConstructors;
 import static dagger.internal.codegen.binding.SourceFiles.bindingTypeElementTypeVariableNames;
 import static dagger.internal.codegen.binding.SourceFiles.frameworkFieldUsages;
@@ -57,7 +58,6 @@ import dagger.internal.codegen.binding.MembersInjectionBinding.InjectionSite;
 import dagger.internal.codegen.kotlin.KotlinMetadataUtil;
 import dagger.internal.codegen.langmodel.DaggerElements;
 import dagger.internal.codegen.langmodel.DaggerTypes;
-import dagger.internal.codegen.statistics.DaggerStatisticsCollector;
 import dagger.internal.codegen.writing.InjectionMethods.InjectionSiteMethod;
 import dagger.model.DependencyRequest;
 import java.util.Map.Entry;
@@ -72,8 +72,6 @@ import javax.lang.model.element.Element;
  */
 public final class MembersInjectorGenerator extends SourceFileGenerator<MembersInjectionBinding> {
   private final DaggerTypes types;
-  private final DaggerElements elements;
-  private final DaggerStatisticsCollector statisticsCollector;
   private final KotlinMetadataUtil metadataUtil;
 
   @Inject
@@ -82,12 +80,9 @@ public final class MembersInjectorGenerator extends SourceFileGenerator<MembersI
       DaggerElements elements,
       DaggerTypes types,
       SourceVersion sourceVersion,
-      DaggerStatisticsCollector statisticsCollector,
       KotlinMetadataUtil metadataUtil) {
     super(filer, elements, sourceVersion);
     this.types = types;
-    this.elements = elements;
-    this.statisticsCollector = statisticsCollector;
     this.metadataUtil = metadataUtil;
   }
 
@@ -111,11 +106,11 @@ public final class MembersInjectorGenerator extends SourceFileGenerator<MembersI
     // Members injectors for classes with no local injection sites and no @Inject
     // constructor are unused.
     if (!binding.hasLocalInjectionSites()
-        && injectedConstructors(binding.membersInjectedType()).isEmpty()) {
+        && injectedConstructors(binding.membersInjectedType()).isEmpty()
+        && assistedInjectedConstructors(binding.membersInjectedType()).isEmpty()) {
       return Optional.empty();
     }
 
-    statisticsCollector.recordMembersInjectorGenerated();
 
     // We don't want to write out resolved bindings -- we want to write out the generic version.
     checkState(
@@ -210,9 +205,8 @@ public final class MembersInjectorGenerator extends SourceFileGenerator<MembersI
             generatedTypeName,
             CodeBlock.of("instance"),
             binding.key().type(),
-            types,
             frameworkFieldUsages(binding.dependencies(), dependencyFields)::get,
-            elements,
+            types,
             metadataUtil));
 
     if (usesRawFrameworkTypes) {
@@ -222,8 +216,7 @@ public final class MembersInjectorGenerator extends SourceFileGenerator<MembersI
 
     for (InjectionSite injectionSite : binding.injectionSites()) {
       if (injectionSite.element().getEnclosingElement().equals(binding.membersInjectedType())) {
-        injectorTypeBuilder.addMethod(
-            InjectionSiteMethod.create(injectionSite, elements, metadataUtil).toMethodSpec());
+        injectorTypeBuilder.addMethod(InjectionSiteMethod.create(injectionSite, metadataUtil));
       }
     }
 

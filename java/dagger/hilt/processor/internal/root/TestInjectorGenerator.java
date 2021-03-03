@@ -17,6 +17,7 @@
 package dagger.hilt.processor.internal.root;
 
 import com.squareup.javapoet.AnnotationSpec;
+import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
@@ -26,6 +27,7 @@ import dagger.hilt.processor.internal.Processors;
 import java.io.IOException;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Modifier;
+import javax.lang.model.element.TypeElement;
 
 /** Generates an entry point for a test. */
 public final class TestInjectorGenerator {
@@ -38,7 +40,7 @@ public final class TestInjectorGenerator {
   }
 
   // @GeneratedEntryPoint
-  // @InstallIn(ApplicationComponent.class)
+  // @InstallIn(SingletonComponent.class)
   // public interface FooTest_GeneratedInjector extends TestInjector<FooTest> {}
   public void generate() throws IOException {
     TypeSpec.Builder builder =
@@ -48,16 +50,14 @@ public final class TestInjectorGenerator {
             .addAnnotation(ClassNames.GENERATED_ENTRY_POINT)
             .addAnnotation(
                 AnnotationSpec.builder(ClassNames.INSTALL_IN)
-                    .addMember(
-                        "value",
-                        "$T.class",
-                    ClassNames.APPLICATION_COMPONENT)
+                    .addMember("value", "$T.class", installInComponent(metadata.testElement()))
                     .build())
             .addModifiers(Modifier.PUBLIC)
             .addSuperinterface(
                 ParameterizedTypeName.get(ClassNames.TEST_INJECTOR, metadata.testName()))
             .addMethod(
                 MethodSpec.methodBuilder("injectTest")
+                    .addAnnotation(Override.class)
                     .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
                     .addParameter(
                         metadata.testName(),
@@ -69,5 +69,9 @@ public final class TestInjectorGenerator {
     JavaFile.builder(metadata.testInjectorName().packageName(), builder.build())
         .build()
         .writeTo(env.getFiler());
+  }
+
+  private static ClassName installInComponent(TypeElement testElement) {
+    return ClassNames.SINGLETON_COMPONENT;
   }
 }
