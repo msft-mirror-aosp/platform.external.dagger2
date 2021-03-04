@@ -69,6 +69,7 @@ java_library {
 
     srcs: [
         "java/dagger/*.java",
+        "java/dagger/assisted/*.java",
         "java/dagger/internal/*.java",
         "java/dagger/multibindings/*.java",
         "java/dagger/releasablereferences/*.java",
@@ -384,6 +385,7 @@ java_library_host {
         "auto_service_plugin",
         "auto_value_plugin",
         "auto_value_memoized_extension_plugin",
+        "dagger2-compiler",
     ],
     static_libs: [
         "auto_common",

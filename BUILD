@@ -15,8 +15,16 @@
 load("@rules_java//java:defs.bzl", "java_library")
 load("@google_bazel_common//tools/javadoc:javadoc.bzl", "javadoc_library")
 load("@google_bazel_common//tools/jarjar:jarjar.bzl", "jarjar_library")
+load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "define_kt_toolchain")
 
 package(default_visibility = ["//visibility:public"])
+
+define_kt_toolchain(
+    name = "kotlin_toolchain",
+    api_version = "1.4",
+    jvm_target = "1.8",
+    language_version = "1.4",
+)
 
 package_group(
     name = "src",
@@ -34,6 +42,22 @@ java_library(
     exports = [
         ":dagger_with_compiler",
         "//java/dagger/producers",
+    ],
+)
+
+java_library(
+    name = "spi",
+    exports = ["//java/dagger/spi"],
+)
+
+java_library(
+    name = "compiler_internals",
+    exports = [
+        "//java/dagger/internal/codegen:processor",
+        "//java/dagger/internal/codegen/base",
+        "//java/dagger/internal/codegen/binding",
+        "//java/dagger/internal/codegen/validation",
+        "//java/dagger/internal/codegen/writing",
     ],
 )
 
@@ -87,7 +111,7 @@ javadoc_library(
         "//java/dagger/producers:producers-srcs",
         "//java/dagger/spi:spi-srcs",
     ],
-    android_api_level = 29,
+    android_api_level = 30,
     # TODO(ronshapiro): figure out how to specify the version number for release builds
     doctitle = "Dagger Dependency Injection API",
     exclude_packages = [
