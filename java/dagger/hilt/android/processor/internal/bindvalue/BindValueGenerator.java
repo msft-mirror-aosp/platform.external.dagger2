@@ -23,6 +23,7 @@ import static java.util.Comparator.comparing;
 import com.google.common.collect.ImmutableSet;
 import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
+import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterSpec;
@@ -37,7 +38,6 @@ import dagger.multibindings.ElementsIntoSet;
 import dagger.multibindings.IntoMap;
 import dagger.multibindings.IntoSet;
 import java.io.IOException;
-import javax.annotation.Generated;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Modifier;
 
@@ -60,7 +60,7 @@ final class BindValueGenerator {
   }
 
   //  @Module
-  //  @InstallIn(ApplicationComponent.class)
+  //  @InstallIn(SingletonComponent.class)
   //  public final class FooTest_BindValueModule {
   //     // providesMethods ...
   //  }
@@ -70,15 +70,13 @@ final class BindValueGenerator {
             .addOriginatingElement(metadata.testElement())
             .addAnnotation(Processors.getOriginatingElementAnnotation(metadata.testElement()))
             .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
-            .addAnnotation(
-                AnnotationSpec.builder(Generated.class)
-                    .addMember("value", "$S", getClass().getName())
-                    .build())
             .addAnnotation(Module.class)
             .addAnnotation(
                 Components.getInstallInAnnotationSpec(
-                    ImmutableSet.of(ClassNames.APPLICATION_COMPONENT)))
+                    ImmutableSet.of(ClassNames.SINGLETON_COMPONENT)))
             .addMethod(providesTestMethod());
+
+    Processors.addGeneratedAnnotation(builder, env, getClass());
 
     metadata.bindValueElements().stream()
         .map(this::providesMethod)
@@ -137,7 +135,11 @@ final class BindValueGenerator {
     } else {
       builder
           .addParameter(testClassName, "test")
-          .addStatement("return test.$L", bindValue.variableElement().getSimpleName());
+          .addStatement(
+              "return $L",
+              bindValue.getterElement().isPresent()
+                  ? CodeBlock.of("test.$L()", bindValue.getterElement().get().getSimpleName())
+                  : CodeBlock.of("test.$L", bindValue.variableElement().getSimpleName()));
     }
 
     ClassName annotationClassName = bindValue.annotationName();

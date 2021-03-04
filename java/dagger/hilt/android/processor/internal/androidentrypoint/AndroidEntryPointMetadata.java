@@ -35,9 +35,10 @@ import dagger.hilt.android.processor.internal.AndroidClassNames;
 import dagger.hilt.processor.internal.BadInputException;
 import dagger.hilt.processor.internal.ClassNames;
 import dagger.hilt.processor.internal.Components;
-import dagger.hilt.processor.internal.KotlinMetadata;
+import dagger.hilt.processor.internal.KotlinMetadataUtils;
 import dagger.hilt.processor.internal.ProcessorErrors;
 import dagger.hilt.processor.internal.Processors;
+import dagger.internal.codegen.kotlin.KotlinMetadataUtil;
 import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -251,11 +252,10 @@ public abstract class AndroidEntryPointMetadata {
       // If this AndroidEntryPoint is a Kotlin class and its base type is also Kotlin and has
       // default values declared in its constructor then error out because for the short-form
       // usage of @AndroidEntryPoint the bytecode transformation will be done incorrectly.
+      KotlinMetadataUtil metadataUtil = KotlinMetadataUtils.getMetadataUtil();
       ProcessorErrors.checkState(
-          !KotlinMetadata.of(androidEntryPointElement).isPresent()
-              || !KotlinMetadata.of(baseElement)
-                  .map(KotlinMetadata::containsConstructorWithDefaultParam)
-                  .orElse(false),
+          !metadataUtil.hasMetadata(androidEntryPointElement)
+              || !metadataUtil.containsConstructorWithDefaultParam(baseElement),
           baseElement,
           "The base class, '%s', of the @AndroidEntryPoint, '%s', contains a constructor with "
               + "default parameters. This is currently not supported by the Gradle plugin. Either "
@@ -271,7 +271,8 @@ public abstract class AndroidEntryPointMetadata {
           !MoreTypes.isTypeOf(Void.class, baseElement.asType()),
           androidEntryPointElement,
           "Expected @%s to have a value."
-          + " Did you forget to apply the Gradle Plugin?",
+          + " Did you forget to apply the Gradle Plugin? (dagger.hilt.android.plugin)\n"
+          + "See https://dagger.dev/hilt/gradle-setup.html" ,
           annotationClassName.simpleName());
 
       // Check that the root $CLASS extends Hilt_$CLASS
@@ -381,7 +382,7 @@ public abstract class AndroidEntryPointMetadata {
   private static final class Type {
     private static final Type APPLICATION =
         new Type(
-            AndroidClassNames.APPLICATION_COMPONENT,
+            AndroidClassNames.SINGLETON_COMPONENT,
             AndroidType.APPLICATION,
             AndroidClassNames.APPLICATION_COMPONENT_MANAGER,
             null);
@@ -393,7 +394,7 @@ public abstract class AndroidEntryPointMetadata {
             CodeBlock.of("this"));
     private static final Type BROADCAST_RECEIVER =
         new Type(
-            AndroidClassNames.APPLICATION_COMPONENT,
+            AndroidClassNames.SINGLETON_COMPONENT,
             AndroidType.BROADCAST_RECEIVER,
             AndroidClassNames.BROADCAST_RECEIVER_COMPONENT_MANAGER,
             null);
