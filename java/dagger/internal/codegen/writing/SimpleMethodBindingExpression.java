@@ -19,14 +19,12 @@ package dagger.internal.codegen.writing;
 import static com.google.auto.common.MoreElements.asExecutable;
 import static com.google.auto.common.MoreElements.asType;
 import static com.google.common.base.Preconditions.checkArgument;
-import static dagger.internal.codegen.javapoet.CodeBlocks.toParametersCodeBlock;
+import static dagger.internal.codegen.javapoet.CodeBlocks.makeParametersCodeBlock;
 import static dagger.internal.codegen.javapoet.TypeNames.rawTypeName;
 import static dagger.internal.codegen.langmodel.Accessibility.isTypeAccessibleFrom;
 import static dagger.internal.codegen.writing.InjectionMethods.ProvisionMethod.requiresInjectionMethod;
 
 import com.google.auto.common.MoreTypes;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.MethodSpec;
@@ -37,11 +35,9 @@ import dagger.internal.codegen.compileroption.CompilerOptions;
 import dagger.internal.codegen.javapoet.Expression;
 import dagger.internal.codegen.kotlin.KotlinMetadataUtil;
 import dagger.internal.codegen.langmodel.DaggerElements;
-import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.internal.codegen.writing.InjectionMethods.ProvisionMethod;
 import dagger.model.DependencyRequest;
 import java.util.Optional;
-import java.util.function.Function;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
@@ -58,7 +54,6 @@ final class SimpleMethodBindingExpression extends SimpleInvocationBindingExpress
   private final ComponentBindingExpressions componentBindingExpressions;
   private final MembersInjectionMethods membersInjectionMethods;
   private final ComponentRequirementExpressions componentRequirementExpressions;
-  private final DaggerTypes types;
   private final DaggerElements elements;
   private final SourceVersion sourceVersion;
   private final KotlinMetadataUtil metadataUtil;
@@ -69,7 +64,6 @@ final class SimpleMethodBindingExpression extends SimpleInvocationBindingExpress
       ComponentBindingExpressions componentBindingExpressions,
       MembersInjectionMethods membersInjectionMethods,
       ComponentRequirementExpressions componentRequirementExpressions,
-      DaggerTypes types,
       DaggerElements elements,
       SourceVersion sourceVersion,
       KotlinMetadataUtil metadataUtil) {
@@ -84,38 +78,25 @@ final class SimpleMethodBindingExpression extends SimpleInvocationBindingExpress
     this.componentBindingExpressions = componentBindingExpressions;
     this.membersInjectionMethods = membersInjectionMethods;
     this.componentRequirementExpressions = componentRequirementExpressions;
-    this.types = types;
     this.elements = elements;
     this.sourceVersion = sourceVersion;
   }
 
   @Override
   Expression getDependencyExpression(ClassName requestingClass) {
-    ImmutableMap<DependencyRequest, Expression> arguments =
-        ImmutableMap.copyOf(
-            Maps.asMap(
-                provisionBinding.dependencies(),
-                request -> dependencyArgument(request, requestingClass)));
-    Function<DependencyRequest, CodeBlock> argumentsFunction =
-        request -> arguments.get(request).codeBlock();
-    return requiresInjectionMethod(
-            provisionBinding,
-            arguments.values().asList(),
-            compilerOptions,
-            requestingClass.packageName(),
-            types)
-        ? invokeInjectionMethod(argumentsFunction, requestingClass)
-        : invokeMethod(argumentsFunction, requestingClass);
+    return requiresInjectionMethod(provisionBinding, compilerOptions, requestingClass)
+        ? invokeInjectionMethod(requestingClass)
+        : invokeMethod(requestingClass);
   }
 
-  private Expression invokeMethod(
-      Function<DependencyRequest, CodeBlock> argumentsFunction,
-      ClassName requestingClass) {
+  private Expression invokeMethod(ClassName requestingClass) {
     // TODO(dpb): align this with the contents of InlineMethods.create
     CodeBlock arguments =
-        provisionBinding.dependencies().stream()
-            .map(argumentsFunction)
-            .collect(toParametersCodeBlock());
+        makeParametersCodeBlock(
+            ProvisionMethod.invokeArguments(
+                provisionBinding,
+                request -> dependencyArgument(request, requestingClass).codeBlock(),
+                requestingClass));
     ExecutableElement method = asExecutable(provisionBinding.bindingElement().get());
     CodeBlock invocation;
     switch (method.getKind()) {
@@ -146,24 +127,21 @@ final class SimpleMethodBindingExpression extends SimpleInvocationBindingExpress
   private TypeName constructorTypeName(ClassName requestingClass) {
     DeclaredType type = MoreTypes.asDeclared(provisionBinding.key().type());
     TypeName typeName = TypeName.get(type);
-    if (type.getTypeArguments()
-        .stream()
+    if (type.getTypeArguments().stream()
         .allMatch(t -> isTypeAccessibleFrom(t, requestingClass.packageName()))) {
       return typeName;
     }
     return rawTypeName(typeName);
   }
 
-  private Expression invokeInjectionMethod(
-      Function<DependencyRequest, CodeBlock> argumentsFunction, ClassName requestingClass) {
+  private Expression invokeInjectionMethod(ClassName requestingClass) {
     return injectMembers(
         ProvisionMethod.invoke(
             provisionBinding,
-            argumentsFunction,
+            request -> dependencyArgument(request, requestingClass).codeBlock(),
             requestingClass,
             moduleReference(requestingClass),
             compilerOptions,
-            elements,
             metadataUtil));
   }
 

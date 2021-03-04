@@ -30,6 +30,7 @@ import javax.lang.model.element.Modifier;
 
 /** Generates an Hilt Activity class for the @AndroidEntryPoint annotated class. */
 public final class ActivityGenerator {
+
   private final ProcessingEnvironment env;
   private final AndroidEntryPointMetadata metadata;
   private final ClassName generatedClassName;
@@ -50,12 +51,14 @@ public final class ActivityGenerator {
         TypeSpec.classBuilder(generatedClassName.simpleName())
             .addOriginatingElement(metadata.element())
             .superclass(metadata.baseClassName())
-            .addModifiers(metadata.generatedClassModifiers())
-            .addMethod(onCreate());
+            .addModifiers(metadata.generatedClassModifiers());
 
     Generators.addGeneratedBaseClassJavadoc(builder, AndroidClassNames.ANDROID_ENTRY_POINT);
     Processors.addGeneratedAnnotation(builder, env, getClass());
-    Generators.copyConstructors(metadata.baseElement(), builder);
+
+      Generators.copyConstructors(metadata.baseElement(), builder);
+      builder.addMethod(onCreate());
+
 
     metadata.baseElement().getTypeParameters().stream()
         .map(TypeVariableName::get)
@@ -98,11 +101,7 @@ public final class ActivityGenerator {
 
   // @Override
   // public ViewModelProvider.Factory getDefaultViewModelProviderFactory() {
-  //   ViewModelProvider.Factory factory = DefaultViewModelFactories.getActivityFactory(this);
-  //   if (factory != null) {
-  //     return factory;
-  //   }
-  //   return super.getDefaultViewModelProviderFactory();
+  //   return DefaultViewModelFactories.getActivityFactory(this);
   // }
   private MethodSpec getDefaultViewModelProviderFactory() {
     return MethodSpec.methodBuilder("getDefaultViewModelProviderFactory")
@@ -110,13 +109,8 @@ public final class ActivityGenerator {
         .addModifiers(Modifier.PUBLIC)
         .returns(AndroidClassNames.VIEW_MODEL_PROVIDER_FACTORY)
         .addStatement(
-            "$T factory = $T.getActivityFactory(this)",
-            AndroidClassNames.VIEW_MODEL_PROVIDER_FACTORY,
+            "return $T.getActivityFactory(this)",
             AndroidClassNames.DEFAULT_VIEW_MODEL_FACTORIES)
-        .beginControlFlow("if (factory != null)")
-        .addStatement("return factory")
-        .endControlFlow()
-        .addStatement("return super.getDefaultViewModelProviderFactory()")
         .build();
   }
 }
