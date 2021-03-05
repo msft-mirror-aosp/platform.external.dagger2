@@ -16,50 +16,64 @@
 
 package dagger.internal.codegen.writing;
 
+import static com.google.auto.common.MoreElements.asExecutable;
+import static com.google.auto.common.MoreElements.asType;
+import static com.google.auto.common.MoreElements.asVariable;
 import static com.google.common.base.CaseFormat.LOWER_CAMEL;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.squareup.javapoet.MethodSpec.methodBuilder;
 import static dagger.internal.codegen.base.RequestKinds.requestTypeName;
 import static dagger.internal.codegen.binding.ConfigurationAnnotations.getNullableType;
 import static dagger.internal.codegen.binding.SourceFiles.generatedClassNameForBinding;
 import static dagger.internal.codegen.binding.SourceFiles.memberInjectedFieldSignatureForVariable;
 import static dagger.internal.codegen.binding.SourceFiles.membersInjectorNameForType;
-import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
+import static dagger.internal.codegen.binding.SourceFiles.protectAgainstKeywords;
+import static dagger.internal.codegen.extension.DaggerStreams.toImmutableMap;
+import static dagger.internal.codegen.javapoet.CodeBlocks.makeParametersCodeBlock;
 import static dagger.internal.codegen.javapoet.CodeBlocks.toConcatenatedCodeBlock;
+import static dagger.internal.codegen.javapoet.CodeBlocks.toParametersCodeBlock;
 import static dagger.internal.codegen.javapoet.TypeNames.rawTypeName;
 import static dagger.internal.codegen.langmodel.Accessibility.isElementAccessibleFrom;
 import static dagger.internal.codegen.langmodel.Accessibility.isRawTypeAccessible;
 import static dagger.internal.codegen.langmodel.Accessibility.isRawTypePubliclyAccessible;
 import static dagger.internal.codegen.langmodel.Accessibility.isTypeAccessibleFrom;
 import static java.util.stream.Collectors.toList;
+import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
 import static javax.lang.model.type.TypeKind.VOID;
 
 import com.google.auto.common.MoreElements;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
+import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.TypeName;
+import com.squareup.javapoet.TypeVariableName;
 import dagger.internal.Preconditions;
+import dagger.internal.codegen.base.UniqueNameSet;
+import dagger.internal.codegen.binding.AssistedInjectionAnnotations;
 import dagger.internal.codegen.binding.MembersInjectionBinding.InjectionSite;
 import dagger.internal.codegen.binding.ProvisionBinding;
 import dagger.internal.codegen.compileroption.CompilerOptions;
 import dagger.internal.codegen.extension.DaggerCollectors;
-import dagger.internal.codegen.javapoet.Expression;
+import dagger.internal.codegen.javapoet.CodeBlocks;
+import dagger.internal.codegen.javapoet.TypeNames;
 import dagger.internal.codegen.kotlin.KotlinMetadataUtil;
-import dagger.internal.codegen.langmodel.DaggerElements;
 import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.model.DependencyRequest;
 import dagger.model.RequestKind;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import javax.lang.model.SourceVersion;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Parameterizable;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeKind;
@@ -73,11 +87,7 @@ final class InjectionMethods {
    * constructor. Its parameters match the dependency requests for constructor and members
    * injection.
    *
-   * <p>For {@code @Provides} methods named "foo", the method name is "proxyFoo". If the
-   * {@code @Provides} method and its raw parameter types are publicly accessible, no method is
-   * necessary and this method returns {@link Optional#empty()}.
-   *
-   * <p>Example:
+   * <p>For {@code @Provides} methods named "foo", the method name is "proxyFoo". For example:
    *
    * <pre><code>
    * abstract class FooModule {
@@ -87,11 +97,7 @@ final class InjectionMethods {
    * public static proxyProvideFoo(Bar bar, Baz baz) { … }
    * </code></pre>
    *
-   * <p>For {@code @Inject}ed constructors, the method name is "newFoo". If the constructor and its
-   * raw parameter types are publicly accessible, no method is necessary and this method returns
-   * {@code Optional#empty()}.
-   *
-   * <p>Example:
+   * <p>For {@code @Inject}ed constructors, the method name is "newFoo". For example:
    *
    * <pre><code>
    * class Foo {
@@ -102,34 +108,27 @@ final class InjectionMethods {
    * </code></pre>
    */
   static final class ProvisionMethod {
-    /**
-     * Names of methods that are already defined in factories and shouldn't be used for the proxy
-     * method name.
-     */
+    // These names are already defined in factories and shouldn't be used for the proxy method name.
     private static final ImmutableSet<String> BANNED_PROXY_NAMES = ImmutableSet.of("get", "create");
 
     /**
      * Returns a method that invokes the binding's {@linkplain ProvisionBinding#bindingElement()
      * constructor} and injects the instance's members.
      */
-    static InjectionMethod create(
+    static MethodSpec create(
         ProvisionBinding binding,
         CompilerOptions compilerOptions,
-        DaggerElements elements,
         KotlinMetadataUtil metadataUtil) {
-      ClassName proxyEnclosingClass = generatedClassNameForBinding(binding);
-      ExecutableElement element = MoreElements.asExecutable(binding.bindingElement().get());
+      ExecutableElement element = asExecutable(binding.bindingElement().get());
       switch (element.getKind()) {
         case CONSTRUCTOR:
-          return constructorProxy(proxyEnclosingClass, element, elements);
+          return constructorProxy(element);
         case METHOD:
           return methodProxy(
-              proxyEnclosingClass,
               element,
               methodName(element),
-              ReceiverAccessibility.IGNORE,
+              InstanceCastPolicy.IGNORE,
               CheckNotNullPolicy.get(binding, compilerOptions),
-              elements,
               metadataUtil);
         default:
           throw new AssertionError(element);
@@ -140,44 +139,64 @@ final class InjectionMethods {
      * Invokes the injection method for {@code binding}, with the dependencies transformed with the
      * {@code dependencyUsage} function.
      */
-    // TODO(ronshapiro): Further extract a ProvisionMethod type that composes an InjectionMethod, so
-    // users can write ProvisionMethod.create().invoke()
     static CodeBlock invoke(
         ProvisionBinding binding,
         Function<DependencyRequest, CodeBlock> dependencyUsage,
         ClassName requestingClass,
         Optional<CodeBlock> moduleReference,
         CompilerOptions compilerOptions,
-        DaggerElements elements,
         KotlinMetadataUtil metadataUtil) {
       ImmutableList.Builder<CodeBlock> arguments = ImmutableList.builder();
       moduleReference.ifPresent(arguments::add);
-      arguments.addAll(
-          injectionMethodArguments(
-              binding.provisionDependencies(), dependencyUsage, requestingClass));
-      // TODO(ronshapiro): make InjectionMethods @Injectable
-      return create(binding, compilerOptions, elements, metadataUtil)
-          .invoke(arguments.build(), requestingClass);
+      invokeArguments(binding, dependencyUsage, requestingClass).forEach(arguments::add);
+
+      ClassName enclosingClass = generatedClassNameForBinding(binding);
+      MethodSpec methodSpec = create(binding, compilerOptions, metadataUtil);
+      return invokeMethod(methodSpec, arguments.build(), enclosingClass, requestingClass);
     }
 
-    private static InjectionMethod constructorProxy(
-        ClassName proxyEnclosingClass, ExecutableElement constructor, DaggerElements elements) {
+    static ImmutableList<CodeBlock> invokeArguments(
+        ProvisionBinding binding,
+        Function<DependencyRequest, CodeBlock> dependencyUsage,
+        ClassName requestingClass) {
+      ImmutableMap<VariableElement, DependencyRequest> dependencyRequestMap =
+          binding.provisionDependencies().stream()
+              .collect(
+                  toImmutableMap(
+                      request -> MoreElements.asVariable(request.requestElement().get()),
+                      request -> request));
+
+      ImmutableList.Builder<CodeBlock> arguments = ImmutableList.builder();
+      for (VariableElement parameter :
+          asExecutable(binding.bindingElement().get()).getParameters()) {
+        if (AssistedInjectionAnnotations.isAssistedParameter(parameter)) {
+          arguments.add(CodeBlock.of("$L", parameter.getSimpleName()));
+        } else if (dependencyRequestMap.containsKey(parameter)) {
+          DependencyRequest request = dependencyRequestMap.get(parameter);
+          arguments.add(
+              injectionMethodArgument(request, dependencyUsage.apply(request), requestingClass));
+        } else {
+          throw new AssertionError("Unexpected parameter: " + parameter);
+        }
+      }
+
+      return arguments.build();
+    }
+
+    private static MethodSpec constructorProxy(ExecutableElement constructor) {
       TypeElement enclosingType = MoreElements.asType(constructor.getEnclosingElement());
-      InjectionMethod.Builder injectionMethod =
-          InjectionMethod.builder(elements)
-              .name(methodName(constructor))
-              .returnType(enclosingType.asType())
-              .enclosingClass(proxyEnclosingClass);
+      MethodSpec.Builder builder =
+          methodBuilder(methodName(constructor))
+              .addModifiers(PUBLIC, STATIC)
+              .varargs(constructor.isVarArgs())
+              .returns(TypeName.get(enclosingType.asType()));
 
-      injectionMethod
-          .copyTypeParameters(enclosingType)
-          .copyThrows(constructor);
+      copyTypeParameters(builder, enclosingType);
+      copyThrows(builder, constructor);
 
-      CodeBlock arguments = injectionMethod.copyParameters(constructor);
-      injectionMethod
-          .methodBodyBuilder()
-          .addStatement("return new $T($L)", enclosingType, arguments);
-      return injectionMethod.build();
+      CodeBlock arguments =
+          copyParameters(builder, new UniqueNameSet(), constructor.getParameters());
+      return builder.addStatement("return new $T($L)", enclosingType, arguments).build();
     }
 
     /**
@@ -185,32 +204,15 @@ final class InjectionMethods {
      * requires the use of an injection method.
      */
     static boolean requiresInjectionMethod(
-        ProvisionBinding binding,
-        ImmutableList<Expression> arguments,
-        CompilerOptions compilerOptions,
-        String callingPackage,
-        DaggerTypes types) {
+        ProvisionBinding binding, CompilerOptions compilerOptions, ClassName requestingClass) {
       ExecutableElement method = MoreElements.asExecutable(binding.bindingElement().get());
       return !binding.injectionSites().isEmpty()
           || binding.shouldCheckForNull(compilerOptions)
-          || !isElementAccessibleFrom(method, callingPackage)
-          || !areParametersAssignable(method, arguments, types)
+          || !isElementAccessibleFrom(method, requestingClass.packageName())
           // This check should be removable once we drop support for -source 7
           || method.getParameters().stream()
               .map(VariableElement::asType)
-              .anyMatch(type -> !isRawTypeAccessible(type, callingPackage));
-    }
-
-    private static boolean areParametersAssignable(
-        ExecutableElement element, ImmutableList<Expression> arguments, DaggerTypes types) {
-      List<? extends VariableElement> parameters = element.getParameters();
-      checkArgument(parameters.size() == arguments.size());
-      for (int i = 0; i < parameters.size(); i++) {
-        if (!types.isAssignable(arguments.get(i).type(), parameters.get(i).asType())) {
-          return false;
-        }
-      }
-      return true;
+              .anyMatch(type -> !isRawTypeAccessible(type, requestingClass.packageName()));
     }
 
     /**
@@ -258,20 +260,15 @@ final class InjectionMethods {
      * receives its own method, as the subclass may need to inject them in a different order from
      * the parent class.
      */
-    static InjectionMethod create(
-        InjectionSite injectionSite, DaggerElements elements, KotlinMetadataUtil metadataUtil) {
+    static MethodSpec create(InjectionSite injectionSite, KotlinMetadataUtil metadataUtil) {
       String methodName = methodName(injectionSite);
-      ClassName proxyEnclosingClass = membersInjectorNameForType(
-          MoreElements.asType(injectionSite.element().getEnclosingElement()));
       switch (injectionSite.kind()) {
         case METHOD:
           return methodProxy(
-              proxyEnclosingClass,
-              MoreElements.asExecutable(injectionSite.element()),
+              asExecutable(injectionSite.element()),
               methodName,
-              ReceiverAccessibility.CAST_IF_NOT_PUBLIC,
+              InstanceCastPolicy.CAST_IF_NOT_PUBLIC,
               CheckNotNullPolicy.IGNORE,
-              elements,
               metadataUtil);
         case FIELD:
           Optional<AnnotationMirror> qualifier =
@@ -280,12 +277,7 @@ final class InjectionMethods {
                   .collect(DaggerCollectors.onlyElement())
                   .key()
                   .qualifier();
-          return fieldProxy(
-              proxyEnclosingClass,
-              MoreElements.asVariable(injectionSite.element()),
-              methodName,
-              qualifier,
-              elements);
+          return fieldProxy(asVariable(injectionSite.element()), methodName, qualifier);
       }
       throw new AssertionError(injectionSite);
     }
@@ -301,9 +293,8 @@ final class InjectionMethods {
         ClassName generatedTypeName,
         CodeBlock instanceCodeBlock,
         TypeMirror instanceType,
-        DaggerTypes types,
         Function<DependencyRequest, CodeBlock> dependencyUsage,
-        DaggerElements elements,
+        DaggerTypes types,
         KotlinMetadataUtil metadataUtil) {
       return injectionSites.stream()
           .map(
@@ -328,7 +319,6 @@ final class InjectionMethods {
                         generatedTypeName,
                         maybeCastedInstance,
                         dependencyUsage,
-                        elements,
                         metadataUtil));
               })
           .collect(toConcatenatedCodeBlock());
@@ -343,19 +333,18 @@ final class InjectionMethods {
         ClassName generatedTypeName,
         CodeBlock instanceCodeBlock,
         Function<DependencyRequest, CodeBlock> dependencyUsage,
-        DaggerElements elements,
         KotlinMetadataUtil metadataUtil) {
-      List<CodeBlock> arguments = new ArrayList<>();
+      ImmutableList.Builder<CodeBlock> arguments = ImmutableList.builder();
       arguments.add(instanceCodeBlock);
       if (!injectionSite.dependencies().isEmpty()) {
         arguments.addAll(
-            injectionSite
-                .dependencies()
-                .stream()
-                .map(dependencyUsage)
-                .collect(toList()));
+            injectionSite.dependencies().stream().map(dependencyUsage).collect(toList()));
       }
-      return create(injectionSite, elements, metadataUtil).invoke(arguments, generatedTypeName);
+
+      ClassName enclosingClass =
+          membersInjectorNameForType(asType(injectionSite.element().getEnclosingElement()));
+      MethodSpec methodSpec = create(injectionSite, metadataUtil);
+      return invokeMethod(methodSpec, arguments.build(), enclosingClass, generatedTypeName);
     }
 
     /*
@@ -380,23 +369,6 @@ final class InjectionMethods {
           + LOWER_CAMEL.to(UPPER_CAMEL, injectionSite.element().getSimpleName().toString())
           + indexString;
     }
-  }
-
-  /**
-   * Returns an argument list suitable for calling an injection method. Down-casts any arguments
-   * that are {@code Object} (or {@code Provider<Object>}) at the caller but not the method.
-   *
-   * @param dependencies the dependencies used by the method
-   * @param dependencyUsage function to apply on each of {@code dependencies} before casting
-   * @param requestingClass the class calling the injection method
-   */
-  private static ImmutableList<CodeBlock> injectionMethodArguments(
-      ImmutableSet<DependencyRequest> dependencies,
-      Function<DependencyRequest, CodeBlock> dependencyUsage,
-      ClassName requestingClass) {
-    return dependencies.stream()
-        .map(dep -> injectionMethodArgument(dep, dependencyUsage.apply(dep), requestingClass))
-        .collect(toImmutableList());
   }
 
   private static CodeBlock injectionMethodArgument(
@@ -437,63 +409,21 @@ final class InjectionMethods {
     return isRawTypePubliclyAccessible(type) ? TypeName.get(type) : TypeName.OBJECT;
   }
 
-  /**
-   * Returns the accessible type for {@code type}. If the raw type is not accessible, returns {@link
-   * Object}.
-   */
-  // TODO(ronshapiro): Can we use DaggerTypes.publiclyAccessibleType in place of this method?
-  private static TypeMirror accessibleType(TypeMirror type, DaggerElements elements) {
-    return isRawTypePubliclyAccessible(type)
-        ? type
-        : elements.getTypeElement(Object.class).asType();
-  }
+  private enum InstanceCastPolicy {
+    CAST_IF_NOT_PUBLIC, IGNORE;
 
-
-  private enum ReceiverAccessibility {
-    CAST_IF_NOT_PUBLIC {
-      @Override
-      TypeMirror parameterType(TypeMirror type, DaggerElements elements) {
-        return accessibleType(type, elements);
-      }
-
-      @Override
-      CodeBlock potentiallyCast(CodeBlock instance, TypeMirror instanceType) {
-        return instanceWithPotentialCast(instance, instanceType);
-      }
-    },
-    IGNORE {
-      @Override
-      TypeMirror parameterType(TypeMirror type, DaggerElements elements) {
-        return type;
-      }
-
-      @Override
-      CodeBlock potentiallyCast(CodeBlock instance, TypeMirror instanceType) {
-        return instance;
-      }
-    },
-    ;
-
-    abstract TypeMirror parameterType(TypeMirror type, DaggerElements elements);
-    abstract CodeBlock potentiallyCast(CodeBlock instance, TypeMirror instanceType);
-  }
-
-  private static CodeBlock instanceWithPotentialCast(CodeBlock instance, TypeMirror instanceType) {
-    return isRawTypePubliclyAccessible(instanceType)
-        ? instance
-        : CodeBlock.of("(($T) $L)", instanceType, instance);
+    boolean useObjectType(TypeMirror instanceType) {
+      return this == CAST_IF_NOT_PUBLIC && !isRawTypePubliclyAccessible(instanceType);
+    }
   }
 
   private enum CheckNotNullPolicy {
     IGNORE, CHECK_FOR_NULL;
+
     CodeBlock checkForNull(CodeBlock maybeNull) {
       return this.equals(IGNORE)
           ? maybeNull
-          : CodeBlock.of(
-              "$T.checkNotNull($L, $S)",
-              Preconditions.class,
-              maybeNull,
-              "Cannot return null from a non-@Nullable @Provides method");
+          : CodeBlock.of("$T.checkNotNullFromProvides($L)", Preconditions.class, maybeNull);
     }
 
     static CheckNotNullPolicy get(ProvisionBinding binding, CompilerOptions compilerOptions) {
@@ -501,87 +431,141 @@ final class InjectionMethods {
     }
   }
 
-  private static InjectionMethod methodProxy(
-      ClassName proxyEnclosingClass,
+  private static MethodSpec methodProxy(
       ExecutableElement method,
       String methodName,
-      ReceiverAccessibility receiverAccessibility,
+      InstanceCastPolicy instanceCastPolicy,
       CheckNotNullPolicy checkNotNullPolicy,
-      DaggerElements elements,
       KotlinMetadataUtil metadataUtil) {
-    TypeElement enclosingType = MoreElements.asType(method.getEnclosingElement());
+    MethodSpec.Builder builder =
+        methodBuilder(methodName).addModifiers(PUBLIC, STATIC).varargs(method.isVarArgs());
+
+    TypeElement enclosingType = asType(method.getEnclosingElement());
     boolean isMethodInKotlinObject = metadataUtil.isObjectClass(enclosingType);
     boolean isMethodInKotlinCompanionObject = metadataUtil.isCompanionObjectClass(enclosingType);
-    InjectionMethod.Builder injectionMethod =
-        InjectionMethod.builder(elements).name(methodName).enclosingClass(proxyEnclosingClass);
-    ParameterSpec instance = null;
-    if (!isMethodInKotlinObject
-        && !isMethodInKotlinCompanionObject
-        && !method.getModifiers().contains(STATIC)) {
-      instance =
-          injectionMethod.addParameter(
-              "instance", receiverAccessibility.parameterType(enclosingType.asType(), elements));
-    }
-
-    CodeBlock arguments = injectionMethod.copyParameters(method);
-    if (!method.getReturnType().getKind().equals(VOID)) {
-      injectionMethod
-          .returnType(method.getReturnType())
-          .nullableAnnotation(getNullableType(method));
-      injectionMethod.methodBodyBuilder().add("return ");
-    }
-    CodeBlock.Builder proxyInvocation = CodeBlock.builder();
+    UniqueNameSet parameterNameSet = new UniqueNameSet();
+    CodeBlock instance;
     if (isMethodInKotlinCompanionObject || method.getModifiers().contains(STATIC)) {
-      proxyInvocation.add("$T", rawTypeName(TypeName.get(enclosingType.asType())));
+      instance = CodeBlock.of("$T", rawTypeName(TypeName.get(enclosingType.asType())));
     } else if (isMethodInKotlinObject) {
       // Call through the singleton instance.
       // See: https://kotlinlang.org/docs/reference/java-to-kotlin-interop.html#static-methods
-      proxyInvocation.add("$T.INSTANCE", rawTypeName(TypeName.get(enclosingType.asType())));
+      instance = CodeBlock.of("$T.INSTANCE", rawTypeName(TypeName.get(enclosingType.asType())));
     } else {
-      injectionMethod.copyTypeParameters(enclosingType);
-      proxyInvocation.add(
-          receiverAccessibility.potentiallyCast(
-              CodeBlock.of("$N", instance), enclosingType.asType()));
+      copyTypeParameters(builder, enclosingType);
+      boolean useObject = instanceCastPolicy.useObjectType(enclosingType.asType());
+      instance = copyInstance(builder, parameterNameSet, enclosingType.asType(), useObject);
     }
+    CodeBlock arguments = copyParameters(builder, parameterNameSet, method.getParameters());
+    CodeBlock invocation =
+        checkNotNullPolicy.checkForNull(
+            CodeBlock.of("$L.$L($L)", instance, method.getSimpleName(), arguments));
 
-    injectionMethod
-        .copyTypeParameters(method)
-        .copyThrows(method);
+    copyTypeParameters(builder, method);
+    copyThrows(builder, method);
 
-    proxyInvocation.add(".$N($L)", method.getSimpleName(), arguments);
-    injectionMethod
-        .methodBodyBuilder()
-        .add(checkNotNullPolicy.checkForNull(proxyInvocation.build()))
-        .add(";\n");
-    return injectionMethod.build();
+    if (method.getReturnType().getKind().equals(VOID)) {
+      return builder.addStatement("$L", invocation).build();
+    } else {
+      getNullableType(method)
+          .ifPresent(annotation -> CodeBlocks.addAnnotation(builder, annotation));
+      return builder
+          .returns(TypeName.get(method.getReturnType()))
+          .addStatement("return $L", invocation).build();
+    }
   }
 
-  private static InjectionMethod fieldProxy(
-      ClassName proxyEnclosingClass,
-      VariableElement field,
-      String methodName,
-      Optional<AnnotationMirror> qualifierAnnotation,
-      DaggerElements elements) {
-    TypeElement enclosingType = MoreElements.asType(field.getEnclosingElement());
-    InjectionMethod.Builder injectionMethod =
-        InjectionMethod.builder(elements)
-            .name(methodName)
-            .enclosingClass(proxyEnclosingClass)
-            .injectedFieldSignature(memberInjectedFieldSignatureForVariable(field));
-    qualifierAnnotation.ifPresent(
-        qualifier -> injectionMethod.qualifierSpec(AnnotationSpec.get(qualifier)));
-    injectionMethod.copyTypeParameters(enclosingType);
+  private static MethodSpec fieldProxy(
+      VariableElement field, String methodName, Optional<AnnotationMirror> qualifierAnnotation) {
+    MethodSpec.Builder builder =
+        methodBuilder(methodName)
+            .addModifiers(PUBLIC, STATIC)
+            .addAnnotation(
+                AnnotationSpec.builder(TypeNames.INJECTED_FIELD_SIGNATURE)
+                    .addMember("value", "$S", memberInjectedFieldSignatureForVariable(field))
+                    .build());
 
-    ParameterSpec instance =
-        injectionMethod.addParameter("instance", accessibleType(enclosingType.asType(), elements));
-    CodeBlock parameter = injectionMethod.copyParameter(field);
-    injectionMethod
-        .methodBodyBuilder()
-        .addStatement(
-            "$L.$L = $L",
-            instanceWithPotentialCast(CodeBlock.of("$N", instance), enclosingType.asType()),
-            field.getSimpleName(),
-            parameter);
-    return injectionMethod.build();
+    qualifierAnnotation.map(AnnotationSpec::get).ifPresent(builder::addAnnotation);
+
+    TypeElement enclosingType = asType(field.getEnclosingElement());
+    copyTypeParameters(builder, enclosingType);
+
+    boolean useObject = !isRawTypePubliclyAccessible(enclosingType.asType());
+    UniqueNameSet parameterNameSet = new UniqueNameSet();
+    CodeBlock instance = copyInstance(builder, parameterNameSet, enclosingType.asType(), useObject);
+    CodeBlock argument = copyParameters(builder, parameterNameSet, ImmutableList.of(field));
+    return builder.addStatement("$L.$L = $L", instance, field.getSimpleName(), argument).build();
+  }
+
+  private static CodeBlock invokeMethod(
+      MethodSpec methodSpec,
+      ImmutableList<CodeBlock> parameters,
+      ClassName enclosingClass,
+      ClassName requestingClass) {
+    checkArgument(methodSpec.parameters.size() == parameters.size());
+    CodeBlock parameterBlock = makeParametersCodeBlock(parameters);
+    return enclosingClass.equals(requestingClass)
+        ? CodeBlock.of("$L($L)", methodSpec.name, parameterBlock)
+        : CodeBlock.of("$T.$L($L)", enclosingClass, methodSpec.name, parameterBlock);
+  }
+
+  private static void copyTypeParameters(
+      MethodSpec.Builder methodBuilder, Parameterizable element) {
+    element.getTypeParameters().stream()
+        .map(TypeVariableName::get)
+        .forEach(methodBuilder::addTypeVariable);
+  }
+
+  private static void copyThrows(MethodSpec.Builder methodBuilder, ExecutableElement method) {
+    method.getThrownTypes().stream().map(TypeName::get).forEach(methodBuilder::addException);
+  }
+
+  private static CodeBlock copyParameters(
+      MethodSpec.Builder methodBuilder,
+      UniqueNameSet parameterNameSet,
+      List<? extends VariableElement> parameters) {
+    return parameters.stream()
+        .map(
+            parameter -> {
+              String name =
+                  parameterNameSet.getUniqueName(validJavaName(parameter.getSimpleName()));
+              TypeMirror type = parameter.asType();
+              boolean useObject = !isRawTypePubliclyAccessible(type);
+              return copyParameter(methodBuilder, type, name, useObject);
+            })
+        .collect(toParametersCodeBlock());
+  }
+
+  private static CodeBlock copyParameter(
+      MethodSpec.Builder methodBuilder, TypeMirror type, String name, boolean useObject) {
+    TypeName typeName = useObject ? TypeName.OBJECT : TypeName.get(type);
+    methodBuilder.addParameter(ParameterSpec.builder(typeName, name).build());
+    return useObject ? CodeBlock.of("($T) $L", type, name) : CodeBlock.of("$L", name);
+  }
+
+  private static CodeBlock copyInstance(
+      MethodSpec.Builder methodBuilder,
+      UniqueNameSet parameterNameSet,
+      TypeMirror type,
+      boolean useObject) {
+    CodeBlock instance =
+        copyParameter(methodBuilder, type, parameterNameSet.getUniqueName("instance"), useObject);
+    // If we had to cast the instance add an extra parenthesis incase we're calling a method on it.
+    return useObject ? CodeBlock.of("($L)", instance) : instance;
+  }
+
+  private static String validJavaName(CharSequence name) {
+    if (SourceVersion.isIdentifier(name)) {
+      return protectAgainstKeywords(name.toString());
+    }
+
+    StringBuilder newName = new StringBuilder(name.length());
+    char firstChar = name.charAt(0);
+    if (!Character.isJavaIdentifierStart(firstChar)) {
+      newName.append('_');
+    }
+
+    name.chars().forEach(c -> newName.append(Character.isJavaIdentifierPart(c) ? c : '_'));
+    return newName.toString();
   }
 }

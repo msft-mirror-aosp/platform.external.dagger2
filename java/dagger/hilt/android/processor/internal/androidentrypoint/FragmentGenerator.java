@@ -40,10 +40,11 @@ public final class FragmentGenerator {
   private final AndroidEntryPointMetadata metadata;
   private final ClassName generatedClassName;
 
-  public FragmentGenerator(ProcessingEnvironment env, AndroidEntryPointMetadata metadata) {
+  public FragmentGenerator(
+      ProcessingEnvironment env,
+      AndroidEntryPointMetadata metadata ) {
     this.env = env;
     this.metadata = metadata;
-
     generatedClassName = metadata.generatedClassName();
   }
 
@@ -73,6 +74,7 @@ public final class FragmentGenerator {
     Generators.addGeneratedBaseClassJavadoc(builder, AndroidClassNames.ANDROID_ENTRY_POINT);
     Processors.addGeneratedAnnotation(builder, env, getClass());
     Generators.copyLintAnnotations(metadata.element(), builder);
+    Generators.addSuppressAnnotation(builder, "deprecation");
     Generators.copyConstructors(metadata.baseElement(), builder);
 
     metadata.baseElement().getTypeParameters().stream()
@@ -83,7 +85,7 @@ public final class FragmentGenerator {
 
     Generators.addInjectionMethods(metadata, builder);
 
-    if (!metadata.overridesAndroidEntryPointClass()) {
+    if (!metadata.overridesAndroidEntryPointClass() ) {
       builder.addMethod(getDefaultViewModelProviderFactory());
     }
 
@@ -200,11 +202,7 @@ public final class FragmentGenerator {
 
   // @Override
   // public ViewModelProvider.Factory getDefaultViewModelProviderFactory() {
-  //   ViewModelProvider.Factory factory = DefaultViewModelFactories.getFragmentFactory(this);
-  //   if (factory != null) {
-  //     return factory;
-  //   }
-  //   return super.getDefaultViewModelProviderFactory();
+  //   return DefaultViewModelFactories.getFragmentFactory(this);
   // }
   private MethodSpec getDefaultViewModelProviderFactory() {
     return MethodSpec.methodBuilder("getDefaultViewModelProviderFactory")
@@ -212,13 +210,8 @@ public final class FragmentGenerator {
         .addModifiers(Modifier.PUBLIC)
         .returns(AndroidClassNames.VIEW_MODEL_PROVIDER_FACTORY)
         .addStatement(
-            "$T factory = $T.getFragmentFactory(this)",
-            AndroidClassNames.VIEW_MODEL_PROVIDER_FACTORY,
+            "return $T.getFragmentFactory(this)",
             AndroidClassNames.DEFAULT_VIEW_MODEL_FACTORIES)
-        .beginControlFlow("if (factory != null)")
-        .addStatement("return factory")
-        .endControlFlow()
-        .addStatement("return super.getDefaultViewModelProviderFactory()")
         .build();
   }
 }
