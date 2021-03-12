@@ -235,6 +235,7 @@ android_library {
         "java/dagger/hilt/android/internal/managers/*.java",
         "java/dagger/hilt/android/internal/migration/*.java",
         "java/dagger/hilt/android/internal/modules/*.java",
+        "java/dagger/hilt/android/lifecycle/*.java",
     ],
     manifest: "java/dagger/hilt/android/AndroidManifest.xml",
     static_libs: [
@@ -265,6 +266,7 @@ android_library {
         "hilt_generates_root_input_processor",
         "hilt_originating_element_processor",
         "hilt_root_processor",
+        "hilt_viewmodel_processor",
     ],
 }
 
@@ -305,7 +307,9 @@ android_library {
         "hilt_generates_root_input_processor",
         "hilt_originating_element_processor",
         "hilt_root_processor",
+	"hilt_viewmodel_processor",
         "hilt_custom_test_application_processor",
+        "hilt_bindvalue_processor",
         "hilt_uninstall_modules_processor",
     ],
 }
@@ -357,11 +361,23 @@ java_plugin {
     processor_class: "dagger.hilt.processor.internal.root.RootProcessor",
 }
 
+java_plugin {
+    name: "hilt_viewmodel_processor",
+    generates_api: true,
+    processor_class: "dagger.hilt.android.processor.internal.viewmodel.ViewModelProcessor",
+}
+
 // Hilt testing processors
 java_plugin {
     name: "hilt_custom_test_application_processor",
     generates_api: true,
     processor_class: "dagger.hilt.android.processor.internal.customtestapplication.CustomTestApplicationProcessor",
+}
+
+java_plugin {
+    name: "hilt_bindvalue_processor",
+    generates_api: true,
+    processor_class: "dagger.hilt.android.processor.internal.bindvalue.BindValueProcessor",
 }
 
 java_plugin {
@@ -375,11 +391,9 @@ java_library_host {
     use_tools_jar: true,
     srcs: [
         "java/dagger/hilt/android/processor/**/*.java",
+        "java/dagger/hilt/android/processor/**/*.kt",
         "java/dagger/hilt/codegen/*.java",
         "java/dagger/hilt/processor/internal/**/*.java",
-    ],
-    exclude_srcs: [
-        "java/dagger/hilt/android/processor/internal/bindvalue/*.java",
     ],
     plugins: [
         "auto_service_plugin",
