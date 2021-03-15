@@ -30,12 +30,12 @@ import com.squareup.javapoet.TypeName;
 import dagger.hilt.processor.internal.ClassNames;
 import dagger.hilt.processor.internal.ComponentDescriptor;
 import dagger.hilt.processor.internal.ComponentTree;
-import dagger.hilt.processor.internal.KotlinMetadata;
+import dagger.hilt.processor.internal.KotlinMetadataUtils;
 import dagger.hilt.processor.internal.Processors;
 import dagger.hilt.processor.internal.aggregateddeps.ComponentDependencies;
 import dagger.hilt.processor.internal.aliasof.AliasOfs;
+import dagger.internal.codegen.kotlin.KotlinMetadataUtil;
 import java.util.List;
-import java.util.Optional;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
@@ -56,6 +56,12 @@ public final class RootMetadata {
     RootMetadata metadata = new RootMetadata(root, componentTree, deps, env);
     metadata.validate();
     return metadata;
+  }
+
+  static RootMetadata copyWithNewTree(
+      RootMetadata other,
+      ComponentTree componentTree) {
+    return create(other.root, componentTree, other.deps, other.env);
   }
 
   private final Root root;
@@ -93,7 +99,7 @@ public final class RootMetadata {
   }
 
   public ImmutableSet<TypeElement> modules(ClassName componentName) {
-    return deps.getModules(componentName, root.classname());
+    return deps.modules().get(componentName, root.classname(), root.isTestRoot());
   }
 
   public ImmutableSet<TypeName> entryPoints(ClassName componentName) {
@@ -143,7 +149,7 @@ public final class RootMetadata {
     for (ComponentDescriptor componentDescriptor : componentTree.getComponentDescriptors()) {
       ClassName componentName = componentDescriptor.component();
       for (TypeElement extraModule : modulesThatDaggerCannotConstruct(componentName)) {
-        if (root.type().isTestRoot() && !componentName.equals(ClassNames.APPLICATION_COMPONENT)) {
+        if (root.type().isTestRoot() && !componentName.equals(ClassNames.SINGLETON_COMPONENT)) {
           env.getMessager()
               .printMessage(
                   Diagnostic.Kind.ERROR,
@@ -167,7 +173,8 @@ public final class RootMetadata {
   private ImmutableSet<TypeName> getUserDefinedEntryPoints(ClassName componentName) {
     ImmutableSet.Builder<TypeName> entryPointSet = ImmutableSet.builder();
     entryPointSet.add(ClassNames.GENERATED_COMPONENT);
-    for (TypeElement element : deps.getEntryPoints(componentName, root.classname())) {
+    for (TypeElement element :
+        deps.entryPoints().get(componentName, root.classname(), root.isTestRoot())) {
       entryPointSet.add(ClassName.get(element));
     }
     return entryPointSet.build();
@@ -194,11 +201,9 @@ public final class RootMetadata {
   }
 
   private static boolean daggerCanConstruct(TypeElement type) {
-    Optional<KotlinMetadata> kotlinMetadata = KotlinMetadata.of(type);
+    KotlinMetadataUtil metadataUtil = KotlinMetadataUtils.getMetadataUtil();
     boolean isKotlinObject =
-        kotlinMetadata
-            .map(metadata -> metadata.isObjectClass() || metadata.isCompanionObjectClass())
-            .orElse(false);
+        metadataUtil.isObjectClass(type) || metadataUtil.isCompanionObjectClass(type);
     if (isKotlinObject) {
       // Treat Kotlin object modules as if Dagger can construct them (it technically can't, but it
       // doesn't need to as it can use them since all their provision methods are static).

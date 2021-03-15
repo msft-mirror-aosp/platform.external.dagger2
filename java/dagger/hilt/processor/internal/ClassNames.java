@@ -24,6 +24,8 @@ import com.squareup.javapoet.ClassName;
 public final class ClassNames {
   public static final ClassName ORIGINATING_ELEMENT =
       get("dagger.hilt.codegen", "OriginatingElement");
+  public static final ClassName AGGREGATED_DEPS =
+      get("dagger.hilt.processor.internal.aggregateddeps", "AggregatedDeps");
   public static final ClassName GENERATED_COMPONENT =
       get("dagger.hilt.internal", "GeneratedComponent");
   public static final ClassName GENERATED_COMPONENT_MANAGER =
@@ -41,6 +43,7 @@ public final class ClassNames {
   public static final ClassName DEFINE_COMPONENT_CLASSES =
       get("dagger.hilt.internal.definecomponent", "DefineComponentClasses");
 
+  public static final ClassName ASSISTED_INJECT = get("dagger.assisted", "AssistedInject");
   public static final ClassName BINDS =
       get("dagger", "Binds");
   public static final ClassName BINDS_OPTIONAL_OF =
@@ -48,6 +51,9 @@ public final class ClassNames {
   public static final ClassName MODULE = get("dagger", "Module");
   public static final ClassName MULTIBINDS =
       get("dagger.multibindings", "Multibinds");
+  public static final ClassName INTO_MAP = get("dagger.multibindings", "IntoMap");
+  public static final ClassName INTO_SET = get("dagger.multibindings", "IntoSet");
+  public static final ClassName STRING_KEY = get("dagger.multibindings", "StringKey");
   public static final ClassName PROVIDES =
       get("dagger", "Provides");
   public static final ClassName COMPONENT = get("dagger", "Component");
@@ -67,6 +73,7 @@ public final class ClassNames {
       get("javax.inject", "Qualifier");
   public static final ClassName SCOPE =
       get("javax.inject", "Scope");
+  public static final ClassName PROVIDER = get("javax.inject", "Provider");
   public static final ClassName DISABLE_INSTALL_IN_CHECK =
       get("dagger.hilt.migration", "DisableInstallInCheck");
   public static final ClassName ALIAS_OF = get("dagger.hilt.migration", "AliasOf");
@@ -86,6 +93,7 @@ public final class ClassNames {
 
   public static final ClassName INSTALL_IN =
       get("dagger.hilt", "InstallIn");
+  public static final ClassName TEST_INSTALL_IN = get("dagger.hilt.testing", "TestInstallIn");
   public static final ClassName ENTRY_POINT =
       get("dagger.hilt", "EntryPoint");
   public static final ClassName ENTRY_POINTS = get("dagger.hilt", "EntryPoints");
@@ -159,9 +167,7 @@ public final class ClassNames {
   public static final ClassName ARRAYS = get("java.util", "Arrays");
 
   // Standard components
-  public static final ClassName LEGACY_APPLICATION_COMPONENT =
-      get("dagger.hilt.android.components", "ApplicationComponent");
-  public static final ClassName APPLICATION_COMPONENT =
+  public static final ClassName SINGLETON_COMPONENT =
       get("dagger.hilt.components", "SingletonComponent");
   public static final ClassName ACTIVITY_COMPONENT =
       get("dagger.hilt.android.components", "ActivityComponent");
