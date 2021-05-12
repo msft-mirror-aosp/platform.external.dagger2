@@ -22,6 +22,8 @@ import static dagger.internal.codegen.CompilerMode.DEFAULT_MODE;
 import static dagger.internal.codegen.CompilerMode.FAST_INIT_MODE;
 import static dagger.internal.codegen.Compilers.compilerWithOptions;
 import static dagger.internal.codegen.Compilers.daggerCompiler;
+import static dagger.internal.codegen.GeneratedLines.GENERATED_CODE_ANNOTATIONS;
+import static dagger.internal.codegen.GeneratedLines.IMPORT_GENERATED_ANNOTATION;
 
 import com.google.auto.common.MoreElements;
 import com.google.common.base.Predicate;
@@ -175,12 +177,12 @@ public class ComponentProcessorTest {
             .addLines(
                 "package test;",
                 "",
-                GeneratedLines.generatedImports(
-                    "import dagger.Lazy;",
-                    "import dagger.internal.DoubleCheck;",
-                    "import javax.inject.Provider;"),
+                "import dagger.Lazy;",
+                "import dagger.internal.DoubleCheck;",
+                IMPORT_GENERATED_ANNOTATION,
+                "import javax.inject.Provider;",
                 "",
-                GeneratedLines.generatedAnnotations(),
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerSimpleComponent implements SimpleComponent {")
             .addLinesIn(
                 FAST_INIT_MODE,
@@ -296,7 +298,7 @@ public class ComponentProcessorTest {
             .addLines(
                 "package test;",
                 "",
-                GeneratedLines.generatedAnnotations(),
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerSimpleComponent implements SimpleComponent {")
             .addLinesIn(
                 FAST_INIT_MODE,
@@ -415,7 +417,7 @@ public class ComponentProcessorTest {
             .addLines(
                 "package test;",
                 "",
-                GeneratedLines.generatedAnnotations(),
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerOuterType_SimpleComponent",
                 "    implements OuterType.SimpleComponent {",
                 "  private DaggerOuterType_SimpleComponent() {}",
@@ -496,9 +498,10 @@ public class ComponentProcessorTest {
             .addLines(
                 "package test;",
                 "",
-                GeneratedLines.generatedImports("import dagger.internal.Preconditions;"),
+                "import dagger.internal.Preconditions;",
+                IMPORT_GENERATED_ANNOTATION,
                 "",
-                GeneratedLines.generatedAnnotations(),
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  private final TestModule testModule;",
                 "",
@@ -601,7 +604,7 @@ public class ComponentProcessorTest {
             .addLines(
                 "package test;",
                 "",
-                GeneratedLines.generatedAnnotations(),
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  private B b() {",
                 "    return TestModule_BFactory.b(new C());",
@@ -695,9 +698,10 @@ public class ComponentProcessorTest {
         "test.DaggerTestComponent",
         "package test;",
         "",
-        GeneratedLines.generatedImports("import dagger.internal.Preconditions;"),
+        "import dagger.internal.Preconditions;",
+        IMPORT_GENERATED_ANNOTATION,
         "",
-        GeneratedLines.generatedAnnotations(),
+        GENERATED_CODE_ANNOTATIONS,
         "final class DaggerTestComponent implements TestComponent {",
         "  static final class Builder {",
         "",
@@ -878,9 +882,10 @@ public class ComponentProcessorTest {
             "test.DaggerParent",
             "package test;",
             "",
-            GeneratedLines.generatedImports("import dagger.internal.Preconditions;"),
+            "import dagger.internal.Preconditions;",
+            IMPORT_GENERATED_ANNOTATION,
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerParent implements Parent {",
             "",
             "  private DaggerParent() {}",
@@ -992,7 +997,7 @@ public class ComponentProcessorTest {
                 "",
                 "import com.google.errorprone.annotations.CanIgnoreReturnValue;",
                 "",
-                GeneratedLines.generatedAnnotations(),
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerSimpleComponent implements SimpleComponent {",
                 "  @Override",
                 "  public void inject(SomeInjectedType instance) {",
@@ -1048,7 +1053,7 @@ public class ComponentProcessorTest {
             "test.DaggerSimpleComponent",
             "package test;",
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerSimpleComponent implements SimpleComponent {",
             "  private Provider<SimpleComponent> simpleComponentProvider;",
             "",
@@ -1112,7 +1117,7 @@ public class ComponentProcessorTest {
                 "",
                 "import com.google.errorprone.annotations.CanIgnoreReturnValue;",
                 "",
-                GeneratedLines.generatedAnnotations(),
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerSimpleComponent implements SimpleComponent {",
                 "  @Override",
                 "  public SomeInjectedType createAndInject() {",
@@ -1180,7 +1185,7 @@ public class ComponentProcessorTest {
             .addLines(
                 "package test;",
                 "",
-                GeneratedLines.generatedAnnotations(),
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerBComponent implements BComponent {")
             .addLinesIn(DEFAULT_MODE, "  private Provider<A> aProvider;")
             .addLinesIn(
@@ -1227,7 +1232,7 @@ public class ComponentProcessorTest {
                 "  }")
             .addLinesIn(
                 DEFAULT_MODE,
-                "  private static final class test_AComponent_a implements Provider<A> {",
+                "  private static class test_AComponent_a implements Provider<A> {",
                 "    private final AComponent aComponent;",
                 "    ",
                 "    test_AComponent_a(AComponent aComponent) {",
@@ -1313,7 +1318,7 @@ public class ComponentProcessorTest {
             "test.DaggerTestComponent",
             "package test;",
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerTestComponent implements TestComponent {",
             "  private final TestModule testModule;",
             "  private final other.test.TestModule testModule2;",
@@ -1435,9 +1440,10 @@ public class ComponentProcessorTest {
             "test.DaggerBComponent",
             "package test;",
             "",
-            GeneratedLines.generatedImports("import dagger.internal.Preconditions;"),
+            "import dagger.internal.Preconditions;",
+            IMPORT_GENERATED_ANNOTATION,
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerBComponent implements BComponent {",
             "  private final AComponent aComponent;",
             "",
@@ -1519,7 +1525,9 @@ public class ComponentProcessorTest {
             .addLines(
                 "package test;",
                 "",
-                GeneratedLines.generatedAnnotations(),
+                IMPORT_GENERATED_ANNOTATION,
+                "",
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  private B b() {",
                 "    return new B(new C());",
@@ -1597,9 +1605,9 @@ public class ComponentProcessorTest {
             "test.DaggerSimpleComponent",
             "package test;",
             "",
-            GeneratedLines.generatedImports(),
+            IMPORT_GENERATED_ANNOTATION,
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerSimpleComponent implements SimpleComponent {",
             "  private DaggerSimpleComponent() {}",
             "",
@@ -1668,7 +1676,7 @@ public class ComponentProcessorTest {
             "test.DaggerSimpleComponent",
             "package test;",
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerSimpleComponent implements SimpleComponent {",
             "  @Override",
             "  public SomeInjectableType someInjectableType() {",
@@ -2038,9 +2046,10 @@ public class ComponentProcessorTest {
             "test.DaggerParent",
             "package test;",
             "",
-            GeneratedLines.generatedImports("import dagger.internal.Preconditions;"),
+            "import dagger.internal.Preconditions;",
+            IMPORT_GENERATED_ANNOTATION,
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerParent implements Parent {",
             "  private DaggerParent() {",
             "  }",
@@ -2181,7 +2190,7 @@ public class ComponentProcessorTest {
                 "test.TestModule_NonNullableStringFactory",
                 "package test;",
                 "",
-                GeneratedLines.generatedAnnotations(),
+                GENERATED_CODE_ANNOTATIONS,
                 "public final class TestModule_NonNullableStringFactory",
                 "    implements Factory<String> {",
                 "  @Override",
@@ -2201,7 +2210,7 @@ public class ComponentProcessorTest {
             .addLines(
                 "package test;",
                 "",
-                GeneratedLines.generatedAnnotations(),
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  @Override",
                 "  public String nonNullableString() {",
@@ -2271,7 +2280,7 @@ public class ComponentProcessorTest {
                 "test.TestModule_PrimitiveIntegerFactory",
                 "package test;",
                 "",
-                GeneratedLines.generatedAnnotations(),
+                GENERATED_CODE_ANNOTATIONS,
                 "public final class TestModule_PrimitiveIntegerFactory",
                 "    implements Factory<Integer> {",
                 "",
@@ -2291,7 +2300,7 @@ public class ComponentProcessorTest {
             .addLines(
                 "package test;",
                 "",
-                GeneratedLines.generatedAnnotations(),
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  @Override",
                 "  public Integer nonNullableInteger() {",
@@ -2367,7 +2376,7 @@ public class ComponentProcessorTest {
         JavaFileObjects.forSourceLines(
             "test.DaggerParent",
             "package test;",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerParent implements Parent {",
             "  private String string() {",
             "    return TestModule_StringFactory.string(numberProvider.get());",
@@ -2437,7 +2446,7 @@ public class ComponentProcessorTest {
         JavaFileObjects.forSourceLines(
             "test.DaggerParent",
             "package test;",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerParent implements Parent {",
             "  private final class ChildImpl implements Child {",
             "    @Override",
@@ -2504,7 +2513,7 @@ public class ComponentProcessorTest {
             "test.DaggerTestComponent",
             "package test;",
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerTestComponent implements TestComponent {",
             "  @Override",
             "  public Injected injected() {",
@@ -2577,7 +2586,7 @@ public class ComponentProcessorTest {
             "test.DaggerTestComponent",
             "package test;",
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerTestComponent implements TestComponent {",
             "  @Override",
             "  public String unqualified() {",
@@ -2629,9 +2638,9 @@ public class ComponentProcessorTest {
                 "test.DaggerPublicComponent",
                 "package test;",
                 "",
-                GeneratedLines.generatedImports(),
+                IMPORT_GENERATED_ANNOTATION,
                 "",
-                GeneratedLines.generatedAnnotations(),
+                GENERATED_CODE_ANNOTATIONS,
                 "public final class DaggerPublicComponent implements PublicComponent {",
                 "  private DaggerPublicComponent() {}",
                 "",
