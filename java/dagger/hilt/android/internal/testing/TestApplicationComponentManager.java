@@ -21,7 +21,7 @@ import dagger.hilt.android.testing.OnComponentReadyRunner;
 import dagger.hilt.android.testing.OnComponentReadyRunner.OnComponentReadyRunnerHolder;
 import dagger.hilt.internal.GeneratedComponentManager;
 import dagger.hilt.internal.Preconditions;
-import dagger.hilt.internal.TestSingletonComponentManager;
+import java.lang.reflect.InvocationTargetException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -35,18 +35,17 @@ import org.junit.runner.Description;
  * <p>A manager for the creation of components that live in the test Application.
  */
 public final class TestApplicationComponentManager
-    implements TestSingletonComponentManager, OnComponentReadyRunnerHolder {
+    implements GeneratedComponentManager<Object>, OnComponentReadyRunnerHolder {
 
-  private final Object earlyComponentLock = new Object();
-  private volatile Object earlyComponent = null;
-
-  private final Object testComponentDataLock = new Object();
-  private volatile TestComponentData testComponentData;
+  // This is a generated class that we always generate in a known location.
+  private static final String TEST_COMPONENT_DATA_SUPPLIER_IMPL =
+      "dagger.hilt.android.internal.testing.TestComponentDataSupplierImpl";
 
   private final Application application;
+  private final Map<Class<?>, TestComponentData> testComponentDataSupplier;
+
   private final AtomicReference<Object> component = new AtomicReference<>();
   private final AtomicReference<Description> hasHiltTestRule = new AtomicReference<>();
-  // TODO(bcorso): Consider using a lock here rather than ConcurrentHashMap to avoid b/37042460.
   private final Map<Class<?>, Object> registeredModules = new ConcurrentHashMap<>();
   private final AtomicReference<Boolean> autoAddModuleEnabled = new AtomicReference<>();
   private final AtomicReference<DelayedComponentState> delayedComponentState =
@@ -76,18 +75,24 @@ public final class TestApplicationComponentManager
 
   public TestApplicationComponentManager(Application application) {
     this.application = application;
-  }
-
-  @Override
-  public Object earlySingletonComponent() {
-    if (earlyComponent == null) {
-      synchronized (earlyComponentLock) {
-        if (earlyComponent == null) {
-          earlyComponent = EarlySingletonComponentCreator.createComponent();
-        }
-      }
+    try {
+      this.testComponentDataSupplier =
+          Class.forName(TEST_COMPONENT_DATA_SUPPLIER_IMPL)
+              .asSubclass(TestComponentDataSupplier.class)
+              .getDeclaredConstructor()
+              .newInstance()
+              .get();
+    } catch (ClassNotFoundException
+        | NoSuchMethodException
+        | IllegalAccessException
+        | InstantiationException
+        | InvocationTargetException e) {
+      throw new RuntimeException(
+          "Hilt classes generated from @HiltAndroidTest are missing. Check that you have annotated "
+              + "your test class with @HiltAndroidTest and that the processor is running over your "
+              + "test",
+          e);
     }
-    return earlyComponent;
   }
 
   @Override
@@ -144,9 +149,6 @@ public final class TestApplicationComponentManager
         testInstance == null,
         "The Hilt BindValue instance cannot be set before Hilt's test rule has run.");
     Preconditions.checkState(
-        testComponentData == null,
-        "The testComponentData instance cannot be set before Hilt's test rule has run.");
-    Preconditions.checkState(
         registeredModules.isEmpty(),
         "The Hilt registered modules cannot be set before Hilt's test rule has run.");
     Preconditions.checkState(
@@ -169,7 +171,6 @@ public final class TestApplicationComponentManager
     component.set(null);
     hasHiltTestRule.set(null);
     testInstance = null;
-    testComponentData = null;
     registeredModules.clear();
     autoAddModuleEnabled.set(null);
     delayedComponentState.set(DelayedComponentState.NOT_DELAYED);
@@ -307,14 +308,7 @@ public final class TestApplicationComponentManager
   }
 
   private TestComponentData testComponentData() {
-    if (testComponentData == null) {
-      synchronized (testComponentDataLock) {
-        if (testComponentData == null) {
-          testComponentData = TestComponentDataSupplier.get(testClass());
-        }
-      }
-    }
-    return testComponentData;
+    return testComponentDataSupplier.get(testClass());
   }
 
   private Class<?> testClass() {
