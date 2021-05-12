@@ -17,12 +17,10 @@
 package dagger.hilt.processor.internal;
 
 import static com.google.auto.common.MoreElements.asPackage;
-import static com.google.auto.common.MoreElements.asType;
 import static com.google.auto.common.MoreElements.asVariable;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static dagger.internal.codegen.extension.DaggerCollectors.toOptional;
 import static javax.lang.model.element.Modifier.ABSTRACT;
-import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
 
 import com.google.auto.common.AnnotationMirrors;
@@ -43,7 +41,6 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.SetMultimap;
 import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
-import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
@@ -51,7 +48,6 @@ import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 import dagger.internal.codegen.extension.DaggerStreams;
 import dagger.internal.codegen.kotlin.KotlinMetadataUtil;
-import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -91,26 +87,6 @@ public final class Processors {
   public static final String STATIC_INITIALIZER_NAME = "<clinit>";
 
   private static final String JAVA_CLASS = "java.lang.Class";
-
-  public static void generateAggregatingClass(
-      String aggregatingPackage,
-      AnnotationSpec aggregatingAnnotation,
-      TypeElement element,
-      Class<?> generatedAnnotationClass,
-      ProcessingEnvironment env) throws IOException {
-    ClassName name = ClassName.get(aggregatingPackage, "_" + getFullEnclosedName(element));
-    TypeSpec.Builder builder =
-        TypeSpec.classBuilder(name)
-            .addModifiers(PUBLIC)
-            .addOriginatingElement(element)
-            .addAnnotation(aggregatingAnnotation)
-            .addJavadoc("This class should only be referenced by generated code!")
-            .addJavadoc("This class aggregates information across multiple compilations.\n");;
-
-    addGeneratedAnnotation(builder, env, generatedAnnotationClass);
-
-    JavaFile.builder(name.packageName(), builder.build()).build().writeTo(env.getFiler());
-  }
 
   /** Returns a map from {@link AnnotationMirror} attribute name to {@link AnnotationValue}s */
   public static ImmutableMap<String, AnnotationValue> getAnnotationValues(Elements elements,
@@ -535,14 +511,6 @@ public final class Processors {
     return ClassName.get(className.packageName(), getEnclosedName(className));
   }
 
-  /**
-   * Returns an equivalent class name with the {@code .} (dots) used for inner classes replaced with
-   * {@code _}.
-   */
-  public static ClassName getEnclosedClassName(TypeElement typeElement) {
-    return getEnclosedClassName(ClassName.get(typeElement));
-  }
-
   /** Returns the fully qualified class name, with _ instead of . */
   public static String getFullyQualifiedEnclosedClassName(ClassName className) {
     return className.packageName().replace('.', '_') + getEnclosedName(className);
@@ -925,10 +893,7 @@ public final class Processors {
     return ElementFilter.methodsIn(elements.getAllMembers(module)).stream()
         .filter(Processors::isBindingMethod)
         .map(ExecutableElement::getModifiers)
-        .anyMatch(modifiers -> !modifiers.contains(ABSTRACT) && !modifiers.contains(STATIC))
-        // TODO(erichang): Getting a new KotlinMetadataUtil each time isn't great here, but until
-        // we have some sort of dependency management it will be difficult to share the instance.
-        && !KotlinMetadataUtils.getMetadataUtil().isObjectOrCompanionObjectClass(module);
+        .anyMatch(modifiers -> !modifiers.contains(ABSTRACT) && !modifiers.contains(STATIC));
   }
 
   private static boolean isBindingMethod(ExecutableElement method) {
@@ -969,28 +934,6 @@ public final class Processors {
     return (typeName instanceof ParameterizedTypeName)
         ? ((ParameterizedTypeName) typeName).rawType
         : typeName;
-  }
-
-  public static Optional<TypeElement> getOriginatingTestElement(
-      Element element, Elements elements) {
-    TypeElement topLevelType = getOriginatingTopLevelType(element, elements);
-    return hasAnnotation(topLevelType, ClassNames.HILT_ANDROID_TEST)
-        ? Optional.of(asType(topLevelType))
-        : Optional.empty();
-  }
-
-  private static TypeElement getOriginatingTopLevelType(Element element, Elements elements) {
-    TypeElement topLevelType = getTopLevelType(element);
-    if (hasAnnotation(topLevelType, ClassNames.ORIGINATING_ELEMENT)) {
-      return getOriginatingTopLevelType(
-          getAnnotationClassValue(
-              elements,
-              getAnnotationMirror(topLevelType, ClassNames.ORIGINATING_ELEMENT),
-              "topLevelClass"),
-          elements);
-    }
-
-    return topLevelType;
   }
 
   private Processors() {}
