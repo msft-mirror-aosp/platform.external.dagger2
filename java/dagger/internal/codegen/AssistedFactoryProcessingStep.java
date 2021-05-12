@@ -34,7 +34,6 @@ import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
 
 import com.google.auto.common.MoreElements;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
@@ -138,7 +137,7 @@ final class AssistedFactoryProcessingStep extends TypeCheckingProcessingStep<Typ
       }
 
       ImmutableSet<ExecutableElement> abstractFactoryMethods =
-          AssistedInjectionAnnotations.assistedFactoryMethods(factory, elements);
+          AssistedInjectionAnnotations.assistedFactoryMethods(factory, elements, types);
 
       if (abstractFactoryMethods.isEmpty()) {
         report.addError(
@@ -227,6 +226,11 @@ final class AssistedFactoryProcessingStep extends TypeCheckingProcessingStep<Typ
     }
 
     @Override
+    public ClassName nameGeneratedType(ProvisionBinding binding) {
+      return generatedClassNameForBinding(binding);
+    }
+
+    @Override
     public Element originatingElement(ProvisionBinding binding) {
       return binding.bindingElement().get();
     }
@@ -264,10 +268,10 @@ final class AssistedFactoryProcessingStep extends TypeCheckingProcessingStep<Typ
     //   }
     // }
     @Override
-    public ImmutableList<TypeSpec.Builder> topLevelTypes(ProvisionBinding binding) {
+    public Optional<TypeSpec.Builder> write(ProvisionBinding binding) {
       TypeElement factory = asType(binding.bindingElement().get());
 
-      ClassName name = generatedClassNameForBinding(binding);
+      ClassName name = nameGeneratedType(binding);
       TypeSpec.Builder builder =
           TypeSpec.classBuilder(name)
               .addModifiers(PUBLIC, FINAL)
@@ -329,7 +333,7 @@ final class AssistedFactoryProcessingStep extends TypeCheckingProcessingStep<Typ
                       name,
                       delegateFactoryParam)
                   .build());
-      return ImmutableList.of(builder);
+      return Optional.of(builder);
     }
 
     /** Returns the generated factory {@link TypeName type} for an @AssistedInject constructor. */
