@@ -19,6 +19,7 @@ package dagger.hilt.processor.internal.root;
 import com.squareup.javapoet.ClassName;
 import dagger.hilt.processor.internal.ClassNames;
 import dagger.hilt.processor.internal.Processors;
+import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.TypeElement;
 
 /** The valid root types for Hilt applications. */
@@ -46,7 +47,7 @@ import javax.lang.model.element.TypeElement;
     return annotation;
   }
 
-  public static RootType of(TypeElement element) {
+  public static RootType of(ProcessingEnvironment env, TypeElement element) {
     if (Processors.hasAnnotation(element, ClassNames.HILT_ANDROID_APP)) {
       return ROOT;
     } else if (Processors.hasAnnotation(element, ClassNames.HILT_ANDROID_TEST)) {
