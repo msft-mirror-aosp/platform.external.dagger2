@@ -21,6 +21,8 @@ import static dagger.internal.codegen.CompilerMode.DEFAULT_MODE;
 import static dagger.internal.codegen.CompilerMode.FAST_INIT_MODE;
 import static dagger.internal.codegen.Compilers.compilerWithOptions;
 import static dagger.internal.codegen.Compilers.daggerCompiler;
+import static dagger.internal.codegen.GeneratedLines.GENERATED_CODE_ANNOTATIONS;
+import static dagger.internal.codegen.GeneratedLines.IMPORT_GENERATED_ANNOTATION;
 
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
@@ -455,7 +457,7 @@ public class SubcomponentValidationTest {
             .addLines(
                 "package test;",
                 "",
-                GeneratedLines.generatedAnnotations(),
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerParentComponent implements ParentComponent {")
             .addLinesIn(
                 DEFAULT_MODE,
@@ -654,7 +656,7 @@ public class SubcomponentValidationTest {
             "",
             "import test.subpackage.Sub;",
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerParentComponent implements ParentComponent {",
             "  @Override",
             "  public Foo.Sub newInstanceSubcomponent() {",
@@ -681,10 +683,10 @@ public class SubcomponentValidationTest {
             "    private final class B_SubImpl implements Bar.Sub {",
             "      @Override",
             "      public Sub newSubcomponentInSubpackage() {",
-            "        return new ts_SubI();",
+            "        return new ts_SubImpl();",
             "      }",
             "",
-            "      private final class ts_SubI implements Sub {}",
+            "      private final class ts_SubImpl implements Sub {}",
             "    }",
             "  }",
             "",
@@ -736,7 +738,7 @@ public class SubcomponentValidationTest {
             "test.DaggerParentComponent",
             "package test;",
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerParentComponent implements ParentComponent {",
             "  @Override",
             "  public Sub newSubcomponent() {",
@@ -801,7 +803,7 @@ public class SubcomponentValidationTest {
         JavaFileObjects.forSourceLines(
             "DaggerParentComponent",
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerParentComponent implements ParentComponent {",
             "  @Override",
             "  public Sub newSubcomponent() {",
@@ -878,7 +880,7 @@ public class SubcomponentValidationTest {
             "",
             "import top1.a.b.c.d.E;",
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerParentComponent implements ParentComponent {",
             "  @Override",
             "  public E.F.Sub top1() {",
@@ -935,7 +937,7 @@ public class SubcomponentValidationTest {
             "test.DaggerC",
             "package test;",
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerC implements C {",
             "  @Override",
             "  public Foo.C newInstanceC() {",
@@ -994,9 +996,9 @@ public class SubcomponentValidationTest {
             "test.DaggerC",
             "package test;",
             "",
-            GeneratedLines.generatedImports(),
+            IMPORT_GENERATED_ANNOTATION,
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerC implements C {",
             "  @Override",
             "  public C.Foo.Sub.Builder fooBuilder() {",
