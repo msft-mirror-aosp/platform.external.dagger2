@@ -97,27 +97,32 @@ public final class FactoryGenerator extends SourceFileGenerator<ProvisionBinding
   }
 
   @Override
+  public ClassName nameGeneratedType(ProvisionBinding binding) {
+    return generatedClassNameForBinding(binding);
+  }
+
+  @Override
   public Element originatingElement(ProvisionBinding binding) {
     // we only create factories for bindings that have a binding element
     return binding.bindingElement().get();
   }
 
   @Override
-  public ImmutableList<TypeSpec.Builder> topLevelTypes(ProvisionBinding binding) {
+  public Optional<TypeSpec.Builder> write(ProvisionBinding binding) {
     // We don't want to write out resolved bindings -- we want to write out the generic version.
     checkArgument(!binding.unresolved().isPresent());
     checkArgument(binding.bindingElement().isPresent());
 
     if (binding.factoryCreationStrategy().equals(DELEGATE)) {
-      return ImmutableList.of();
+      return Optional.empty();
     }
 
-    return ImmutableList.of(factoryBuilder(binding));
+    return Optional.of(factoryBuilder(binding));
   }
 
   private TypeSpec.Builder factoryBuilder(ProvisionBinding binding) {
     TypeSpec.Builder factoryBuilder =
-        classBuilder(generatedClassNameForBinding(binding))
+        classBuilder(nameGeneratedType(binding))
             .addModifiers(PUBLIC, FINAL)
             .addTypeVariables(bindingTypeElementTypeVariableNames(binding));
 
@@ -189,9 +194,8 @@ public final class FactoryGenerator extends SourceFileGenerator<ProvisionBinding
     switch (binding.factoryCreationStrategy()) {
       case SINGLETON_INSTANCE:
         FieldSpec.Builder instanceFieldBuilder =
-            FieldSpec.builder(
-                    generatedClassNameForBinding(binding), "INSTANCE", PRIVATE, STATIC, FINAL)
-                .initializer("new $T()", generatedClassNameForBinding(binding));
+            FieldSpec.builder(nameGeneratedType(binding), "INSTANCE", PRIVATE, STATIC, FINAL)
+                .initializer("new $T()", nameGeneratedType(binding));
 
         if (!bindingTypeElementTypeVariableNames(binding).isEmpty()) {
           // If the factory has type parameters, ignore them in the field declaration & initializer
@@ -199,8 +203,7 @@ public final class FactoryGenerator extends SourceFileGenerator<ProvisionBinding
           createMethodBuilder.addAnnotation(suppressWarnings(UNCHECKED));
         }
 
-        ClassName instanceHolderName =
-            generatedClassNameForBinding(binding).nestedClass("InstanceHolder");
+        ClassName instanceHolderName = nameGeneratedType(binding).nestedClass("InstanceHolder");
         createMethodBuilder.addStatement("return $T.INSTANCE", instanceHolderName);
         factoryBuilder.addType(
             TypeSpec.classBuilder(instanceHolderName)
@@ -245,7 +248,7 @@ public final class FactoryGenerator extends SourceFileGenerator<ProvisionBinding
             request ->
                 frameworkTypeUsageStatement(
                     CodeBlock.of("$N", frameworkFields.get(request)), request.kind()),
-            generatedClassNameForBinding(binding),
+            nameGeneratedType(binding),
             moduleParameter(binding).map(module -> CodeBlock.of("$N", module)),
             compilerOptions,
             metadataUtil);
@@ -262,7 +265,7 @@ public final class FactoryGenerator extends SourceFileGenerator<ProvisionBinding
           .addCode(
               InjectionSiteMethod.invokeAll(
                   binding.injectionSites(),
-                  generatedClassNameForBinding(binding),
+                  nameGeneratedType(binding),
                   instance,
                   binding.key().type(),
                   frameworkFieldUsages(binding.dependencies(), frameworkFields)::get,
