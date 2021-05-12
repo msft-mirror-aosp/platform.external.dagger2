@@ -157,22 +157,28 @@ class IncrementalProcessorTest {
     genActivityInjector2 = File(projectRoot, "$GEN_SRC_DIR/simple/Activity2_GeneratedInjector.java")
     genAppInjectorDeps = File(
       projectRoot,
-      "$GEN_SRC_DIR/hilt_aggregated_deps/_simple_SimpleApp_GeneratedInjector.java"
+      "$GEN_SRC_DIR/hilt_aggregated_deps/simple_SimpleApp_GeneratedInjectorModuleDeps.java"
     )
     genActivityInjectorDeps1 = File(
       projectRoot,
-      "$GEN_SRC_DIR/hilt_aggregated_deps/_simple_Activity1_GeneratedInjector.java"
+      "$GEN_SRC_DIR/hilt_aggregated_deps/simple_Activity1_GeneratedInjectorModuleDeps.java"
     )
     genActivityInjectorDeps2 = File(
       projectRoot,
-      "$GEN_SRC_DIR/hilt_aggregated_deps/_simple_Activity2_GeneratedInjector.java"
+      "$GEN_SRC_DIR/hilt_aggregated_deps/simple_Activity2_GeneratedInjectorModuleDeps.java"
     )
     genModuleDeps1 = File(
       projectRoot,
-      "$GEN_SRC_DIR/hilt_aggregated_deps/_simple_Module1.java"
+      "$GEN_SRC_DIR/hilt_aggregated_deps/simple_Module1ModuleDeps.java"
     )
-    genModuleDeps2 = File(projectRoot, "$GEN_SRC_DIR/hilt_aggregated_deps/_simple_Module2.java")
-    genHiltComponents = File(projectRoot, "$GEN_SRC_DIR/simple/SimpleApp_HiltComponents.java")
+    genModuleDeps2 = File(
+      projectRoot,
+      "$GEN_SRC_DIR/hilt_aggregated_deps/simple_Module2ModuleDeps.java"
+    )
+    genHiltComponents = File(
+      projectRoot,
+      "$GEN_SRC_DIR/simple/SimpleApp_HiltComponents.java"
+    )
     genDaggerHiltApplicationComponent = File(
       projectRoot,
       "$GEN_SRC_DIR/simple/DaggerSimpleApp_HiltComponents_SingletonC.java"
@@ -197,18 +203,24 @@ class IncrementalProcessorTest {
     )
     classGenAppInjectorDeps = File(
       projectRoot,
-      "$CLASS_DIR/hilt_aggregated_deps/_simple_SimpleApp_GeneratedInjector.class"
+      "$CLASS_DIR/hilt_aggregated_deps/simple_SimpleApp_GeneratedInjectorModuleDeps.class"
     )
     classGenActivityInjectorDeps1 = File(
       projectRoot,
-      "$CLASS_DIR/hilt_aggregated_deps/_simple_Activity1_GeneratedInjector.class"
+      "$CLASS_DIR/hilt_aggregated_deps/simple_Activity1_GeneratedInjectorModuleDeps.class"
     )
     classGenActivityInjectorDeps2 = File(
       projectRoot,
-      "$CLASS_DIR/hilt_aggregated_deps/_simple_Activity2_GeneratedInjector.class"
+      "$CLASS_DIR/hilt_aggregated_deps/simple_Activity2_GeneratedInjectorModuleDeps.class"
     )
-    classGenModuleDeps1 = File(projectRoot, "$CLASS_DIR/hilt_aggregated_deps/_simple_Module1.class")
-    classGenModuleDeps2 = File(projectRoot, "$CLASS_DIR/hilt_aggregated_deps/_simple_Module2.class")
+    classGenModuleDeps1 = File(
+      projectRoot,
+      "$CLASS_DIR/hilt_aggregated_deps/simple_Module1ModuleDeps.class"
+    )
+    classGenModuleDeps2 = File(
+      projectRoot,
+      "$CLASS_DIR/hilt_aggregated_deps/simple_Module2ModuleDeps.class"
+    )
     classGenHiltComponents = File(
       projectRoot,
       "$CLASS_DIR/simple/SimpleApp_HiltComponents.class"
