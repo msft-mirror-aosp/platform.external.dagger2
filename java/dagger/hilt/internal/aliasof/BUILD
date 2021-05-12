@@ -17,7 +17,7 @@
 
 package(default_visibility = ["//:src"])
 
-java_library(
+android_library(
     name = "aliasof",
     srcs = ["AliasOfPropagatedData.java"],
 )
