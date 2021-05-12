@@ -18,6 +18,8 @@ package dagger.internal.codegen;
 
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static dagger.internal.codegen.Compilers.compilerWithOptions;
+import static dagger.internal.codegen.GeneratedLines.GENERATED_CODE_ANNOTATIONS;
+import static dagger.internal.codegen.GeneratedLines.IMPORT_GENERATED_ANNOTATION;
 
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
@@ -80,9 +82,9 @@ public class ElidedFactoriesTest {
             "test.DaggerSimpleComponent",
             "package test;",
             "",
-            GeneratedLines.generatedImports(),
+            IMPORT_GENERATED_ANNOTATION,
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerSimpleComponent implements SimpleComponent {",
             "  private DaggerSimpleComponent() {}",
             "",
@@ -177,12 +179,12 @@ public class ElidedFactoriesTest {
                 "test.DaggerSimpleComponent",
                 "package test;",
                 "",
-                GeneratedLines.generatedImports(
-                    "import dagger.internal.DoubleCheck;",
-                    "import dagger.internal.MemoizedSentinel;",
-                    "import javax.inject.Provider;"),
+                "import dagger.internal.DoubleCheck;",
+                "import dagger.internal.MemoizedSentinel;",
+                IMPORT_GENERATED_ANNOTATION,
+                "import javax.inject.Provider;",
                 "",
-                GeneratedLines.generatedAnnotations(),
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerSimpleComponent implements SimpleComponent {",
                 "  private volatile Object scopedType = new MemoizedSentinel();",
                 "  private volatile Provider<DependsOnScoped> dependsOnScopedProvider;",
@@ -260,11 +262,11 @@ public class ElidedFactoriesTest {
                 "test.DaggerSimpleComponent",
                 "package test;",
                 "",
-                GeneratedLines.generatedImports(
-                    "import dagger.internal.DoubleCheck;",
-                    "import javax.inject.Provider;"),
+                "import dagger.internal.DoubleCheck;",
+                IMPORT_GENERATED_ANNOTATION,
+                "import javax.inject.Provider;",
                 "",
-                GeneratedLines.generatedAnnotations(),
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerSimpleComponent implements SimpleComponent {",
                 "  private Provider<ScopedType> scopedTypeProvider;",
                 "  private Provider<DependsOnScoped> dependsOnScopedProvider;",
@@ -371,11 +373,11 @@ public class ElidedFactoriesTest {
                 "test.DaggerSimpleComponent",
                 "package test;",
                 "",
-                GeneratedLines.generatedImports(
-                    "import dagger.internal.DoubleCheck;",
-                    "import dagger.internal.MemoizedSentinel;"),
+                "import dagger.internal.DoubleCheck;",
+                "import dagger.internal.MemoizedSentinel;",
+                IMPORT_GENERATED_ANNOTATION,
                 "",
-                GeneratedLines.generatedAnnotations(),
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerSimpleComponent implements SimpleComponent {",
                 "  private volatile Object scopedType = new MemoizedSentinel();",
                 "",
@@ -432,11 +434,11 @@ public class ElidedFactoriesTest {
                 "test.DaggerSimpleComponent",
                 "package test;",
                 "",
-                GeneratedLines.generatedImports(
-                    "import dagger.internal.DoubleCheck;",
-                    "import javax.inject.Provider;"),
+                "import dagger.internal.DoubleCheck;",
+                IMPORT_GENERATED_ANNOTATION,
+                "import javax.inject.Provider;",
                 "",
-                GeneratedLines.generatedAnnotations(),
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerSimpleComponent implements SimpleComponent {",
                 "  private Provider<ScopedType> scopedTypeProvider;",
                 "",

@@ -45,7 +45,7 @@ class ViewModelGeneratorTest {
 
     val expected = """
         package dagger.hilt.android.test;
-
+        
         import androidx.lifecycle.ViewModel;
         import dagger.Binds;
         import dagger.Module;
@@ -60,7 +60,7 @@ class ViewModelGeneratorTest {
         import dagger.multibindings.StringKey;
         import java.lang.String;
         import $GENERATED_TYPE
-
+        
         $GENERATED_ANNOTATION
         @OriginatingElement(
             topLevelClass = MyViewModel.class
@@ -68,25 +68,23 @@ class ViewModelGeneratorTest {
         public final class MyViewModel_HiltModules {
           private MyViewModel_HiltModules() {
           }
-
+        
           @Module
           @InstallIn(ViewModelComponent.class)
           public static abstract class BindsModule {
-            private BindsModule() {}
-
             @Binds
             @IntoMap
             @StringKey("dagger.hilt.android.test.MyViewModel")
             @HiltViewModelMap
             public abstract ViewModel binds(MyViewModel vm);
           }
-
+        
           @Module
           @InstallIn(ActivityRetainedComponent.class)
           public static final class KeyModule {
             private KeyModule() {
             }
-
+        
             @Provides
             @IntoSet
             @HiltViewModelMap.KeySet
@@ -125,7 +123,7 @@ class ViewModelGeneratorTest {
 
     val expected = """
         package dagger.hilt.android.test;
-
+        
         import androidx.lifecycle.ViewModel;
         import dagger.Binds;
         import dagger.Module;
@@ -140,7 +138,7 @@ class ViewModelGeneratorTest {
         import dagger.multibindings.StringKey;
         import java.lang.String;
         import $GENERATED_TYPE
-
+        
         $GENERATED_ANNOTATION
         @OriginatingElement(
             topLevelClass = MyViewModel.class
@@ -148,25 +146,23 @@ class ViewModelGeneratorTest {
         public final class MyViewModel_HiltModules {
           private MyViewModel_HiltModules() {
           }
-
+        
           @Module
           @InstallIn(ViewModelComponent.class)
           public static abstract class BindsModule {
-            private BindsModule() {}
-
             @Binds
             @IntoMap
             @StringKey("dagger.hilt.android.test.MyViewModel")
             @HiltViewModelMap
             public abstract ViewModel binds(MyViewModel vm);
           }
-
+        
           @Module
           @InstallIn(ActivityRetainedComponent.class)
           public static final class KeyModule {
             private KeyModule() {
             }
-
+        
             @Provides
             @IntoSet
             @HiltViewModelMap.KeySet
@@ -212,7 +208,7 @@ class ViewModelGeneratorTest {
 
     val expected = """
         package dagger.hilt.android.test;
-
+        
         import androidx.lifecycle.ViewModel;
         import dagger.Binds;
         import dagger.Module;
@@ -227,7 +223,7 @@ class ViewModelGeneratorTest {
         import dagger.multibindings.StringKey;
         import java.lang.String;
         import $GENERATED_TYPE
-
+        
         $GENERATED_ANNOTATION
         @OriginatingElement(
             topLevelClass = MyViewModel.class
@@ -235,25 +231,23 @@ class ViewModelGeneratorTest {
         public final class MyViewModel_HiltModules {
           private MyViewModel_HiltModules() {
           }
-
+        
           @Module
           @InstallIn(ViewModelComponent.class)
           public static abstract class BindsModule {
-            private BindsModule() {}
-
             @Binds
             @IntoMap
             @StringKey("dagger.hilt.android.test.MyViewModel")
             @HiltViewModelMap
             public abstract ViewModel binds(MyViewModel vm);
           }
-
+        
           @Module
           @InstallIn(ActivityRetainedComponent.class)
           public static final class KeyModule {
             private KeyModule() {
             }
-
+        
             @Provides
             @IntoSet
             @HiltViewModelMap.KeySet
@@ -300,7 +294,7 @@ class ViewModelGeneratorTest {
 
     val expected = """
         package dagger.hilt.android.test;
-
+    
         import androidx.lifecycle.ViewModel;
         import dagger.Binds;
         import dagger.Module;
@@ -315,7 +309,7 @@ class ViewModelGeneratorTest {
         import dagger.multibindings.StringKey;
         import java.lang.String;
         import $GENERATED_TYPE;
-
+        
         $GENERATED_ANNOTATION
         @OriginatingElement(
             topLevelClass = MyViewModel.class
@@ -323,25 +317,23 @@ class ViewModelGeneratorTest {
         public final class MyViewModel_HiltModules {
           private MyViewModel_HiltModules() {
           }
-
+        
           @Module
           @InstallIn(ViewModelComponent.class)
           public static abstract class BindsModule {
-            private BindsModule() {}
-
             @Binds
             @IntoMap
             @StringKey("dagger.hilt.android.test.MyViewModel")
             @HiltViewModelMap
             public abstract ViewModel binds(MyViewModel vm);
           }
-
+        
           @Module
           @InstallIn(ActivityRetainedComponent.class)
           public static final class KeyModule {
             private KeyModule() {
             }
-
+        
             @Provides
             @IntoSet
             @HiltViewModelMap.KeySet
@@ -395,7 +387,7 @@ class ViewModelGeneratorTest {
 
     val expected = """
         package dagger.hilt.android.test;
-
+        
         import androidx.lifecycle.ViewModel;
         import dagger.Binds;
         import dagger.Module;
@@ -410,7 +402,7 @@ class ViewModelGeneratorTest {
         import dagger.multibindings.StringKey;
         import java.lang.String;
         import $GENERATED_TYPE;
-
+        
         $GENERATED_ANNOTATION
         @OriginatingElement(
             topLevelClass = MyViewModel.class
@@ -418,25 +410,23 @@ class ViewModelGeneratorTest {
         public final class MyViewModel_HiltModules {
           private MyViewModel_HiltModules() {
           }
-
+        
           @Module
           @InstallIn(ViewModelComponent.class)
           public static abstract class BindsModule {
-            private BindsModule() {}
-
             @Binds
             @IntoMap
             @StringKey("dagger.hilt.android.test.MyViewModel")
             @HiltViewModelMap
             public abstract ViewModel binds(MyViewModel vm);
           }
-
+        
           @Module
           @InstallIn(ActivityRetainedComponent.class)
           public static final class KeyModule {
             private KeyModule() {
             }
-
+        
             @Provides
             @IntoSet
             @HiltViewModelMap.KeySet
@@ -476,7 +466,7 @@ class ViewModelGeneratorTest {
 
     val expectedModule = """
         package dagger.hilt.android.test;
-
+        
         import androidx.lifecycle.ViewModel;
         import dagger.Binds;
         import dagger.Module;
@@ -491,7 +481,7 @@ class ViewModelGeneratorTest {
         import dagger.multibindings.StringKey;
         import java.lang.String;
         import $GENERATED_TYPE
-
+        
         $GENERATED_ANNOTATION
         @OriginatingElement(
             topLevelClass = Outer.class
@@ -499,25 +489,23 @@ class ViewModelGeneratorTest {
         public final class Outer_InnerViewModel_HiltModules {
           private Outer_InnerViewModel_HiltModules() {
           }
-
+        
           @Module
           @InstallIn(ViewModelComponent.class)
           public static abstract class BindsModule {
-            private BindsModule() {}
-
             @Binds
             @IntoMap
             @StringKey("dagger.hilt.android.test.Outer${'$'}InnerViewModel")
             @HiltViewModelMap
             public abstract ViewModel binds(Outer.InnerViewModel vm);
           }
-
+        
           @Module
           @InstallIn(ActivityRetainedComponent.class)
           public static final class KeyModule {
             private KeyModule() {
             }
-
+        
             @Provides
             @IntoSet
             @HiltViewModelMap.KeySet
