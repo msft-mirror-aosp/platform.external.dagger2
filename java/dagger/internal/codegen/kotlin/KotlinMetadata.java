@@ -362,7 +362,6 @@ abstract class KotlinMetadata {
 
       Builder addConstructor(FunctionMetadata constructor) {
         constructorsBuilder().add(constructor);
-        functionsBySignatureBuilder().put(constructor.signature(), constructor);
         return this;
       }
 
