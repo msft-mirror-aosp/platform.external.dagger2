@@ -18,17 +18,13 @@ package dagger.android;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import android.os.Build;
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import dagger.android.internal.AndroidInjectionKeys;
 import java.net.URL;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.annotation.Config;
+import org.robolectric.RobolectricTestRunner;
 
-@RunWith(AndroidJUnit4.class)
-// Robolectric requires Java9 to run API 29 and above, so use API 28 instead
-@Config(sdk = Build.VERSION_CODES.P)
+@RunWith(RobolectricTestRunner.class)
 public class AndroidProguardTest {
 
   @Test

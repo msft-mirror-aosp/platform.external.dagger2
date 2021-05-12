@@ -19,15 +19,14 @@ package dagger.hilt.android.simple;
 import android.app.Application;
 import android.content.Context;
 import androidx.test.runner.AndroidJUnitRunner;
-import dagger.hilt.android.testing.CustomTestApplication;
+import dagger.hilt.android.testing.HiltTestApplication;
 
 /** A custom runner to setup the emulator application class for tests. */
-@CustomTestApplication(BaseTestApplication.class)
 public final class SimpleEmulatorTestRunner extends AndroidJUnitRunner {
 
   @Override
   public Application newApplication(ClassLoader cl, String className, Context context)
       throws ClassNotFoundException, IllegalAccessException, InstantiationException {
-    return super.newApplication(cl, SimpleEmulatorTestRunner_Application.class.getName(), context);
+    return super.newApplication(cl, HiltTestApplication.class.getName(), context);
   }
 }
