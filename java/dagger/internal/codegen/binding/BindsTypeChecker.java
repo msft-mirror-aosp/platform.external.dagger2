@@ -18,6 +18,7 @@ package dagger.internal.codegen.binding;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
 
+import com.google.auto.common.MoreElements;
 import com.google.auto.common.MoreTypes;
 import com.google.common.collect.ImmutableList;
 import dagger.internal.codegen.base.ContributionType;
@@ -82,8 +83,8 @@ public final class BindsTypeChecker {
         // type.asElement().getEnclosedElements() is not used because some non-standard JDKs (e.g.
         // J2CL) don't redefine Set.add() (whose only purpose of being redefined in the standard JDK
         // is documentation, and J2CL's implementation doesn't declare docs for JDK types).
-        // getLocalAndInheritedMethods ensures that the method will always be present.
-        elements.getLocalAndInheritedMethods(MoreTypes.asTypeElement(type))) {
+        // MoreElements.getLocalAndInheritedMethods ensures that the method will always be present.
+        MoreElements.getLocalAndInheritedMethods(MoreTypes.asTypeElement(type), types, elements)) {
       if (method.getSimpleName().contentEquals(methodName)) {
         methodsForName.add(method);
       }
