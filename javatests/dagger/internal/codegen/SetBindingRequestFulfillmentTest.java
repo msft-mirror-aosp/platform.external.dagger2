@@ -19,6 +19,8 @@ package dagger.internal.codegen;
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static dagger.internal.codegen.Compilers.CLASS_PATH_WITHOUT_GUAVA_OPTION;
 import static dagger.internal.codegen.Compilers.compilerWithOptions;
+import static dagger.internal.codegen.GeneratedLines.GENERATED_CODE_ANNOTATIONS;
+import static dagger.internal.codegen.GeneratedLines.IMPORT_GENERATED_ANNOTATION;
 
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.Compiler;
@@ -94,7 +96,7 @@ public class SetBindingRequestFulfillmentTest {
             "",
             "import dagger.internal.SetBuilder;",
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerTestComponent implements TestComponent {",
             "  @Override",
             "  public Set<String> strings() {",
@@ -189,7 +191,7 @@ public class SetBindingRequestFulfillmentTest {
             "import other.UsesInaccessible;",
             "import other.UsesInaccessible_Factory;",
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerTestComponent implements TestComponent {",
             "  private Set setOfInaccessible2() {",
             "    return SetBuilder.newSetBuilder(1)",
@@ -259,12 +261,12 @@ public class SetBindingRequestFulfillmentTest {
             "test.DaggerParent",
             "package test;",
             "",
-            GeneratedLines.generatedImports(
-                "import dagger.internal.Preconditions;",
-                "import java.util.Collections;",
-                "import java.util.Set;"),
+            "import dagger.internal.Preconditions;",
+            "import java.util.Collections;",
+            "import java.util.Set;",
+            IMPORT_GENERATED_ANNOTATION,
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerParent implements Parent {",
             "  private DaggerParent() {}",
             "",
