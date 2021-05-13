@@ -33,7 +33,6 @@ import static javax.lang.model.element.Modifier.STATIC;
 
 import com.google.auto.common.MoreTypes;
 import com.google.common.base.Ascii;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.MethodSpec;
@@ -49,6 +48,7 @@ import dagger.internal.codegen.kotlin.KotlinMetadataUtil;
 import dagger.internal.codegen.langmodel.DaggerElements;
 import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.producers.internal.CancellationListener;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 import javax.annotation.processing.Filer;
@@ -91,13 +91,18 @@ final class ComponentHjarGenerator extends SourceFileGenerator<ComponentDescript
   }
 
   @Override
+  public ClassName nameGeneratedType(ComponentDescriptor input) {
+    return componentName(input.typeElement());
+  }
+
+  @Override
   public Element originatingElement(ComponentDescriptor input) {
     return input.typeElement();
   }
 
   @Override
-  public ImmutableList<TypeSpec.Builder> topLevelTypes(ComponentDescriptor componentDescriptor) {
-    ClassName generatedTypeName = componentName(componentDescriptor.typeElement());
+  public Optional<TypeSpec.Builder> write(ComponentDescriptor componentDescriptor) {
+    ClassName generatedTypeName = nameGeneratedType(componentDescriptor);
     TypeSpec.Builder generatedComponent =
         TypeSpec.classBuilder(generatedTypeName)
             .addModifiers(FINAL)
@@ -143,7 +148,8 @@ final class ComponentHjarGenerator extends SourceFileGenerator<ComponentDescript
         && !hasBindsInstanceMethods(componentDescriptor)
         && componentRequirements(componentDescriptor)
             .noneMatch(
-                requirement -> requirement.requiresAPassedInstance(elements, metadataUtil))) {
+                requirement ->
+                    requirement.requiresAPassedInstance(elements, types, metadataUtil))) {
       generatedComponent.addMethod(createMethod(componentDescriptor));
     }
 
@@ -168,7 +174,7 @@ final class ComponentHjarGenerator extends SourceFileGenerator<ComponentDescript
           .addMethod(onProducerFutureCancelledMethod());
     }
 
-    return ImmutableList.of(generatedComponent);
+    return Optional.of(generatedComponent);
   }
 
   private MethodSpec emptyComponentMethod(TypeElement typeElement, ExecutableElement baseMethod) {
