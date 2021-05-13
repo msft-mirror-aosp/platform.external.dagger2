@@ -18,9 +18,11 @@ package dagger.internal.codegen.componentgenerator;
 
 import dagger.Binds;
 import dagger.Module;
+import dagger.internal.codegen.base.ClearableCache;
 import dagger.internal.codegen.base.SourceFileGenerator;
 import dagger.internal.codegen.binding.BindingGraph;
 import dagger.internal.codegen.binding.ComponentDescriptor;
+import dagger.multibindings.IntoSet;
 
 /** Provides bindings needed to generated the component. */
 @Module(subcomponents = TopLevelImplementationComponent.class)
@@ -39,4 +41,8 @@ public interface ComponentGeneratorModule {
   @Binds
   abstract SourceFileGenerator<ComponentDescriptor> componentHjarGenerator(
       ComponentHjarGenerator hjarGenerator);
+
+  @Binds
+  @IntoSet
+  ClearableCache componentImplementationFactory(ComponentImplementationFactory cache);
 }

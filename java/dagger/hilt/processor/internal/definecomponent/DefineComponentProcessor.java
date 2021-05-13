@@ -22,6 +22,8 @@ import com.google.auto.service.AutoService;
 import com.google.common.collect.ImmutableSet;
 import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
+import com.squareup.javapoet.JavaFile;
+import com.squareup.javapoet.TypeSpec;
 import dagger.hilt.processor.internal.BaseProcessor;
 import dagger.hilt.processor.internal.ClassNames;
 import dagger.hilt.processor.internal.Processors;
@@ -68,13 +70,18 @@ public final class DefineComponentProcessor extends BaseProcessor {
   }
 
   private void generateFile(String member, TypeElement typeElement) throws IOException {
-    Processors.generateAggregatingClass(
-        ClassNames.DEFINE_COMPONENT_CLASSES_PACKAGE,
-        AnnotationSpec.builder(ClassNames.DEFINE_COMPONENT_CLASSES)
-            .addMember(member, "$S", typeElement.getQualifiedName())
-            .build(),
-        typeElement,
-        getClass(),
-        getProcessingEnv());
+    TypeSpec.Builder builder =
+        TypeSpec.interfaceBuilder(Processors.getFullEnclosedName(typeElement))
+            .addOriginatingElement(typeElement)
+            .addAnnotation(
+                AnnotationSpec.builder(ClassNames.DEFINE_COMPONENT_CLASSES)
+                    .addMember(member, "$S", typeElement.getQualifiedName())
+                    .build());
+
+    Processors.addGeneratedAnnotation(builder, processingEnv, getClass());
+
+    JavaFile.builder(DefineComponents.AGGREGATING_PACKAGE, builder.build())
+        .build()
+        .writeTo(processingEnv.getFiler());
   }
 }
