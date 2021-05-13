@@ -93,11 +93,6 @@ internal class ViewModelModuleGenerator(
     component = AndroidClassNames.VIEW_MODEL_COMPONENT
   )
     .addModifiers(Modifier.ABSTRACT)
-    .addMethod(
-      MethodSpec.constructorBuilder()
-        .addModifiers(Modifier.PRIVATE)
-        .build()
-    )
     .addMethod(getViewModelBindsMethod())
     .build()
 
