@@ -236,11 +236,17 @@ android_library {
         "java/dagger/hilt/android/internal/migration/*.java",
         "java/dagger/hilt/android/internal/modules/*.java",
         "java/dagger/hilt/android/lifecycle/*.java",
+        "java/dagger/hilt/internal/aggregatedroot/*.java",
+        "java/dagger/hilt/internal/processedrootsentinel/*.java",
     ],
     manifest: "java/dagger/hilt/android/AndroidManifest.xml",
     static_libs: [
+        "androidx.activity_activity",
         "androidx.annotation_annotation",
         "androidx.fragment_fragment",
+        "androidx.lifecycle_lifecycle-common",
+        "androidx.lifecycle_lifecycle-viewmodel",
+        "androidx.lifecycle_lifecycle-viewmodel-savedstate",
         "jsr305",
         "jsr330",
         "dagger2",
@@ -383,7 +389,7 @@ java_plugin {
 java_plugin {
     name: "hilt_uninstall_modules_processor",
     generates_api: true,
-    processor_class: "dagger.hilt.android.processor.internal.uninstallmodules.UninstallModulesProcessor",
+    processor_class: "dagger.hilt.processor.internal.uninstallmodules.UninstallModulesProcessor",
 }
 
 java_library_host {
