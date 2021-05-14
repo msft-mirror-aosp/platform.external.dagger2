@@ -18,6 +18,7 @@ package dagger.internal.codegen;
 
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static com.google.testing.compile.Compiler.javac;
+import static dagger.internal.codegen.GeneratedLines.GENERATED_CODE_ANNOTATIONS;
 import static java.util.stream.Collectors.joining;
 
 import com.google.common.collect.ImmutableList;
@@ -88,7 +89,7 @@ public class ComponentShardTest {
         JavaFileObjects.forSourceLines(
             "dagger.internal.codegen.DaggerTestComponent",
                 "package dagger.internal.codegen;",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  private final Shard1 shard1 = new Shard1();",
                 "",

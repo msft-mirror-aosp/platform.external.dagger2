@@ -202,8 +202,7 @@ public final class FragmentGenerator {
 
   // @Override
   // public ViewModelProvider.Factory getDefaultViewModelProviderFactory() {
-  //   return DefaultViewModelFactories.getFragmentFactory(
-  //       this, super.getDefaultViewModelProviderFactory());
+  //   return DefaultViewModelFactories.getFragmentFactory(this);
   // }
   private MethodSpec getDefaultViewModelProviderFactory() {
     return MethodSpec.methodBuilder("getDefaultViewModelProviderFactory")
@@ -211,7 +210,7 @@ public final class FragmentGenerator {
         .addModifiers(Modifier.PUBLIC)
         .returns(AndroidClassNames.VIEW_MODEL_PROVIDER_FACTORY)
         .addStatement(
-            "return $T.getFragmentFactory(this, super.getDefaultViewModelProviderFactory())",
+            "return $T.getFragmentFactory(this)",
             AndroidClassNames.DEFAULT_VIEW_MODEL_FACTORIES)
         .build();
   }
