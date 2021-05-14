@@ -23,6 +23,8 @@ import static dagger.internal.codegen.CompilerMode.FAST_INIT_MODE;
 import static dagger.internal.codegen.Compilers.compilerWithOptions;
 import static dagger.internal.codegen.Compilers.daggerCompiler;
 import static dagger.internal.codegen.ComponentCreatorTest.CompilerType.JAVAC;
+import static dagger.internal.codegen.GeneratedLines.GENERATED_CODE_ANNOTATIONS;
+import static dagger.internal.codegen.GeneratedLines.IMPORT_GENERATED_ANNOTATION;
 import static dagger.internal.codegen.binding.ComponentCreatorAnnotation.COMPONENT_BUILDER;
 import static dagger.internal.codegen.binding.ComponentCreatorAnnotation.COMPONENT_FACTORY;
 import static dagger.internal.codegen.binding.ComponentCreatorKind.BUILDER;
@@ -104,7 +106,7 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "test.DaggerSimpleComponent",
             "package test;",
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerSimpleComponent implements SimpleComponent {",
             "  private static final class Builder implements SimpleComponent.Builder {",
             "    @Override",
@@ -157,9 +159,9 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "test.DaggerTestComponent",
             "package test;",
             "",
-            GeneratedLines.generatedImports(),
+            IMPORT_GENERATED_ANNOTATION,
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerTestComponent implements TestComponent {",
             "  private final TestModule testModule;",
             "",
@@ -355,9 +357,10 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             .addLines(
                 "package test;",
                 "",
-                GeneratedLines.generatedImports("import dagger.internal.Preconditions;"),
+                "import dagger.internal.Preconditions;",
+                IMPORT_GENERATED_ANNOTATION,
                 "",
-                GeneratedLines.generatedAnnotations(),
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerSimpleComponent implements SimpleComponent {",
                 "  private final Object object;",
                 "",
@@ -456,9 +459,10 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             .addLines(
                 "package test;",
                 "",
-                GeneratedLines.generatedImports("import dagger.internal.Preconditions;"),
+                "import dagger.internal.Preconditions;",
+                IMPORT_GENERATED_ANNOTATION,
                 "",
-                GeneratedLines.generatedAnnotations(),
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerSimpleComponent implements SimpleComponent {",
                 "  private final Integer i;",
                 "",
