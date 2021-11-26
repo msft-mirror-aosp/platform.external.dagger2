@@ -81,7 +81,6 @@ java_library {
         "jsr330",
     ],
 
-    java_version: "1.8",
     sdk_version: "core_current",
 }
 
@@ -105,7 +104,6 @@ java_library {
         "jsr330",
     ],
 
-    java_version: "1.8",
     sdk_version: "core_current",
 }
 
@@ -178,7 +176,17 @@ java_library_host {
         include_dirs: ["external/protobuf/src/"],
     },
 
-    java_version: "1.8",
+    // From Java 9 onward com.sun.tools.javac is not visible by default
+    javacflags: [
+        "--add-modules=jdk.compiler",
+        "--add-exports jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
+        "--add-exports jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED",
+        "--add-exports jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
+        "--add-exports jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED",
+        "--add-exports jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED",
+        "--add-exports jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED",
+        "--add-exports jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED",
+    ],
 }
 
 // Compile  dummy implementations of annotations used by dagger2 but not
