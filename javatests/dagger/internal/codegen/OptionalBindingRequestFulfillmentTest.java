@@ -20,6 +20,7 @@ import static com.google.testing.compile.CompilationSubject.assertThat;
 import static dagger.internal.codegen.CompilerMode.DEFAULT_MODE;
 import static dagger.internal.codegen.CompilerMode.FAST_INIT_MODE;
 import static dagger.internal.codegen.Compilers.compilerWithOptions;
+import static dagger.internal.codegen.GeneratedLines.GENERATED_CODE_ANNOTATIONS;
 
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
@@ -109,7 +110,7 @@ public class OptionalBindingRequestFulfillmentTest {
                 "",
                 "import com.google.common.base.Optional;",
                 "",
-                GeneratedLines.generatedAnnotations(),
+                GENERATED_CODE_ANNOTATIONS,
                 "final class DaggerTestComponent implements TestComponent {")
             .addLinesIn(
                 FAST_INIT_MODE,
@@ -249,7 +250,7 @@ public class OptionalBindingRequestFulfillmentTest {
             "import com.google.common.base.Optional;",
             "import dagger.producers.internal.CancellationListener;",
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerTestComponent implements TestComponent, CancellationListener {",
             "  @Override",
             "  public ListenableFuture<Optional<Maybe>> maybe() {",
