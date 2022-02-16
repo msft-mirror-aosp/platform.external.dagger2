@@ -39,13 +39,14 @@ java_library(
         "AggregatedDepsGenerator.java",
         "AggregatedDepsProcessor.java",
         "PkgPrivateEntryPointGenerator.java",
+        "PkgPrivateMetadata.java",
         "PkgPrivateModuleGenerator.java",
     ],
     deps = [
-        ":pkg_private_metadata",
+        "//:dagger_with_compiler",
+        "//java/dagger/hilt/android/processor/internal/androidentrypoint:compiler_options",
         "//java/dagger/hilt/processor/internal:base_processor",
         "//java/dagger/hilt/processor/internal:classnames",
-        "//java/dagger/hilt/processor/internal:compiler_options",
         "//java/dagger/hilt/processor/internal:components",
         "//java/dagger/hilt/processor/internal:kotlin",
         "//java/dagger/hilt/processor/internal:processor_errors",
@@ -54,21 +55,10 @@ java_library(
         "//java/dagger/internal/codegen/kotlin",
         "//java/dagger/internal/guava:collect",
         "@google_bazel_common//third_party/java/auto:service",
+        "@google_bazel_common//third_party/java/auto:value",
         "@google_bazel_common//third_party/java/incap",
         "@google_bazel_common//third_party/java/javapoet",
-        "@maven//:com_google_auto_auto_common",
-    ],
-)
-
-java_library(
-    name = "pkg_private_metadata",
-    srcs = ["PkgPrivateMetadata.java"],
-    deps = [
-        "//java/dagger/hilt/processor/internal:classnames",
-        "//java/dagger/hilt/processor/internal:kotlin",
-        "//java/dagger/hilt/processor/internal:processors",
-        "@google_bazel_common//third_party/java/auto:value",
-        "@google_bazel_common//third_party/java/javapoet",
+        "@google_bazel_common//third_party/java/jsr250_annotations",
         "@maven//:com_google_auto_auto_common",
     ],
 )
@@ -76,17 +66,14 @@ java_library(
 java_library(
     name = "component_dependencies",
     srcs = [
-        "AggregatedDepsMetadata.java",
         "ComponentDependencies.java",
     ],
     deps = [
-        ":pkg_private_metadata",
-        "//java/dagger/hilt/processor/internal:aggregated_elements",
+        ":processor_lib",
         "//java/dagger/hilt/processor/internal:classnames",
         "//java/dagger/hilt/processor/internal:component_descriptor",
+        "//java/dagger/hilt/processor/internal:processor_errors",
         "//java/dagger/hilt/processor/internal:processors",
-        "//java/dagger/hilt/processor/internal/earlyentrypoint:aggregated_early_entry_point_metadata",
-        "//java/dagger/hilt/processor/internal/uninstallmodules:aggregated_uninstall_modules_metadata",
         "//java/dagger/internal/codegen/extension",
         "//java/dagger/internal/guava:base",
         "//java/dagger/internal/guava:collect",
