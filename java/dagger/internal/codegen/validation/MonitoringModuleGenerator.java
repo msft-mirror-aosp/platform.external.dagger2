@@ -26,7 +26,6 @@ import static javax.lang.model.element.Modifier.ABSTRACT;
 import static javax.lang.model.element.Modifier.PRIVATE;
 import static javax.lang.model.element.Modifier.STATIC;
 
-import com.google.common.collect.ImmutableList;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.TypeSpec;
@@ -39,6 +38,7 @@ import dagger.multibindings.Multibinds;
 import dagger.producers.ProductionScope;
 import dagger.producers.monitoring.ProductionComponentMonitor;
 import dagger.producers.monitoring.internal.Monitors;
+import java.util.Optional;
 import javax.annotation.processing.Filer;
 import javax.inject.Inject;
 import javax.lang.model.SourceVersion;
@@ -54,14 +54,19 @@ final class MonitoringModuleGenerator extends SourceFileGenerator<TypeElement> {
   }
 
   @Override
+  public ClassName nameGeneratedType(TypeElement componentElement) {
+    return SourceFiles.generatedMonitoringModuleName(componentElement);
+  }
+
+  @Override
   public Element originatingElement(TypeElement componentElement) {
     return componentElement;
   }
 
   @Override
-  public ImmutableList<TypeSpec.Builder> topLevelTypes(TypeElement componentElement) {
-    return ImmutableList.of(
-        classBuilder(SourceFiles.generatedMonitoringModuleName(componentElement))
+  public Optional<TypeSpec.Builder> write(TypeElement componentElement) {
+    return Optional.of(
+        classBuilder(nameGeneratedType(componentElement))
             .addAnnotation(Module.class)
             .addModifiers(ABSTRACT)
             .addMethod(privateConstructor())
