@@ -19,7 +19,6 @@ package dagger.internal.codegen.componentgenerator;
 import static com.google.common.base.Verify.verify;
 import static dagger.internal.codegen.binding.SourceFiles.classFileName;
 
-import com.google.common.collect.ImmutableList;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.TypeSpec;
 import dagger.Component;
@@ -27,6 +26,7 @@ import dagger.internal.codegen.base.SourceFileGenerator;
 import dagger.internal.codegen.binding.BindingGraph;
 import dagger.internal.codegen.langmodel.DaggerElements;
 import dagger.internal.codegen.writing.ComponentImplementation;
+import java.util.Optional;
 import javax.annotation.processing.Filer;
 import javax.inject.Inject;
 import javax.lang.model.SourceVersion;
@@ -47,6 +47,11 @@ final class ComponentGenerator extends SourceFileGenerator<BindingGraph> {
     this.componentImplementationFactory = componentImplementationFactory;
   }
 
+  @Override
+  public ClassName nameGeneratedType(BindingGraph input) {
+    return componentName(input.componentTypeElement());
+  }
+
   static ClassName componentName(TypeElement componentDefinitionType) {
     ClassName componentName = ClassName.get(componentDefinitionType);
     return ClassName.get(componentName.packageName(), "Dagger" + classFileName(componentName));
@@ -58,11 +63,10 @@ final class ComponentGenerator extends SourceFileGenerator<BindingGraph> {
   }
 
   @Override
-  public ImmutableList<TypeSpec.Builder> topLevelTypes(BindingGraph bindingGraph) {
+  public Optional<TypeSpec.Builder> write(BindingGraph bindingGraph) {
     ComponentImplementation componentImplementation =
         componentImplementationFactory.createComponentImplementation(bindingGraph);
-    verify(
-        componentImplementation.name().equals(componentName(bindingGraph.componentTypeElement())));
-    return ImmutableList.of(componentImplementation.generate());
+    verify(componentImplementation.name().equals(nameGeneratedType(bindingGraph)));
+    return Optional.of(componentImplementation.generate());
   }
 }
