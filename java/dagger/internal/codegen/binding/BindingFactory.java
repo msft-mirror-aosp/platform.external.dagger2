@@ -191,7 +191,7 @@ public final class BindingFactory {
     }
 
     ExecutableElement factoryMethod =
-        AssistedInjectionAnnotations.assistedFactoryMethod(factory, elements);
+        AssistedInjectionAnnotations.assistedFactoryMethod(factory, elements, types);
     ExecutableType factoryMethodType =
         MoreTypes.asExecutable(types.asMemberOf(factoryType, factoryMethod));
     return ProvisionBinding.builder()

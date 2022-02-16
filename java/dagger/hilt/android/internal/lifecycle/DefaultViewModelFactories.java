@@ -50,11 +50,10 @@ public final class DefaultViewModelFactories {
    *
    * <p>Do not use except in Hilt generated code!
    */
-  public static ViewModelProvider.Factory getActivityFactory(ComponentActivity activity,
-      ViewModelProvider.Factory delegateFactory) {
+  public static ViewModelProvider.Factory getActivityFactory(ComponentActivity activity) {
     return EntryPoints.get(activity, ActivityEntryPoint.class)
         .getHiltInternalFactoryFactory()
-        .fromActivity(activity, delegateFactory);
+        .fromActivity(activity);
   }
 
   /**
@@ -62,11 +61,10 @@ public final class DefaultViewModelFactories {
    *
    * <p>Do not use except in Hilt generated code!
    */
-  public static ViewModelProvider.Factory getFragmentFactory(
-      Fragment fragment, ViewModelProvider.Factory delegateFactory) {
+  public static ViewModelProvider.Factory getFragmentFactory(Fragment fragment) {
     return EntryPoints.get(fragment, FragmentEntryPoint.class)
         .getHiltInternalFactoryFactory()
-        .fromFragment(fragment, delegateFactory);
+        .fromFragment(fragment);
   }
 
   /** Internal factory for the Hilt ViewModel Factory. */
@@ -75,28 +73,33 @@ public final class DefaultViewModelFactories {
     private final Application application;
     private final Set<String> keySet;
     private final ViewModelComponentBuilder viewModelComponentBuilder;
+    @Nullable private final ViewModelProvider.Factory defaultActivityFactory;
+    @Nullable private final ViewModelProvider.Factory defaultFragmentFactory;
 
     @Inject
     InternalFactoryFactory(
             Application application,
         @HiltViewModelMap.KeySet Set<String> keySet,
-        ViewModelComponentBuilder viewModelComponentBuilder) {
+        ViewModelComponentBuilder viewModelComponentBuilder,
+        // These default factory bindings are temporary for the transition of deprecating
+        // the Hilt ViewModel extension for the built-in support
+        @DefaultActivityViewModelFactory Set<ViewModelProvider.Factory> defaultActivityFactorySet,
+        @DefaultFragmentViewModelFactory Set<ViewModelProvider.Factory> defaultFragmentFactorySet) {
       this.application = application;
       this.keySet = keySet;
       this.viewModelComponentBuilder = viewModelComponentBuilder;
+      this.defaultActivityFactory = getFactoryFromSet(defaultActivityFactorySet);
+      this.defaultFragmentFactory = getFactoryFromSet(defaultFragmentFactorySet);
     }
 
-    ViewModelProvider.Factory fromActivity(
-        ComponentActivity activity, ViewModelProvider.Factory delegateFactory) {
-      return getHiltViewModelFactory(
-          activity,
+    ViewModelProvider.Factory fromActivity(ComponentActivity activity) {
+      return getHiltViewModelFactory(activity,
           activity.getIntent() != null ? activity.getIntent().getExtras() : null,
-          delegateFactory);
+          defaultActivityFactory);
     }
 
-    ViewModelProvider.Factory fromFragment(
-        Fragment fragment, ViewModelProvider.Factory delegateFactory) {
-      return getHiltViewModelFactory(fragment, fragment.getArguments(), delegateFactory);
+    ViewModelProvider.Factory fromFragment(Fragment fragment) {
+      return getHiltViewModelFactory(fragment, fragment.getArguments(), defaultFragmentFactory);
     }
 
     private ViewModelProvider.Factory getHiltViewModelFactory(
@@ -109,6 +112,24 @@ public final class DefaultViewModelFactories {
       return new HiltViewModelFactory(
           owner, defaultArgs, keySet, delegate, viewModelComponentBuilder);
     }
+
+    @Nullable
+    private static ViewModelProvider.Factory getFactoryFromSet(Set<ViewModelProvider.Factory> set) {
+      // A multibinding set is used instead of BindsOptionalOf because Optional is not available in
+      // Android until API 24 and we don't want to have Guava as a transitive dependency.
+      if (set.isEmpty()) {
+        return null;
+      }
+      if (set.size() > 1) {
+        throw new IllegalStateException(
+            "At most one default view model factory is expected. Found " + set);
+      }
+      ViewModelProvider.Factory factory = set.iterator().next();
+      if (factory == null) {
+        throw new IllegalStateException("Default view model factory must not be null.");
+      }
+      return factory;
+    }
   }
 
   /** The activity module to declare the optional factories. */
@@ -118,6 +139,14 @@ public final class DefaultViewModelFactories {
     @Multibinds
     @HiltViewModelMap.KeySet
     abstract Set<String> viewModelKeys();
+
+    @Multibinds
+    @DefaultActivityViewModelFactory
+    Set<ViewModelProvider.Factory> defaultActivityViewModelFactory();
+
+    @Multibinds
+    @DefaultFragmentViewModelFactory
+    Set<ViewModelProvider.Factory> defaultFragmentViewModelFactory();
   }
 
   /** The activity entry point to retrieve the factory. */
