@@ -19,6 +19,8 @@ package dagger.hilt.processor.internal.aggregateddeps;
 import com.google.common.collect.ImmutableSet;
 import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
+import com.squareup.javapoet.JavaFile;
+import com.squareup.javapoet.TypeSpec;
 import dagger.hilt.processor.internal.Processors;
 import java.io.IOException;
 import java.util.Optional;
@@ -57,8 +59,20 @@ final class AggregatedDepsGenerator {
   }
 
   void generate() throws IOException {
-    Processors.generateAggregatingClass(
-        AGGREGATING_PACKAGE, aggregatedDepsAnnotation(), dependency, getClass(), processingEnv);
+    ClassName name =
+        ClassName.get(
+            AGGREGATING_PACKAGE, Processors.getFullEnclosedName(dependency) + "ModuleDeps");
+    TypeSpec.Builder generator =
+        TypeSpec.classBuilder(name.simpleName())
+            .addOriginatingElement(dependency)
+            .addAnnotation(aggregatedDepsAnnotation())
+            .addJavadoc("Generated class to pass information through multiple javac runs.\n");
+
+    Processors.addGeneratedAnnotation(generator, processingEnv, getClass());
+
+    JavaFile.builder(name.packageName(), generator.build())
+        .build()
+        .writeTo(processingEnv.getFiler());
   }
 
   private AnnotationSpec aggregatedDepsAnnotation() {

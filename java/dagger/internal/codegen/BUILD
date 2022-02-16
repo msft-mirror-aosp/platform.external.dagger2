@@ -127,8 +127,6 @@ java_plugin(
         "genclass=${package}.Dagger${outerclasses}${classname}",
         "annotation=dagger.producers.ProductionComponent;" +
         "genclass=${package}.Dagger${outerclasses}${classname}",
-        "annotation=dagger.MapKey;" +
-        "genclass=${package}.${outerclasses}${classname}Creator",
     ],
     deps = [":processor"],
 )

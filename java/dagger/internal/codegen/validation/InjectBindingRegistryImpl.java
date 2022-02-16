@@ -24,7 +24,6 @@ import static dagger.internal.codegen.base.Keys.isValidMembersInjectionKey;
 import static dagger.internal.codegen.binding.AssistedInjectionAnnotations.assistedInjectedConstructors;
 import static dagger.internal.codegen.binding.InjectionAnnotations.injectedConstructors;
 import static dagger.internal.codegen.binding.SourceFiles.generatedClassNameForBinding;
-import static dagger.internal.codegen.langmodel.DaggerTypes.unwrapType;
 
 import com.google.auto.common.MoreElements;
 import com.google.auto.common.MoreTypes;
@@ -113,11 +112,7 @@ final class InjectBindingRegistryImpl implements InjectBindingRegistry {
     /** Caches the binding and generates it if it needs generation. */
     void tryRegisterBinding(B binding, boolean warnIfNotAlreadyGenerated) {
       tryToCacheBinding(binding);
-
-      @SuppressWarnings("unchecked")
-      B maybeUnresolved =
-          binding.unresolved().isPresent() ? (B) binding.unresolved().get() : binding;
-      tryToGenerateBinding(maybeUnresolved, warnIfNotAlreadyGenerated);
+      tryToGenerateBinding(binding, warnIfNotAlreadyGenerated);
     }
 
     /**
@@ -204,6 +199,9 @@ final class InjectBindingRegistryImpl implements InjectBindingRegistry {
    */
   private void registerBinding(ProvisionBinding binding, boolean warnIfNotAlreadyGenerated) {
     provisionBindings.tryRegisterBinding(binding, warnIfNotAlreadyGenerated);
+    if (binding.unresolved().isPresent()) {
+      provisionBindings.tryToGenerateBinding(binding.unresolved().get(), warnIfNotAlreadyGenerated);
+    }
   }
 
   /**
@@ -231,6 +229,10 @@ final class InjectBindingRegistryImpl implements InjectBindingRegistry {
     }
 
     membersInjectionBindings.tryRegisterBinding(binding, warnIfNotAlreadyGenerated);
+    if (binding.unresolved().isPresent()) {
+      membersInjectionBindings.tryToGenerateBinding(
+          binding.unresolved().get(), warnIfNotAlreadyGenerated);
+    }
   }
 
   @Override
@@ -253,16 +255,15 @@ final class InjectBindingRegistryImpl implements InjectBindingRegistry {
 
     ValidationReport<TypeElement> report = injectValidator.validateConstructor(constructorElement);
     report.printMessagesTo(messager);
-    if (!report.isClean()) {
-      return Optional.empty();
+    if (report.isClean()) {
+      ProvisionBinding binding = bindingFactory.injectionBinding(constructorElement, resolvedType);
+      registerBinding(binding, warnIfNotAlreadyGenerated);
+      if (!binding.injectionSites().isEmpty()) {
+        tryRegisterMembersInjectedType(typeElement, resolvedType, warnIfNotAlreadyGenerated);
+      }
+      return Optional.of(binding);
     }
-
-    ProvisionBinding binding = bindingFactory.injectionBinding(constructorElement, resolvedType);
-    registerBinding(binding, warnIfNotAlreadyGenerated);
-    if (!binding.injectionSites().isEmpty()) {
-      tryRegisterMembersInjectedType(typeElement, resolvedType, warnIfNotAlreadyGenerated);
-    }
-    return Optional.of(binding);
+    return Optional.empty();
   }
 
   @Override
@@ -285,18 +286,17 @@ final class InjectBindingRegistryImpl implements InjectBindingRegistry {
     ValidationReport<TypeElement> report =
         injectValidator.validateMembersInjectionType(typeElement);
     report.printMessagesTo(messager);
-    if (!report.isClean()) {
-      return Optional.empty();
+    if (report.isClean()) {
+      MembersInjectionBinding binding = bindingFactory.membersInjectionBinding(type, resolvedType);
+      registerBinding(binding, warnIfNotAlreadyGenerated);
+      for (Optional<DeclaredType> supertype = types.nonObjectSuperclass(type);
+          supertype.isPresent();
+          supertype = types.nonObjectSuperclass(supertype.get())) {
+        getOrFindMembersInjectionBinding(keyFactory.forMembersInjectedType(supertype.get()));
+      }
+      return Optional.of(binding);
     }
-
-    MembersInjectionBinding binding = bindingFactory.membersInjectionBinding(type, resolvedType);
-    registerBinding(binding, warnIfNotAlreadyGenerated);
-    for (Optional<DeclaredType> supertype = types.nonObjectSuperclass(type);
-         supertype.isPresent();
-         supertype = types.nonObjectSuperclass(supertype.get())) {
-      getOrFindMembersInjectionBinding(keyFactory.forMembersInjectedType(supertype.get()));
-    }
-    return Optional.of(binding);
+    return Optional.empty();
   }
 
   @CanIgnoreReturnValue
@@ -352,7 +352,7 @@ final class InjectBindingRegistryImpl implements InjectBindingRegistry {
     if (!isValidMembersInjectionKey(key)) {
       return Optional.empty();
     }
-    Key membersInjectionKey = keyFactory.forMembersInjectedType(unwrapType(key.type()));
+    Key membersInjectionKey = keyFactory.forMembersInjectedType(types.unwrapType(key.type()));
     return getOrFindMembersInjectionBinding(membersInjectionKey)
         .map(binding -> bindingFactory.membersInjectorBinding(key, binding));
   }
