@@ -16,7 +16,6 @@
 
 package dagger.hilt.processor.internal.aliasof;
 
-import static com.google.auto.common.MoreElements.asType;
 import static net.ltgt.gradle.incap.IncrementalAnnotationProcessorType.ISOLATING;
 
 import com.google.auto.service.AutoService;
@@ -49,14 +48,13 @@ public final class AliasOfProcessor extends BaseProcessor {
         "%s should only be used on scopes." + " However, it was found annotating %s",
         annotation,
         element);
-
     AnnotationMirror annotationMirror =
         Processors.getAnnotationMirror(element, ClassNames.ALIAS_OF);
 
-    TypeElement defineComponentScope =
+    Element defineComponentScope =
         Processors.getAnnotationClassValue(getElementUtils(), annotationMirror, "value");
 
-    new AliasOfPropagatedDataGenerator(getProcessingEnv(), asType(element), defineComponentScope)
+    new AliasOfPropagatedDataGenerator(getProcessingEnv(), element, defineComponentScope)
         .generate();
   }
 }
