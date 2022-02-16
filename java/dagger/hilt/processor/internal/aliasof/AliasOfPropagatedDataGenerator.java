@@ -17,37 +17,43 @@
 package dagger.hilt.processor.internal.aliasof;
 
 import com.squareup.javapoet.AnnotationSpec;
+import com.squareup.javapoet.JavaFile;
+import com.squareup.javapoet.TypeSpec;
 import dagger.hilt.processor.internal.ClassNames;
 import dagger.hilt.processor.internal.Processors;
 import java.io.IOException;
 import javax.annotation.processing.ProcessingEnvironment;
-import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.Element;
 
 /** Generates resource files for {@link dagger.hilt.migration.AliasOf}. */
 final class AliasOfPropagatedDataGenerator {
 
   private final ProcessingEnvironment processingEnv;
-  private final TypeElement aliasScope;
-  private final TypeElement defineComponentScope;
+  private final Element aliasScope;
+  private final Element defineComponentScope;
 
   AliasOfPropagatedDataGenerator(
-      ProcessingEnvironment processingEnv,
-      TypeElement aliasScope,
-      TypeElement defineComponentScope) {
+      ProcessingEnvironment processingEnv, Element aliasScope, Element defineComponentScope) {
     this.processingEnv = processingEnv;
     this.aliasScope = aliasScope;
     this.defineComponentScope = defineComponentScope;
   }
 
   void generate() throws IOException {
-    Processors.generateAggregatingClass(
-        ClassNames.ALIAS_OF_PROPAGATED_DATA_PACKAGE,
-        AnnotationSpec.builder(ClassNames.ALIAS_OF_PROPAGATED_DATA)
+    TypeSpec.Builder generator =
+        TypeSpec.classBuilder(Processors.getFullEnclosedName(aliasScope))
+            .addOriginatingElement(aliasScope)
+            .addAnnotation(
+                AnnotationSpec.builder(ClassNames.ALIAS_OF_PROPAGATED_DATA)
                     .addMember("defineComponentScope", "$T.class", defineComponentScope)
                     .addMember("alias", "$T.class", aliasScope)
-                    .build(),
-        aliasScope,
-        getClass(),
-        processingEnv);
+                    .build())
+            .addJavadoc("Generated class for aggregating scope aliases. \n");
+
+    Processors.addGeneratedAnnotation(generator, processingEnv, getClass());
+
+    JavaFile.builder(AliasOfs.AGGREGATING_PACKAGE, generator.build())
+        .build()
+        .writeTo(processingEnv.getFiler());
   }
 }

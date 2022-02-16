@@ -20,6 +20,7 @@ import static com.google.testing.compile.CompilationSubject.assertThat;
 import static dagger.internal.codegen.CompilerMode.DEFAULT_MODE;
 import static dagger.internal.codegen.CompilerMode.FAST_INIT_MODE;
 import static dagger.internal.codegen.Compilers.compilerWithOptions;
+import static dagger.internal.codegen.GeneratedLines.GENERATED_CODE_ANNOTATIONS;
 
 import com.google.common.collect.ImmutableCollection;
 import com.google.testing.compile.Compilation;
@@ -95,7 +96,7 @@ public class AssistedFactoryTest {
     JavaFileObject generatedComponent =
         compilerMode
             .javaFileBuilder("test.DaggerTestComponent")
-            .addLines("package test;", "", GeneratedLines.generatedAnnotations())
+            .addLines("package test;", "", GENERATED_CODE_ANNOTATIONS)
             .addLinesIn(
                 FAST_INIT_MODE,
                 "final class DaggerTestComponent implements TestComponent {",
@@ -191,7 +192,7 @@ public class AssistedFactoryTest {
     JavaFileObject generatedComponent =
         compilerMode
             .javaFileBuilder("test.DaggerTestComponent")
-            .addLines("package test;", "", GeneratedLines.generatedAnnotations())
+            .addLines("package test;", "", GENERATED_CODE_ANNOTATIONS)
             .addLinesIn(
                 FAST_INIT_MODE,
                 "final class DaggerTestComponent implements TestComponent {",
