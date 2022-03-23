@@ -18,6 +18,8 @@ package dagger.internal.codegen;
 
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static dagger.internal.codegen.Compilers.compilerWithOptions;
+import static dagger.internal.codegen.GeneratedLines.GENERATED_CODE_ANNOTATIONS;
+import static dagger.internal.codegen.GeneratedLines.IMPORT_GENERATED_ANNOTATION;
 
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
@@ -97,7 +99,7 @@ public class SetBindingRequestFulfillmentWithGuavaTest {
             "",
             "import com.google.common.collect.ImmutableSet;",
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerTestComponent implements TestComponent {",
             "  @Override",
             "  public Set<String> strings() {",
@@ -200,7 +202,7 @@ public class SetBindingRequestFulfillmentWithGuavaTest {
             "import other.UsesInaccessible;",
             "import other.UsesInaccessible_Factory;",
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerTestComponent implements TestComponent {",
             "  private Set setOfInaccessible2() {",
             "    return ImmutableSet.copyOf(TestModule_EmptySetFactory.emptySet());",
@@ -270,7 +272,7 @@ public class SetBindingRequestFulfillmentWithGuavaTest {
             "",
             "import com.google.common.collect.ImmutableSet;",
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerParent implements Parent {",
             "  private final class ChildImpl implements Child {",
             "    @Override",
@@ -322,14 +324,14 @@ public class SetBindingRequestFulfillmentWithGuavaTest {
             "test.DaggerTestComponent",
             "package test;",
             "",
-            GeneratedLines.generatedImports(
-                "import com.google.common.collect.ImmutableSet;",
-                "import com.google.common.util.concurrent.Futures;",
-                "import com.google.common.util.concurrent.ListenableFuture;",
-                "import dagger.producers.internal.CancellationListener;",
-                "import java.util.Set;"),
+            "import com.google.common.collect.ImmutableSet;",
+            "import com.google.common.util.concurrent.Futures;",
+            "import com.google.common.util.concurrent.ListenableFuture;",
+            "import dagger.producers.internal.CancellationListener;",
+            "import java.util.Set;",
+            IMPORT_GENERATED_ANNOTATION,
             "",
-            GeneratedLines.generatedAnnotations(),
+            GENERATED_CODE_ANNOTATIONS,
             "final class DaggerTestComponent implements TestComponent, "
                 + "CancellationListener {",
             "  private DaggerTestComponent() {}",
