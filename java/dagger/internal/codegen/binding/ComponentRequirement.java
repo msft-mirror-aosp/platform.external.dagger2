@@ -16,6 +16,7 @@
 
 package dagger.internal.codegen.binding;
 
+import static com.google.auto.common.MoreElements.getLocalAndInheritedMethods;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static dagger.internal.codegen.binding.SourceFiles.simpleVariableName;
@@ -37,6 +38,7 @@ import dagger.BindsOptionalOf;
 import dagger.Provides;
 import dagger.internal.codegen.kotlin.KotlinMetadataUtil;
 import dagger.internal.codegen.langmodel.DaggerElements;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.model.BindingKind;
 import dagger.model.Key;
 import dagger.multibindings.Multibinds;
@@ -113,12 +115,14 @@ public abstract class ComponentRequirement {
    * of the default behavior in {@link #nullPolicy}.
    *
    * <p>Some implementations' null policy can be determined upon construction (e.g., for binding
-   * instances), but others' require Elements which must wait until {@link #nullPolicy} is called.
+   * instances), but others' require Elements and Types, which must wait until {@link #nullPolicy}
+   * is called.
    */
   abstract Optional<NullPolicy> overrideNullPolicy();
 
   /** The requirement's null policy. */
-  public NullPolicy nullPolicy(DaggerElements elements, KotlinMetadataUtil metadataUtil) {
+  public NullPolicy nullPolicy(
+      DaggerElements elements, DaggerTypes types, KotlinMetadataUtil metadataUtil) {
     if (overrideNullPolicy().isPresent()) {
       return overrideNullPolicy().get();
     }
@@ -126,7 +130,9 @@ public abstract class ComponentRequirement {
       case MODULE:
         return componentCanMakeNewInstances(typeElement(), metadataUtil)
             ? NullPolicy.NEW
-            : requiresAPassedInstance(elements, metadataUtil) ? NullPolicy.THROW : NullPolicy.ALLOW;
+            : requiresAPassedInstance(elements, types, metadataUtil)
+                ? NullPolicy.THROW
+                : NullPolicy.ALLOW;
       case DEPENDENCY:
       case BOUND_INSTANCE:
         return NullPolicy.THROW;
@@ -138,12 +144,13 @@ public abstract class ComponentRequirement {
    * Returns true if the passed {@link ComponentRequirement} requires a passed instance in order to
    * be used within a component.
    */
-  public boolean requiresAPassedInstance(DaggerElements elements, KotlinMetadataUtil metadataUtil) {
+  public boolean requiresAPassedInstance(
+      DaggerElements elements, DaggerTypes types, KotlinMetadataUtil metadataUtil) {
     if (!kind().isModule()) {
       // Bound instances and dependencies always require the user to provide an instance.
       return true;
     }
-    return requiresModuleInstance(elements, metadataUtil)
+    return requiresModuleInstance(elements, types, metadataUtil)
         && !componentCanMakeNewInstances(typeElement(), metadataUtil);
   }
 
@@ -157,7 +164,8 @@ public abstract class ComponentRequirement {
    * <p>Alternatively, if the module is a Kotlin Object then the binding methods are considered
    * {@code static}, requiring no module instance.
    */
-  private boolean requiresModuleInstance(DaggerElements elements, KotlinMetadataUtil metadataUtil) {
+  private boolean requiresModuleInstance(
+      DaggerElements elements, DaggerTypes types, KotlinMetadataUtil metadataUtil) {
     boolean isKotlinObject =
         metadataUtil.isObjectClass(typeElement())
             || metadataUtil.isCompanionObjectClass(typeElement());
@@ -165,7 +173,8 @@ public abstract class ComponentRequirement {
       return false;
     }
 
-    ImmutableSet<ExecutableElement> methods = elements.getLocalAndInheritedMethods(typeElement());
+    ImmutableSet<ExecutableElement> methods =
+        getLocalAndInheritedMethods(typeElement(), types, elements);
     return methods.stream()
         .filter(this::isBindingMethod)
         .map(ExecutableElement::getModifiers)
