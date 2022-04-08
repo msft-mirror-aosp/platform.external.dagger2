@@ -18,7 +18,6 @@ package dagger.functional;
 
 import javax.inject.Inject;
 
-
 public class Generic2<T> {
   final T t;
 

@@ -18,19 +18,18 @@ package dagger.internal.codegen;
 
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static dagger.internal.codegen.CompilerMode.DEFAULT_MODE;
+import static dagger.internal.codegen.ComponentCreatorAnnotation.SUBCOMPONENT_BUILDER;
+import static dagger.internal.codegen.ComponentCreatorAnnotation.SUBCOMPONENT_FACTORY;
+import static dagger.internal.codegen.ComponentCreatorKind.BUILDER;
+import static dagger.internal.codegen.ComponentCreatorKind.FACTORY;
+import static dagger.internal.codegen.ComponentKind.SUBCOMPONENT;
+import static dagger.internal.codegen.ErrorMessages.ComponentCreatorMessages.moreThanOneRefToSubcomponent;
+import static dagger.internal.codegen.ErrorMessages.componentMessagesFor;
 import static dagger.internal.codegen.TestUtils.message;
-import static dagger.internal.codegen.binding.ComponentCreatorAnnotation.SUBCOMPONENT_BUILDER;
-import static dagger.internal.codegen.binding.ComponentCreatorAnnotation.SUBCOMPONENT_FACTORY;
-import static dagger.internal.codegen.binding.ComponentCreatorKind.BUILDER;
-import static dagger.internal.codegen.binding.ComponentCreatorKind.FACTORY;
-import static dagger.internal.codegen.binding.ComponentKind.SUBCOMPONENT;
-import static dagger.internal.codegen.binding.ErrorMessages.ComponentCreatorMessages.moreThanOneRefToSubcomponent;
-import static dagger.internal.codegen.binding.ErrorMessages.componentMessagesFor;
 
 import com.google.common.collect.ImmutableList;
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
-import dagger.internal.codegen.binding.ComponentCreatorAnnotation;
 import java.util.Collection;
 import javax.tools.JavaFileObject;
 import org.junit.Test;
@@ -674,18 +673,19 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
     Compilation compilation = compile(componentFile, childComponentFile);
     assertThat(compilation).failed();
     String firstBinding = creatorKind.equals(FACTORY)
-        ? "ChildComponent.Factory.create(s1, …)"
-        : "@BindsInstance void ChildComponent.Builder.set1(String)";
+        ? "test.ChildComponent.Factory.create(s1, …)"
+        : "@BindsInstance void test.ChildComponent.Builder.set1(String)";
     String secondBinding = creatorKind.equals(FACTORY)
-        ? "ChildComponent.Factory.create(…, s2)"
-        : "@BindsInstance void ChildComponent.Builder.set2(String)";
+        ? "test.ChildComponent.Factory.create(…, s2)"
+        : "@BindsInstance void test.ChildComponent.Builder.set2(String)";
     assertThat(compilation)
         .hadErrorContaining(
             message(
-                "String is bound multiple times:",
+                "java.lang.String is bound multiple times:",
                 "    " + firstBinding,
                 "    " + secondBinding,
-                "    in component: [ParentComponent → ChildComponent]"))
+                "    java.lang.String is provided at",
+                "        test.ChildComponent.s() [test.ParentComponent → test.ChildComponent]"))
         .inFile(componentFile)
         .onLineContaining("interface ParentComponent {");
   }

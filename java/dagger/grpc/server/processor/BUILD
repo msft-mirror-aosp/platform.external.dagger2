@@ -1,13 +1,7 @@
-load("@rules_java//java:defs.bzl", "java_library", "java_plugin")
-load(
-    "//:build_defs.bzl",
-    "DOCLINT_HTML_AND_SYNTAX",
-    "POM_VERSION",
-)
-load("//tools:maven.bzl", "pom_file")
-load("@google_bazel_common//tools/javadoc:javadoc.bzl", "javadoc_library")
-
 package(default_visibility = ["//:src"])
+
+load("//:build_defs.bzl", "DOCLINT_HTML_AND_SYNTAX")
+load("//tools:maven.bzl", "pom_file", "POM_VERSION")
 
 java_library(
     name = "processor",
@@ -17,14 +11,12 @@ java_library(
     deps = [
         "//:dagger_with_compiler",
         "//java/dagger/grpc/server:annotations",
-        "//java/dagger/internal/guava:base",
-        "//java/dagger/internal/guava:collect",
-        "//java/dagger/internal/guava:io",
+        "@google_bazel_common//third_party/java/auto:common",
         "@google_bazel_common//third_party/java/auto:service",
         "@google_bazel_common//third_party/java/google_java_format",
+        "@google_bazel_common//third_party/java/guava",
         "@google_bazel_common//third_party/java/javapoet",
         "@google_bazel_common//third_party/java/jsr250_annotations",
-        "@maven//:com_google_auto_auto_common",
     ],
 )
 
@@ -46,6 +38,8 @@ filegroup(
     name = "javadoc-srcs",
     srcs = glob(["*.java"]),
 )
+
+load("@google_bazel_common//tools/javadoc:javadoc.bzl", "javadoc_library")
 
 javadoc_library(
     name = "javadoc",

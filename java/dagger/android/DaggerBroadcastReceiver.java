@@ -19,7 +19,7 @@ package dagger.android;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import androidx.annotation.CallSuper;
+import android.support.annotation.CallSuper;
 import dagger.internal.Beta;
 
 /**

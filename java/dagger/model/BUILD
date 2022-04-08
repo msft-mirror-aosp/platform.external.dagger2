@@ -15,21 +15,12 @@
 # Description:
 #   Dagger's core APIs exposed for plugins
 
-load("@rules_java//java:defs.bzl", "java_library")
+package(default_visibility = ["//:src"])
+
 load(
     "//:build_defs.bzl",
     "DOCLINT_HTML_AND_SYNTAX",
     "DOCLINT_REFERENCES",
-)
-
-package(
-    default_visibility = [
-        # The dagger/spi should be the only direct dependent on this target.
-        # If you need to depend on :model, depend on dagger/spi instead so
-        # that pom files correctly pick up the spi maven dependency.
-        # TODO(bcorso): Consider if :model should have its own maven coordinates.
-        "//java/dagger/spi:__pkg__",
-    ],
 )
 
 INTERNAL_PROXIES = ["BindingGraphProxies.java"]
@@ -48,16 +39,14 @@ java_library(
     javacopts = DOCLINT_HTML_AND_SYNTAX + DOCLINT_REFERENCES,
     deps = [
         "//java/dagger:core",
-        "//java/dagger/internal/codegen/extension",
-        "//java/dagger/internal/guava:base",
-        "//java/dagger/internal/guava:collect",
-        "//java/dagger/internal/guava:graph",
+        "//java/dagger/internal/codegen:jdk-and-guava-extras",
         "//java/dagger/producers",
+        "@google_bazel_common//third_party/java/auto:common",
         "@google_bazel_common//third_party/java/auto:value",
         "@google_bazel_common//third_party/java/error_prone:annotations",
+        "@google_bazel_common//third_party/java/guava",
         "@google_bazel_common//third_party/java/javapoet",
         "@google_bazel_common//third_party/java/jsr330_inject",
-        "@maven//:com_google_auto_auto_common",
     ],
 )
 
@@ -65,11 +54,8 @@ java_library(
     name = "internal-proxies",
     srcs = INTERNAL_PROXIES,
     tags = ["maven:merged"],
-    visibility = ["//:src"],
     deps = [
         ":model",
-        "//java/dagger/internal/guava:collect",
-        "//java/dagger/internal/guava:graph",
-        "@google_bazel_common//third_party/java/auto:value",
+        "@google_bazel_common//third_party/java/guava",
     ],
 )

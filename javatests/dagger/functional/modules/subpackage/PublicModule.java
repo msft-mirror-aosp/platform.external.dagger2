@@ -19,7 +19,7 @@ package dagger.functional.modules.subpackage;
 import dagger.Module;
 import dagger.Provides;
 
-@Module(includes = {PackagePrivateModule.class, NonAbstractPackagePrivateModule.class})
+@Module(includes = PackagePrivateModule.class)
 public abstract class PublicModule {
   @Provides
   static int provideInt() {

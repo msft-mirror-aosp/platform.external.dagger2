@@ -18,7 +18,6 @@ package dagger.functional.builder;
 
 import dagger.Component;
 
-
 interface BuildMethodCovariantReturnInherited {
   @Component
   interface Simple {

@@ -17,8 +17,9 @@
 package dagger.internal.codegen;
 
 import static com.google.testing.compile.CompilationSubject.assertThat;
-import static dagger.internal.codegen.Compilers.compilerWithOptions;
-import static dagger.internal.codegen.GeneratedLines.GENERATED_CODE_ANNOTATIONS;
+import static dagger.internal.codegen.Compilers.daggerCompiler;
+import static dagger.internal.codegen.GeneratedLines.GENERATED_ANNOTATION;
+import static dagger.internal.codegen.GeneratedLines.NPE_FROM_COMPONENT_METHOD;
 
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
@@ -66,7 +67,7 @@ public class ComponentRequirementFieldTest {
             "  }",
             "}");
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts()).compile(component);
+        daggerCompiler().withOptions(compilerMode.javacopts()).compile(component);
     assertThat(compilation).succeeded();
     assertThat(compilation)
         .generatedSourceFile("test.DaggerTestComponent")
@@ -75,7 +76,7 @@ public class ComponentRequirementFieldTest {
                 "test.DaggerTestComponent",
                 "package test;",
                 "",
-                GENERATED_CODE_ANNOTATIONS,
+                GENERATED_ANNOTATION,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  private final Integer i;",
                 "  private final List<String> list;",
@@ -161,7 +162,8 @@ public class ComponentRequirementFieldTest {
             "  long l();",
             "}");
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
+        daggerCompiler()
+            .withOptions(compilerMode.javacopts())
             .compile(module, otherPackageModule, component);
     assertThat(compilation).succeeded();
     JavaFileObject generatedComponent =
@@ -172,7 +174,7 @@ public class ComponentRequirementFieldTest {
             "import other.OtherPackageModule;",
             "import other.OtherPackageModule_LFactory;",
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "final class DaggerTestComponent implements TestComponent {",
             "  private final ParentModule parentModule;",
             "  private final OtherPackageModule otherPackageModule;",
@@ -234,7 +236,8 @@ public class ComponentRequirementFieldTest {
             "}");
 
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
+        daggerCompiler()
+            .withOptions(compilerMode.javacopts())
             .compile(dependency, component, subcomponent);
     assertThat(compilation).succeeded();
     assertThat(compilation)
@@ -244,7 +247,7 @@ public class ComponentRequirementFieldTest {
                 "test.DaggerTestComponent",
                 "package test;",
                 "",
-                GENERATED_CODE_ANNOTATIONS,
+                GENERATED_ANNOTATION,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  private final Dep dep;",
                 "",
@@ -264,13 +267,14 @@ public class ComponentRequirementFieldTest {
                 "",
                 "  @Override",
                 "  public String methodOnDep() {",
-                "    return Preconditions.checkNotNullFromComponent(",
-                "        dep.string());",
+                "    return Preconditions.checkNotNull(",
+                "        dep.string(), " + NPE_FROM_COMPONENT_METHOD + " );",
                 "  }",
                 "",
                 "  @Override",
                 "  public Object otherMethodOnDep() {",
-                "    return Preconditions.checkNotNullFromComponent(dep.object());",
+                "    return Preconditions.checkNotNull(",
+                "        dep.object(), " + NPE_FROM_COMPONENT_METHOD + " );",
                 "  }",
                 "",
                 "  private final class TestSubcomponentImpl implements TestSubcomponent {",
@@ -357,7 +361,7 @@ public class ComponentRequirementFieldTest {
                 "test.DaggerTestComponent",
                 "package test;",
                 "",
-                GENERATED_CODE_ANNOTATIONS,
+                GENERATED_ANNOTATION,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  private final ParentModule parentModule;",
                 "",
@@ -366,15 +370,15 @@ public class ComponentRequirementFieldTest {
                 "  }",
                 "",
                 "  private final class TestSubcomponentImpl implements TestSubcomponent {",
-                "    private Set<Object> setOfObject() {",
+                "    private Set<Object> getSetOfObject() {",
                 "      return ImmutableSet.<Object>of(",
                 "          ParentModule_ContributionFactory.contribution(),",
                 "          ChildModule_ContributionFactory.contribution());",
                 "    }",
                 "",
-                "    private Object object() {",
+                "    private Object getObject() {",
                 "      return ParentModule_ReliesOnMultibindingFactory.reliesOnMultibinding(",
-                "          DaggerTestComponent.this.parentModule, setOfObject());",
+                "          DaggerTestComponent.this.parentModule, getSetOfObject());",
                 "    }",
                 "  }",
                 "}");
@@ -385,7 +389,7 @@ public class ComponentRequirementFieldTest {
                 "test.DaggerTestComponent",
                 "package test;",
                 "",
-                GENERATED_CODE_ANNOTATIONS,
+                GENERATED_ANNOTATION,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  private final ParentModule parentModule;",
                 "",
@@ -421,7 +425,8 @@ public class ComponentRequirementFieldTest {
                 "}");
     }
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
+        daggerCompiler()
+            .withOptions(compilerMode.javacopts())
             .compile(parentModule, childModule, component, subcomponent);
     assertThat(compilation).succeeded();
     assertThat(compilation)

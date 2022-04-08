@@ -16,18 +16,15 @@
 
 package dagger.internal.codegen;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.google.googlejavaformat.java.filer.FormattingFiler;
-import dagger.Binds;
 import dagger.Module;
 import dagger.Provides;
 import dagger.Reusable;
-import dagger.internal.codegen.SpiModule.ProcessorClassLoader;
-import dagger.internal.codegen.compileroption.CompilerOptions;
-import dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions;
-import dagger.internal.codegen.compileroption.ProcessingOptions;
 import dagger.internal.codegen.langmodel.DaggerElements;
-import dagger.spi.BindingGraphPlugin;
 import java.util.Map;
+import java.util.Optional;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -36,25 +33,27 @@ import javax.lang.model.util.Types;
 
 /** Bindings that depend on the {@link ProcessingEnvironment}. */
 @Module
-interface ProcessingEnvironmentModule {
-  @Binds
-  @Reusable // to avoid parsing options more than once
-  CompilerOptions bindCompilerOptions(
-      ProcessingEnvironmentCompilerOptions processingEnvironmentCompilerOptions);
+final class ProcessingEnvironmentModule {
+
+  private final ProcessingEnvironment processingEnvironment;
+
+  ProcessingEnvironmentModule(ProcessingEnvironment processingEnvironment) {
+    this.processingEnvironment = checkNotNull(processingEnvironment);
+  }
 
   @Provides
   @ProcessingOptions
-  static Map<String, String> processingOptions(ProcessingEnvironment processingEnvironment) {
+  Map<String, String> processingOptions() {
     return processingEnvironment.getOptions();
   }
 
   @Provides
-  static Messager messager(ProcessingEnvironment processingEnvironment) {
+  Messager messager() {
     return processingEnvironment.getMessager();
   }
 
   @Provides
-  static Filer filer(CompilerOptions compilerOptions, ProcessingEnvironment processingEnvironment) {
+  Filer filer(CompilerOptions compilerOptions) {
     if (compilerOptions.headerCompilation() || !compilerOptions.formatGeneratedSource()) {
       return processingEnvironment.getFiler();
     } else {
@@ -63,23 +62,28 @@ interface ProcessingEnvironmentModule {
   }
 
   @Provides
-  static Types types(ProcessingEnvironment processingEnvironment) {
+  Types types() {
     return processingEnvironment.getTypeUtils();
   }
 
   @Provides
-  static SourceVersion sourceVersion(ProcessingEnvironment processingEnvironment) {
+  SourceVersion sourceVersion() {
     return processingEnvironment.getSourceVersion();
   }
 
   @Provides
-  static DaggerElements daggerElements(ProcessingEnvironment processingEnvironment) {
+  DaggerElements daggerElements() {
     return new DaggerElements(processingEnvironment);
   }
 
   @Provides
-  @ProcessorClassLoader
-  static ClassLoader processorClassloader(ProcessingEnvironment processingEnvironment) {
-    return BindingGraphPlugin.class.getClassLoader();
+  @Reusable // to avoid parsing options more than once
+  CompilerOptions compilerOptions() {
+    return ProcessingEnvironmentCompilerOptions.create(processingEnvironment);
+  }
+
+  @Provides
+  Optional<DaggerStatisticsRecorder> daggerStatisticsRecorder() {
+    return Optional.empty();
   }
 }

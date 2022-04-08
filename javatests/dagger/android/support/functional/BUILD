@@ -15,8 +15,6 @@
 # Description:
 #   Functional test code for Dagger-Android
 
-load("//:test_defs.bzl", "GenRobolectricTests")
-
 package(default_visibility = ["//:src"])
 
 android_library(
@@ -29,10 +27,9 @@ android_library(
     manifest = "AndroidManifest.xml",
     resource_files = glob(["res/**"]),
     deps = [
-        "@maven//:androidx_fragment_fragment",
-        "@maven//:androidx_appcompat_appcompat",
-        "@maven//:androidx_annotation_annotation",
-        "//java/dagger/internal/guava:collect-android",
+        "@androidsdk//com.android.support:support-fragment-25.0.0",
+        "@androidsdk//com.android.support:appcompat-v7-25.0.0",
+        "@google_bazel_common//third_party/java/guava",
         "//:dagger_with_compiler",
         "//:android",
         "//:android-support",
@@ -40,6 +37,8 @@ android_library(
         "@google_bazel_common//third_party/java/jsr250_annotations",
     ],
 )
+
+load("//:test_defs.bzl", "GenRobolectricTests")
 
 GenRobolectricTests(
     name = "functional_tests",
@@ -49,9 +48,9 @@ GenRobolectricTests(
         "//:android",
         "//:android-support",
         "//:dagger_with_compiler",
+        "@androidsdk//com.android.support:support-fragment-25.0.0",
+        "@google_bazel_common//third_party/java/junit",
+        "@google_bazel_common//third_party/java/robolectric",
         "@google_bazel_common//third_party/java/truth",
-        "@maven//:androidx_fragment_fragment",
-        "@maven//:junit_junit",
-        "@maven//:org_robolectric_robolectric",
     ],
 )

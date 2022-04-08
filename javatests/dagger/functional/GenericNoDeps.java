@@ -18,7 +18,6 @@ package dagger.functional;
 
 import javax.inject.Inject;
 
-
 class GenericNoDeps<T> {
   
   @Inject GenericNoDeps() {}

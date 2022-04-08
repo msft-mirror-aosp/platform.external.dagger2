@@ -19,9 +19,8 @@ package dagger.internal.codegen;
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static dagger.internal.codegen.CompilerMode.DEFAULT_MODE;
 import static dagger.internal.codegen.CompilerMode.FAST_INIT_MODE;
-import static dagger.internal.codegen.Compilers.compilerWithOptions;
 import static dagger.internal.codegen.Compilers.daggerCompiler;
-import static dagger.internal.codegen.GeneratedLines.GENERATED_CODE_ANNOTATIONS;
+import static dagger.internal.codegen.GeneratedLines.GENERATED_ANNOTATION;
 import static dagger.internal.codegen.GeneratedLines.IMPORT_GENERATED_ANNOTATION;
 
 import com.google.testing.compile.Compilation;
@@ -84,7 +83,8 @@ public class SubcomponentValidationTest {
         "  }",
         "}");
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
+        daggerCompiler()
+            .withOptions(compilerMode.javacopts())
             .compile(componentFile, childComponentFile, moduleFile);
     assertThat(compilation).failed();
     assertThat(compilation)
@@ -152,15 +152,16 @@ public class SubcomponentValidationTest {
             "  }",
             "}");
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
+        daggerCompiler()
+            .withOptions(compilerMode.javacopts())
             .compile(component, childComponent, grandchildComponent, grandchildModule);
     assertThat(compilation).failed();
     assertThat(compilation)
         .hadErrorContaining(
-            "[ChildComponent.newGrandchildComponent()] "
-                + "GrandchildComponent requires modules which have no visible default "
+            "[test.ChildComponent.newGrandchildComponent()] "
+                + "test.GrandchildComponent requires modules which have no visible default "
                 + "constructors. Add the following modules as parameters to this method: "
-                + "GrandchildModule")
+                + "test.GrandchildModule")
         .inFile(component)
         .onLineContaining("interface TestComponent");
   }
@@ -183,7 +184,8 @@ public class SubcomponentValidationTest {
         "@Subcomponent",
         "interface ChildComponent {}");
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
+        daggerCompiler()
+            .withOptions(compilerMode.javacopts())
             .compile(componentFile, childComponentFile);
     assertThat(compilation).failed();
     assertThat(compilation)
@@ -219,7 +221,8 @@ public class SubcomponentValidationTest {
         "@Subcomponent(modules = TestModule.class)",
         "interface ChildComponent {}");
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
+        daggerCompiler()
+            .withOptions(compilerMode.javacopts())
             .compile(moduleFile, componentFile, childComponentFile);
     assertThat(compilation).failed();
     assertThat(compilation)
@@ -256,7 +259,8 @@ public class SubcomponentValidationTest {
         "@Subcomponent",
         "interface ChildComponent {}");
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
+        daggerCompiler()
+            .withOptions(compilerMode.javacopts())
             .compile(moduleFile, componentFile, childComponentFile);
     assertThat(compilation).failed();
     assertThat(compilation)
@@ -296,15 +300,16 @@ public class SubcomponentValidationTest {
         "",
         "@Subcomponent(modules = TestModule.class)",
         "interface ChildComponent {",
-        "  String string();",
+        "  String getString();",
         "}");
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
+        daggerCompiler()
+            .withOptions(compilerMode.javacopts())
             .compile(moduleFile, componentFile, childComponentFile);
     assertThat(compilation).failed();
     assertThat(compilation)
         .hadErrorContaining(
-            "Integer cannot be provided without an @Inject constructor or an "
+            "java.lang.Integer cannot be provided without an @Inject constructor or an "
                 + "@Provides-annotated method")
         .inFile(componentFile)
         .onLineContaining("interface TestComponent");
@@ -319,7 +324,7 @@ public class SubcomponentValidationTest {
         "@Subcomponent",
         "final class NotASubcomponent {}");
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts()).compile(subcomponentFile);
+        daggerCompiler().withOptions(compilerMode.javacopts()).compile(subcomponentFile);
     assertThat(compilation).failed();
     assertThat(compilation).hadErrorContaining("interface");
   }
@@ -343,7 +348,7 @@ public class SubcomponentValidationTest {
         "",
         "@Subcomponent(modules = ChildModule.class)",
         "interface ChildComponent {",
-        "  Object object();",
+        "  Object getObject();",
         "}");
     JavaFileObject moduleFile = JavaFileObjects.forSourceLines("test.ChildModule",
         "package test;",
@@ -357,7 +362,8 @@ public class SubcomponentValidationTest {
         "  @Provides @Singleton Object provideObject() { return null; }",
         "}");
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
+        daggerCompiler()
+            .withOptions(compilerMode.javacopts())
             .compile(componentFile, subcomponentFile, moduleFile);
     assertThat(compilation).failed();
     assertThat(compilation).hadErrorContaining("@Singleton");
@@ -377,8 +383,8 @@ public class SubcomponentValidationTest {
             "@Component",
             "interface ParentComponent {",
             "  ChildComponent childComponent();",
-            "  Dep1 dep1();",
-            "  Dep2 dep2();",
+            "  Dep1 getDep1();",
+            "  Dep2 getDep2();",
             "}");
     JavaFileObject childComponentFile =
         JavaFileObjects.forSourceLines(
@@ -389,7 +395,7 @@ public class SubcomponentValidationTest {
             "",
             "@Subcomponent(modules = ChildModule.class)",
             "interface ChildComponent {",
-            "  Object object();",
+            "  Object getObject();",
             "}");
     JavaFileObject childModuleFile =
         JavaFileObjects.forSourceLines(
@@ -457,7 +463,7 @@ public class SubcomponentValidationTest {
             .addLines(
                 "package test;",
                 "",
-                GENERATED_CODE_ANNOTATIONS,
+                GENERATED_ANNOTATION,
                 "final class DaggerParentComponent implements ParentComponent {")
             .addLinesIn(
                 DEFAULT_MODE,
@@ -469,7 +475,7 @@ public class SubcomponentValidationTest {
                 "")
             .addLines(
                 "  @Override", //
-                "  public Dep1 dep1() {")
+                "  public Dep1 getDep1() {")
             .addLinesIn(
                 FAST_INIT_MODE,
                 "   Object local = dep1;",
@@ -490,7 +496,7 @@ public class SubcomponentValidationTest {
                 "  }", //
                 "",
                 "  @Override",
-                "  public Dep2 dep2() {")
+                "  public Dep2 getDep2() {")
             .addLinesIn(
                 FAST_INIT_MODE,
                 "   Object local = dep2;",
@@ -539,34 +545,34 @@ public class SubcomponentValidationTest {
                 "")
             .addLinesIn(
                 DEFAULT_MODE,
-                "    private NeedsDep1 needsDep1() {",
+                "    private NeedsDep1 getNeedsDep1() {",
                 "      return new NeedsDep1(DaggerParentComponent.this.dep1Provider.get());",
                 "    }")
             .addLinesIn(
                 FAST_INIT_MODE,
-                "    private NeedsDep1 needsDep1() {",
-                "      return new NeedsDep1(DaggerParentComponent.this.dep1());",
+                "    private NeedsDep1 getNeedsDep1() {",
+                "      return new NeedsDep1(DaggerParentComponent.this.getDep1());",
                 "    }")
             .addLines(
-                "    private A a() {",
+                "    private A getA() {",
                 "      return injectA(",
                 "          A_Factory.newInstance(",
-                "              needsDep1(),")
+                "              getNeedsDep1(),")
             .addLinesIn(
                 DEFAULT_MODE,
                 "              DaggerParentComponent.this.dep1Provider.get(),",
                 "              DaggerParentComponent.this.dep2Provider.get()));")
             .addLinesIn(
                 FAST_INIT_MODE,
-                "              DaggerParentComponent.this.dep1(),",
-                "              DaggerParentComponent.this.dep2()));")
+                "              DaggerParentComponent.this.getDep1(),",
+                "              DaggerParentComponent.this.getDep2()));")
             .addLines(
                 "    }",
                 "",
                 "    @Override",
-                "    public Object object() {",
+                "    public Object getObject() {",
                 "      return ChildModule_ProvideObjectFactory.provideObject(",
-                "          childModule, a());",
+                "          childModule, getA());",
                 "    }",
                 "",
                 "    @CanIgnoreReturnValue",
@@ -579,7 +585,8 @@ public class SubcomponentValidationTest {
             .build();
 
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
+        daggerCompiler()
+            .withOptions(compilerMode.javacopts())
             .compile(
                 parentComponentFile,
                 childComponentFile,
@@ -656,7 +663,7 @@ public class SubcomponentValidationTest {
             "",
             "import test.subpackage.Sub;",
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "final class DaggerParentComponent implements ParentComponent {",
             "  @Override",
             "  public Foo.Sub newInstanceSubcomponent() {",
@@ -693,7 +700,8 @@ public class SubcomponentValidationTest {
             "  private final class NoConflictImpl implements NoConflict {}",
             "}");
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
+        daggerCompiler()
+            .withOptions(compilerMode.javacopts())
             .compile(parent, foo, bar, baz, noConflict);
     assertThat(compilation).succeeded();
     assertThat(compilation)
@@ -738,7 +746,7 @@ public class SubcomponentValidationTest {
             "test.DaggerParentComponent",
             "package test;",
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "final class DaggerParentComponent implements ParentComponent {",
             "  @Override",
             "  public Sub newSubcomponent() {",
@@ -764,7 +772,7 @@ public class SubcomponentValidationTest {
             "  }",
             "}");
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts()).compile(parent, sub, deepSub);
+        daggerCompiler().withOptions(compilerMode.javacopts()).compile(parent, sub, deepSub);
     assertThat(compilation).succeeded();
     assertThat(compilation)
         .generatedSourceFile("test.DaggerParentComponent")
@@ -803,7 +811,7 @@ public class SubcomponentValidationTest {
         JavaFileObjects.forSourceLines(
             "DaggerParentComponent",
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "final class DaggerParentComponent implements ParentComponent {",
             "  @Override",
             "  public Sub newSubcomponent() {",
@@ -827,7 +835,7 @@ public class SubcomponentValidationTest {
             "");
 
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts()).compile(parent, sub, deepSub);
+        daggerCompiler().withOptions(compilerMode.javacopts()).compile(parent, sub, deepSub);
     assertThat(compilation).succeeded();
     assertThat(compilation)
         .generatedSourceFile("DaggerParentComponent")
@@ -880,7 +888,7 @@ public class SubcomponentValidationTest {
             "",
             "import top1.a.b.c.d.E;",
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "final class DaggerParentComponent implements ParentComponent {",
             "  @Override",
             "  public E.F.Sub top1() {",
@@ -901,7 +909,7 @@ public class SubcomponentValidationTest {
             "}");
 
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts()).compile(parent, top1, top2);
+        daggerCompiler().withOptions(compilerMode.javacopts()).compile(parent, top1, top2);
     assertThat(compilation).succeeded();
     assertThat(compilation)
         .generatedSourceFile("test.DaggerParentComponent")
@@ -937,7 +945,7 @@ public class SubcomponentValidationTest {
             "test.DaggerC",
             "package test;",
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "final class DaggerC implements C {",
             "  @Override",
             "  public Foo.C newInstanceC() {",
@@ -948,7 +956,8 @@ public class SubcomponentValidationTest {
             "}");
 
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
+        daggerCompiler()
+            .withOptions(compilerMode.javacopts())
             .compile(parent, subcomponentWithSameSimpleNameAsParent);
     assertThat(compilation).succeeded();
     assertThat(compilation)
@@ -998,7 +1007,7 @@ public class SubcomponentValidationTest {
             "",
             IMPORT_GENERATED_ANNOTATION,
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "final class DaggerC implements C {",
             "  @Override",
             "  public C.Foo.Sub.Builder fooBuilder() {",
@@ -1010,7 +1019,7 @@ public class SubcomponentValidationTest {
             "    return new B_SubBuilder();",
             "  }",
             "",
-            // TODO(bcorso): Reverse the order of subcomponent and builder so that subcomponent
+            // TODO(user): Reverse the order of subcomponent and builder so that subcomponent
             // comes first.
             "  private final class F_SubBuilder implements C.Foo.Sub.Builder {",
             "    @Override",
@@ -1035,7 +1044,7 @@ public class SubcomponentValidationTest {
             "  }",
             "}");
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts()).compile(parent);
+        daggerCompiler().withOptions(compilerMode.javacopts()).compile(parent);
     assertThat(compilation).succeeded();
     assertThat(compilation)
         .generatedSourceFile("test.DaggerC")
@@ -1088,16 +1097,17 @@ public class SubcomponentValidationTest {
             "}");
 
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
+        daggerCompiler()
+            .withOptions(compilerMode.javacopts())
             .compile(module, component, subcomponent);
     assertThat(compilation).failed();
-    assertThat(compilation).hadErrorContaining("Sub.Builder is bound multiple times:");
+    assertThat(compilation).hadErrorContaining("test.Sub.Builder is bound multiple times:");
     assertThat(compilation)
         .hadErrorContaining(
-            "@Provides Sub.Builder "
-                + "TestModule.providesConflictsWithModuleSubcomponents()");
+            "@Provides test.Sub.Builder "
+                + "test.TestModule.providesConflictsWithModuleSubcomponents()");
     assertThat(compilation)
-        .hadErrorContaining("@Module(subcomponents = Sub.class) for TestModule");
+        .hadErrorContaining("@Module(subcomponents = test.Sub.class) for test.TestModule");
   }
 
   @Test

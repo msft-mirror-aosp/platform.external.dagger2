@@ -46,7 +46,6 @@ public class MapProviderFactoryTest {
     MapProviderFactory.<String, Integer>builder(1).put("Hello", null);
   }
 
-
   @Test
   public void iterationOrder() {
     Provider<Integer> p1 = incrementingIntegerProvider(10);
@@ -74,7 +73,6 @@ public class MapProviderFactoryTest {
         .containsExactlyElementsIn(expectedMap.entrySet())
         .inOrder();
   }
-
 
   private static Provider<Integer> incrementingIntegerProvider(int seed) {
     return new AtomicInteger(seed)::getAndIncrement;

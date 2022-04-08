@@ -80,7 +80,7 @@ public class MultibindingTest {
 
   @Test
   public void wrappedAnnotationKeyMap() {
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings("unchecked")
     Class<? extends Number>[] classes = new Class[] {Long.class, Integer.class};
     assertThat(multibindingComponent.wrappedAnnotationKeyMap())
         .containsExactly(

@@ -17,8 +17,8 @@
 package dagger.internal.codegen;
 
 import static com.google.testing.compile.CompilationSubject.assertThat;
-import static dagger.internal.codegen.Compilers.compilerWithOptions;
-import static dagger.internal.codegen.GeneratedLines.GENERATED_CODE_ANNOTATIONS;
+import static dagger.internal.codegen.Compilers.daggerCompiler;
+import static dagger.internal.codegen.GeneratedLines.GENERATED_ANNOTATION;
 import static dagger.internal.codegen.GeneratedLines.IMPORT_GENERATED_ANNOTATION;
 
 import com.google.testing.compile.Compilation;
@@ -84,7 +84,7 @@ public class ElidedFactoriesTest {
             "",
             IMPORT_GENERATED_ANNOTATION,
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "final class DaggerSimpleComponent implements SimpleComponent {",
             "  private DaggerSimpleComponent() {}",
             "",
@@ -112,7 +112,8 @@ public class ElidedFactoriesTest {
             "}");
 
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
+        daggerCompiler()
+            .withOptions(compilerMode.javacopts())
             .compile(injectedType, dependsOnInjected, componentFile);
     assertThat(compilation).succeeded();
     assertThat(compilation)
@@ -184,7 +185,7 @@ public class ElidedFactoriesTest {
                 IMPORT_GENERATED_ANNOTATION,
                 "import javax.inject.Provider;",
                 "",
-                GENERATED_CODE_ANNOTATIONS,
+                GENERATED_ANNOTATION,
                 "final class DaggerSimpleComponent implements SimpleComponent {",
                 "  private volatile Object scopedType = new MemoizedSentinel();",
                 "  private volatile Provider<DependsOnScoped> dependsOnScopedProvider;",
@@ -199,7 +200,7 @@ public class ElidedFactoriesTest {
                 "    return new Builder().build();",
                 "  }",
                 "",
-                "  private ScopedType scopedType() {",
+                "  private ScopedType getScopedType() {",
                 "    Object local = scopedType;",
                 "    if (local instanceof MemoizedSentinel) {",
                 "      synchronized (local) {",
@@ -213,11 +214,11 @@ public class ElidedFactoriesTest {
                 "    return (ScopedType) local;",
                 "  }",
                 "",
-                "  private DependsOnScoped dependsOnScoped() {",
-                "    return new DependsOnScoped(scopedType());",
+                "  private DependsOnScoped getDependsOnScoped() {",
+                "    return new DependsOnScoped(getScopedType());",
                 "  }",
                 "",
-                "  private Provider<DependsOnScoped> dependsOnScopedProvider() {",
+                "  private Provider<DependsOnScoped> getDependsOnScopedProvider() {",
                 "    Object local = dependsOnScopedProvider;",
                 "    if (local == null) {",
                 "      local = new SwitchingProvider<>(0);",
@@ -228,7 +229,7 @@ public class ElidedFactoriesTest {
                 "",
                 "  @Override",
                 "  public NeedsProvider needsProvider() {",
-                "    return new NeedsProvider(dependsOnScopedProvider());",
+                "    return new NeedsProvider(getDependsOnScopedProvider());",
                 "  }",
                 "",
                 "  static final class Builder {",
@@ -249,7 +250,7 @@ public class ElidedFactoriesTest {
                 "    @Override",
                 "    public T get() {",
                 "      switch (id) {",
-                "        case 0: return (T) DaggerSimpleComponent.this.dependsOnScoped();",
+                "        case 0: return (T) DaggerSimpleComponent.this.getDependsOnScoped();",
                 "        default: throw new AssertionError(id);",
                 "      }",
                 "    }",
@@ -266,7 +267,7 @@ public class ElidedFactoriesTest {
                 IMPORT_GENERATED_ANNOTATION,
                 "import javax.inject.Provider;",
                 "",
-                GENERATED_CODE_ANNOTATIONS,
+                GENERATED_ANNOTATION,
                 "final class DaggerSimpleComponent implements SimpleComponent {",
                 "  private Provider<ScopedType> scopedTypeProvider;",
                 "  private Provider<DependsOnScoped> dependsOnScopedProvider;",
@@ -306,7 +307,8 @@ public class ElidedFactoriesTest {
                 "}");
     }
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
+        daggerCompiler()
+            .withOptions(compilerMode.javacopts())
             .compile(scopedType, dependsOnScoped, componentFile, needsProvider);
     assertThat(compilation).succeeded();
     assertThat(compilation)
@@ -377,7 +379,7 @@ public class ElidedFactoriesTest {
                 "import dagger.internal.MemoizedSentinel;",
                 IMPORT_GENERATED_ANNOTATION,
                 "",
-                GENERATED_CODE_ANNOTATIONS,
+                GENERATED_ANNOTATION,
                 "final class DaggerSimpleComponent implements SimpleComponent {",
                 "  private volatile Object scopedType = new MemoizedSentinel();",
                 "",
@@ -391,7 +393,7 @@ public class ElidedFactoriesTest {
                 "    return new Builder().build();",
                 "  }",
                 "",
-                "  private ScopedType scopedType() {",
+                "  private ScopedType getScopedType() {",
                 "    Object local = scopedType;",
                 "    if (local instanceof MemoizedSentinel) {",
                 "      synchronized (local) {",
@@ -423,7 +425,7 @@ public class ElidedFactoriesTest {
                 "",
                 "    @Override",
                 "    public DependsOnScoped dependsOnScoped() {",
-                "      return new DependsOnScoped(DaggerSimpleComponent.this.scopedType());",
+                "      return new DependsOnScoped(DaggerSimpleComponent.this.getScopedType());",
                 "    }",
                 "  }",
                 "}");
@@ -438,7 +440,7 @@ public class ElidedFactoriesTest {
                 IMPORT_GENERATED_ANNOTATION,
                 "import javax.inject.Provider;",
                 "",
-                GENERATED_CODE_ANNOTATIONS,
+                GENERATED_ANNOTATION,
                 "final class DaggerSimpleComponent implements SimpleComponent {",
                 "  private Provider<ScopedType> scopedTypeProvider;",
                 "",
@@ -484,7 +486,8 @@ public class ElidedFactoriesTest {
                 "}");
     }
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
+        daggerCompiler()
+            .withOptions(compilerMode.javacopts())
             .compile(scopedType, dependsOnScoped, componentFile, subcomponentFile);
     assertThat(compilation).succeeded();
     assertThat(compilation)

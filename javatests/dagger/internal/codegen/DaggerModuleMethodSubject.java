@@ -36,7 +36,7 @@ import java.util.List;
 import javax.tools.JavaFileObject;
 
 /** A {@link Truth} subject for testing Dagger module methods. */
-final class DaggerModuleMethodSubject extends Subject {
+final class DaggerModuleMethodSubject extends Subject<DaggerModuleMethodSubject, String> {
 
   /** A {@link Truth} subject factory for testing Dagger module methods. */
   static final class Factory implements Subject.Factory<DaggerModuleMethodSubject, String> {

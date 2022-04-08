@@ -131,7 +131,7 @@ public class MultibindingTest {
     assertThat(compilation).failed();
     assertThat(compilation)
         .hadErrorContaining(
-            "Map<String,String> "
+            "java.util.Map<java.lang.String,java.lang.String> "
                 + "cannot be provided without an @Provides-annotated method")
         .inFile(component)
         .onLineContaining("interface TestComponent");
@@ -183,7 +183,7 @@ public class MultibindingTest {
     assertThat(compilation).failed();
     assertThat(compilation)
         .hadErrorContaining(
-            "Set<Produced<String>> "
+            "java.util.Set<dagger.producers.Produced<java.lang.String>> "
                 + "cannot be provided without an @Provides- or @Produces-annotated method")
         .inFile(component)
         .onLineContaining("interface TestComponent");

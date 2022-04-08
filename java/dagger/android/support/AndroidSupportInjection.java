@@ -20,7 +20,8 @@ import static android.util.Log.DEBUG;
 import static dagger.internal.Preconditions.checkNotNull;
 
 import android.app.Activity;
-import androidx.fragment.app.Fragment;
+import android.app.Application;
+import android.support.v4.app.Fragment;
 import android.util.Log;
 import dagger.android.AndroidInjector;
 import dagger.android.HasAndroidInjector;
@@ -35,59 +36,72 @@ public final class AndroidSupportInjection {
    * Injects {@code fragment} if an associated {@link AndroidInjector} implementation can be found,
    * otherwise throws an {@link IllegalArgumentException}.
    *
-   * <p>Uses the following algorithm to find the appropriate {@code AndroidInjector<Fragment>} to
-   * use to inject {@code fragment}:
+   * <p>Uses the following algorithm to find the appropriate {@link AndroidInjector} to use to
+   * inject {@code fragment}:
    *
    * <ol>
-   *   <li>Walks the parent-fragment hierarchy to find the a fragment that implements {@link
-   *       HasAndroidInjector}, and if none do
+   *   <li>Walks the parent-fragment hierarchy to find a fragment that implements {@link
+   *       HasAndroidInjector} or {@link HasSupportFragmentInjector}, and if none do
    *   <li>Uses the {@code fragment}'s {@link Fragment#getActivity() activity} if it implements
-   *       {@link HasAndroidInjector}, and if not
-   *   <li>Uses the {@link android.app.Application} if it implements {@link HasAndroidInjector}.
+   *       {@link HasAndroidInjector} or {@link HasSupportFragmentInjector}, and if not
+   *   <li>Uses the {@link android.app.Application} if it implements {@link HasAndroidInjector}
+   *       {@link HasSupportFragmentInjector}.
    * </ol>
    *
-   * If none of them implement {@link HasAndroidInjector}, a {@link IllegalArgumentException} is
-   * thrown.
+   * If none of them implement {@link HasAndroidInjector} or {@link HasSupportFragmentInjector}, a
+   * {@link IllegalArgumentException} is thrown.
    *
    * @throws IllegalArgumentException if no parent fragment, activity, or application implements
-   *     {@link HasAndroidInjector}.
+   *     {@link HasAndroidInjector} or {@link HasSupportFragmentInjector}.
    */
   public static void inject(Fragment fragment) {
     checkNotNull(fragment, "fragment");
-    HasAndroidInjector hasAndroidInjector = findHasAndroidInjectorForFragment(fragment);
+
+    Object hasInjector = findHasSupportFragmentInjector(fragment);
+    AndroidInjector<? super Fragment> injector;
+    if (hasInjector instanceof HasAndroidInjector) {
+      injector = ((HasAndroidInjector) hasInjector).androidInjector();
+      checkNotNull(injector, "%s.androidInjector() returned null", hasInjector.getClass());
+    } else if (hasInjector instanceof HasSupportFragmentInjector) {
+      injector = ((HasSupportFragmentInjector) hasInjector).supportFragmentInjector();
+      checkNotNull(injector, "%s.supportFragmentInjector() returned null", hasInjector.getClass());
+    } else {
+      throw new RuntimeException(
+          String.format(
+              "%s does not implement %s or %s",
+              hasInjector.getClass().getCanonicalName(),
+              HasAndroidInjector.class.getCanonicalName(),
+              HasSupportFragmentInjector.class.getCanonicalName()));
+    }
+
     if (Log.isLoggable(TAG, DEBUG)) {
       Log.d(
           TAG,
           String.format(
               "An injector for %s was found in %s",
               fragment.getClass().getCanonicalName(),
-              hasAndroidInjector.getClass().getCanonicalName()));
+              hasInjector.getClass().getCanonicalName()));
     }
 
-    inject(fragment, hasAndroidInjector);
+    injector.inject(fragment);
   }
 
-  private static void inject(Object target, HasAndroidInjector hasAndroidInjector) {
-    AndroidInjector<Object> androidInjector = hasAndroidInjector.androidInjector();
-    checkNotNull(
-        androidInjector, "%s.androidInjector() returned null", hasAndroidInjector.getClass());
-
-    androidInjector.inject(target);
-  }
-
-  private static HasAndroidInjector findHasAndroidInjectorForFragment(Fragment fragment) {
+  private static Object findHasSupportFragmentInjector(Fragment fragment) {
     Fragment parentFragment = fragment;
     while ((parentFragment = parentFragment.getParentFragment()) != null) {
-      if (parentFragment instanceof HasAndroidInjector) {
-        return (HasAndroidInjector) parentFragment;
+      if (parentFragment instanceof HasAndroidInjector
+          || parentFragment instanceof HasSupportFragmentInjector) {
+        return parentFragment;
       }
     }
     Activity activity = fragment.getActivity();
-    if (activity instanceof HasAndroidInjector) {
-      return (HasAndroidInjector) activity;
+    if (activity instanceof HasAndroidInjector || activity instanceof HasSupportFragmentInjector) {
+      return activity;
     }
-    if (activity.getApplication() instanceof HasAndroidInjector) {
-      return (HasAndroidInjector) activity.getApplication();
+    Application application = activity.getApplication();
+    if (application instanceof HasAndroidInjector
+        || application instanceof HasSupportFragmentInjector) {
+      return application;
     }
     throw new IllegalArgumentException(
         String.format("No injector was found for %s", fragment.getClass().getCanonicalName()));

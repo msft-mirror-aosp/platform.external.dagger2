@@ -20,9 +20,8 @@ import static com.google.common.truth.Truth.assertAbout;
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static com.google.testing.compile.JavaSourceSubjectFactory.javaSource;
 import static com.google.testing.compile.JavaSourcesSubjectFactory.javaSources;
-import static dagger.internal.codegen.Compilers.compilerWithOptions;
 import static dagger.internal.codegen.Compilers.daggerCompiler;
-import static dagger.internal.codegen.GeneratedLines.GENERATED_CODE_ANNOTATIONS;
+import static dagger.internal.codegen.GeneratedLines.GENERATED_ANNOTATION;
 import static dagger.internal.codegen.GeneratedLines.IMPORT_GENERATED_ANNOTATION;
 
 import com.google.common.collect.ImmutableList;
@@ -138,7 +137,7 @@ public final class InjectConstructorFactoryGeneratorTest {
             IMPORT_GENERATED_ANNOTATION,
             "import javax.inject.Provider;",
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class GenericClass_Factory<T> implements Factory<GenericClass<T>> {",
             "  private final Provider<T> tProvider;",
             "",
@@ -148,7 +147,7 @@ public final class InjectConstructorFactoryGeneratorTest {
             "",
             "  @Override",
             "  public GenericClass<T> get() {",
-            "    return newInstance(tProvider.get());",
+            "    return new GenericClass<T>(tProvider.get());",
             "  }",
             "",
             "  public static <T> GenericClass_Factory<T> create(Provider<T> tProvider) {",
@@ -187,9 +186,8 @@ public final class InjectConstructorFactoryGeneratorTest {
             IMPORT_GENERATED_ANNOTATION,
             "import javax.inject.Provider;",
             "",
-            GENERATED_CODE_ANNOTATIONS,
-            "public final class GenericClass_Factory<A, B> implements",
-            "    Factory<GenericClass<A, B>> {",
+            GENERATED_ANNOTATION,
+            "public final class GenericClass_Factory<A, B> implements Factory<GenericClass<A, B>> {",
             "  private final Provider<A> aProvider;",
             "  private final Provider<B> bProvider;",
             "",
@@ -201,7 +199,7 @@ public final class InjectConstructorFactoryGeneratorTest {
             "",
             "  @Override",
             "  public GenericClass<A, B> get() {",
-            "    GenericClass<A, B> instance = newInstance();",
+            "    GenericClass<A, B> instance = new GenericClass<A, B>();",
             "    GenericClass_MembersInjector.injectA(instance, aProvider.get());",
             "    GenericClass_MembersInjector.injectRegister(instance, bProvider.get());",
             "    return instance;",
@@ -239,25 +237,23 @@ public final class InjectConstructorFactoryGeneratorTest {
             "import dagger.internal.Factory;",
             IMPORT_GENERATED_ANNOTATION,
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class GenericClass_Factory<T> implements Factory<GenericClass<T>> {",
+            "  @SuppressWarnings(\"rawtypes\")",
+            "  private static final GenericClass_Factory INSTANCE = new GenericClass_Factory();",
+            "",
             "  @Override",
             "  public GenericClass<T> get() {",
-            "    return newInstance();",
+            "    return new GenericClass<T>();",
             "  }",
             "",
             "  @SuppressWarnings(\"unchecked\")",
             "  public static <T> GenericClass_Factory<T> create() {",
-            "    return InstanceHolder.INSTANCE;",
+            "    return INSTANCE;",
             "  }",
             "",
             "  public static <T> GenericClass<T> newInstance() {",
             "    return new GenericClass<T>();",
-            "  }",
-            "",
-            "  private static final class InstanceHolder {",
-            "    @SuppressWarnings(\"rawtypes\")",
-            "    private static final GenericClass_Factory INSTANCE = new GenericClass_Factory();",
             "  }",
             "}");
     assertAbout(javaSource()).that(file)
@@ -284,9 +280,8 @@ public final class InjectConstructorFactoryGeneratorTest {
             IMPORT_GENERATED_ANNOTATION,
             "import javax.inject.Provider;",
             "",
-            GENERATED_CODE_ANNOTATIONS,
-            "public final class GenericClass_Factory<A, B>",
-            "    implements Factory<GenericClass<A, B>> {",
+            GENERATED_ANNOTATION,
+            "public final class GenericClass_Factory<A, B> implements Factory<GenericClass<A, B>> {",
             "  private final Provider<A> aProvider;",
             "  private final Provider<B> bProvider;",
             "",
@@ -297,7 +292,7 @@ public final class InjectConstructorFactoryGeneratorTest {
             "",
             "  @Override",
             "  public GenericClass<A, B> get() {",
-            "    return newInstance(aProvider.get(), bProvider.get());",
+            "    return new GenericClass<A, B>(aProvider.get(), bProvider.get());",
             "  }",
             "",
             "  public static <A, B> GenericClass_Factory<A, B> create(",
@@ -337,7 +332,7 @@ public final class InjectConstructorFactoryGeneratorTest {
             IMPORT_GENERATED_ANNOTATION,
             "import javax.inject.Provider;",
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class GenericClass_Factory<A extends Number & Comparable<A>,",
             "        B extends List<? extends String>,",
             "        C extends List<? super String>>",
@@ -356,7 +351,8 @@ public final class InjectConstructorFactoryGeneratorTest {
             "",
             "  @Override",
             "  public GenericClass<A, B, C> get() {",
-            "    return newInstance(aProvider.get(), bProvider.get(), cProvider.get());",
+            "    return new GenericClass<A, B, C>(",
+            "        aProvider.get(), bProvider.get(), cProvider.get());",
             "  }",
             "",
             "  public static <A extends Number & Comparable<A>,",
@@ -405,110 +401,64 @@ public final class InjectConstructorFactoryGeneratorTest {
             IMPORT_GENERATED_ANNOTATION,
             "import javax.inject.Provider;",
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class GenericClass_Factory<A, B>",
             "    implements Factory<GenericClass<A, B>> {",
-            "  private final Provider<A> aProvider;",
-            "  private final Provider<A> a2Provider;",
-            "  private final Provider<A> paProvider;",
+            "  private final Provider<A> aAndA2AndPaAndLaProvider;",
             "  private final Provider<A> qaProvider;",
-            "  private final Provider<A> laProvider;",
-            "  private final Provider<String> sProvider;",
-            "  private final Provider<String> s2Provider;",
-            "  private final Provider<String> psProvider;",
+            "  private final Provider<String> sAndS2AndPsAndLsProvider;",
             "  private final Provider<String> qsProvider;",
-            "  private final Provider<String> lsProvider;",
-            "  private final Provider<B> bProvider;",
-            "  private final Provider<B> b2Provider;",
-            "  private final Provider<B> pbProvider;",
+            "  private final Provider<B> bAndB2AndPbAndLbProvider;",
             "  private final Provider<B> qbProvider;",
-            "  private final Provider<B> lbProvider;",
             "",
-            "  public GenericClass_Factory(",
-            "      Provider<A> aProvider,",
-            "      Provider<A> a2Provider,",
-            "      Provider<A> paProvider,",
+            "  public GenericClass_Factory(Provider<A> aAndA2AndPaAndLaProvider,",
             "      Provider<A> qaProvider,",
-            "      Provider<A> laProvider,",
-            "      Provider<String> sProvider,",
-            "      Provider<String> s2Provider,",
-            "      Provider<String> psProvider,",
+            "      Provider<String> sAndS2AndPsAndLsProvider,",
             "      Provider<String> qsProvider,",
-            "      Provider<String> lsProvider,",
-            "      Provider<B> bProvider,",
-            "      Provider<B> b2Provider,",
-            "      Provider<B> pbProvider,",
-            "      Provider<B> qbProvider,",
-            "      Provider<B> lbProvider) {",
-            "    this.aProvider = aProvider;",
-            "    this.a2Provider = a2Provider;",
-            "    this.paProvider = paProvider;",
+            "      Provider<B> bAndB2AndPbAndLbProvider,",
+            "      Provider<B> qbProvider) {",
+            "    this.aAndA2AndPaAndLaProvider = aAndA2AndPaAndLaProvider;",
             "    this.qaProvider = qaProvider;",
-            "    this.laProvider = laProvider;",
-            "    this.sProvider = sProvider;",
-            "    this.s2Provider = s2Provider;",
-            "    this.psProvider = psProvider;",
+            "    this.sAndS2AndPsAndLsProvider = sAndS2AndPsAndLsProvider;",
             "    this.qsProvider = qsProvider;",
-            "    this.lsProvider = lsProvider;",
-            "    this.bProvider = bProvider;",
-            "    this.b2Provider = b2Provider;",
-            "    this.pbProvider = pbProvider;",
+            "    this.bAndB2AndPbAndLbProvider = bAndB2AndPbAndLbProvider;",
             "    this.qbProvider = qbProvider;",
-            "    this.lbProvider = lbProvider;",
             "  }",
             "",
             "  @Override",
             "  public GenericClass<A, B> get() {",
-            "    return newInstance(",
-            "        aProvider.get(),",
-            "        a2Provider.get(),",
-            "        paProvider,",
-            "        qaProvider.get(),",
-            "        DoubleCheck.lazy(laProvider),",
-            "        sProvider.get(),",
-            "        s2Provider.get(),",
-            "        psProvider,",
-            "        qsProvider.get(),",
-            "        DoubleCheck.lazy(lsProvider),",
-            "        bProvider.get(),",
-            "        b2Provider.get(),",
-            "        pbProvider,",
-            "        qbProvider.get(),",
-            "        DoubleCheck.lazy(lbProvider));",
+            "    return new GenericClass<A, B>(",
+            "      aAndA2AndPaAndLaProvider.get(),",
+            "      aAndA2AndPaAndLaProvider.get(),",
+            "      aAndA2AndPaAndLaProvider,",
+            "      qaProvider.get(),",
+            "      DoubleCheck.lazy(aAndA2AndPaAndLaProvider),",
+            "      sAndS2AndPsAndLsProvider.get(),",
+            "      sAndS2AndPsAndLsProvider.get(),",
+            "      sAndS2AndPsAndLsProvider,",
+            "      qsProvider.get(),",
+            "      DoubleCheck.lazy(sAndS2AndPsAndLsProvider),",
+            "      bAndB2AndPbAndLbProvider.get(),",
+            "      bAndB2AndPbAndLbProvider.get(),",
+            "      bAndB2AndPbAndLbProvider,",
+            "      qbProvider.get(),",
+            "      DoubleCheck.lazy(bAndB2AndPbAndLbProvider));",
             "  }",
             "",
             "  public static <A, B> GenericClass_Factory<A, B> create(",
-            "      Provider<A> aProvider,",
-            "      Provider<A> a2Provider,",
-            "      Provider<A> paProvider,",
+            "      Provider<A> aAndA2AndPaAndLaProvider,",
             "      Provider<A> qaProvider,",
-            "      Provider<A> laProvider,",
-            "      Provider<String> sProvider,",
-            "      Provider<String> s2Provider,",
-            "      Provider<String> psProvider,",
+            "      Provider<String> sAndS2AndPsAndLsProvider,",
             "      Provider<String> qsProvider,",
-            "      Provider<String> lsProvider,",
-            "      Provider<B> bProvider,",
-            "      Provider<B> b2Provider,",
-            "      Provider<B> pbProvider,",
-            "      Provider<B> qbProvider,",
-            "      Provider<B> lbProvider) {",
+            "      Provider<B> bAndB2AndPbAndLbProvider,",
+            "      Provider<B> qbProvider) {",
             "    return new GenericClass_Factory<A, B>(",
-            "        aProvider,",
-            "        a2Provider,",
-            "        paProvider,",
+            "        aAndA2AndPaAndLaProvider,",
             "        qaProvider,",
-            "        laProvider,",
-            "        sProvider,",
-            "        s2Provider,",
-            "        psProvider,",
+            "        sAndS2AndPsAndLsProvider,",
             "        qsProvider,",
-            "        lsProvider,",
-            "        bProvider,",
-            "        b2Provider,",
-            "        pbProvider,",
-            "        qbProvider,",
-            "        lbProvider);",
+            "        bAndB2AndPbAndLbProvider,",
+            "        qbProvider);",
             "  }",
             "",
             "  public static <A, B> GenericClass<A, B> newInstance(",
@@ -551,11 +501,11 @@ public final class InjectConstructorFactoryGeneratorTest {
     Compilation compilation = daggerCompiler().compile(file);
     assertThat(compilation).failed();
     assertThat(compilation)
-        .hadErrorContaining("Types may only contain one injected constructor")
+        .hadErrorContaining("Types may only contain one @Inject constructor")
         .inFile(file)
         .onLine(6);
     assertThat(compilation)
-        .hadErrorContaining("Types may only contain one injected constructor")
+        .hadErrorContaining("Types may only contain one @Inject constructor")
         .inFile(file)
         .onLine(8);
   }
@@ -652,7 +602,7 @@ public final class InjectConstructorFactoryGeneratorTest {
         "  @Inject CheckedExceptionClass() throws Exception {}",
         "}");
     Compilation compilation =
-        compilerWithOptions("-Adagger.privateMemberValidation=WARNING").compile(file);
+        daggerCompiler().withOptions("-Adagger.privateMemberValidation=WARNING").compile(file);
     assertThat(compilation).succeeded();
     assertThat(compilation)
         .hadWarningContaining("Dagger does not support checked exceptions on @Inject constructors")
@@ -691,7 +641,7 @@ public final class InjectConstructorFactoryGeneratorTest {
         "  }",
         "}");
     Compilation compilation =
-        compilerWithOptions("-Adagger.privateMemberValidation=WARNING").compile(file);
+        daggerCompiler().withOptions("-Adagger.privateMemberValidation=WARNING").compile(file);
     assertThat(compilation).succeeded();
     assertThat(compilation)
         .hadWarningContaining("Dagger does not support injection into private classes")
@@ -734,7 +684,7 @@ public final class InjectConstructorFactoryGeneratorTest {
         "  }",
         "}");
     Compilation compilation =
-        compilerWithOptions("-Adagger.privateMemberValidation=WARNING").compile(file);
+        daggerCompiler().withOptions("-Adagger.privateMemberValidation=WARNING").compile(file);
     assertThat(compilation).succeeded();
     assertThat(compilation)
         .hadWarningContaining("Dagger does not support injection into private classes")
@@ -786,7 +736,7 @@ public final class InjectConstructorFactoryGeneratorTest {
         "  @Inject private String s;",
         "}");
     Compilation compilation =
-        compilerWithOptions("-Adagger.privateMemberValidation=WARNING").compile(file);
+        daggerCompiler().withOptions("-Adagger.privateMemberValidation=WARNING").compile(file);
     assertThat(compilation).succeeded(); // TODO: Verify warning message when supported
   }
 
@@ -817,7 +767,7 @@ public final class InjectConstructorFactoryGeneratorTest {
         "  @Inject static String s;",
         "}");
     Compilation compilation =
-        compilerWithOptions("-Adagger.staticMemberValidation=WARNING").compile(file);
+        daggerCompiler().withOptions("-Adagger.staticMemberValidation=WARNING").compile(file);
     assertThat(compilation).succeeded(); // TODO: Verify warning message when supported
   }
 
@@ -888,7 +838,7 @@ public final class InjectConstructorFactoryGeneratorTest {
         "  @Inject private void method(){}",
         "}");
     Compilation compilation =
-        compilerWithOptions("-Adagger.privateMemberValidation=WARNING").compile(file);
+        daggerCompiler().withOptions("-Adagger.privateMemberValidation=WARNING").compile(file);
     assertThat(compilation).succeeded(); // TODO: Verify warning message when supported
   }
 
@@ -919,7 +869,7 @@ public final class InjectConstructorFactoryGeneratorTest {
         "  @Inject static void method(){}",
         "}");
     Compilation compilation =
-        compilerWithOptions("-Adagger.staticMemberValidation=WARNING").compile(file);
+        daggerCompiler().withOptions("-Adagger.staticMemberValidation=WARNING").compile(file);
     assertThat(compilation).succeeded(); // TODO: Verify warning message when supported
   }
 
@@ -1053,7 +1003,6 @@ public final class InjectConstructorFactoryGeneratorTest {
         .hadErrorContaining("Producer may only be injected in @Produces methods");
   }
 
-
   @Test public void injectConstructor() {
     JavaFileObject file = JavaFileObjects.forSourceLines("test.InjectConstructor",
         "package test;",
@@ -1072,7 +1021,7 @@ public final class InjectConstructorFactoryGeneratorTest {
             IMPORT_GENERATED_ANNOTATION,
             "import javax.inject.Provider;",
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class InjectConstructor_Factory ",
             "    implements Factory<InjectConstructor> {",
             "",
@@ -1083,7 +1032,7 @@ public final class InjectConstructorFactoryGeneratorTest {
             "  }",
             "",
             "  @Override public InjectConstructor get() {",
-            "    return newInstance(sProvider.get());",
+            "    return new InjectConstructor(sProvider.get());",
             "  }",
             "",
             "  public static InjectConstructor_Factory create(Provider<String> sProvider) {",
@@ -1119,39 +1068,28 @@ public final class InjectConstructorFactoryGeneratorTest {
             IMPORT_GENERATED_ANNOTATION,
             "import javax.inject.Provider;",
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class AllInjections_Factory implements Factory<AllInjections> {",
             "  private final Provider<String> sProvider;",
-            "  private final Provider<String> sProvider2;",
-            "  private final Provider<String> sProvider3;",
             "",
-            "  public AllInjections_Factory(",
-            "      Provider<String> sProvider,",
-            "      Provider<String> sProvider2,",
-            "      Provider<String> sProvider3) {",
+            "  public AllInjections_Factory(Provider<String> sProvider) {",
             "    this.sProvider = sProvider;",
-            "    this.sProvider2 = sProvider2;",
-            "    this.sProvider3 = sProvider3;",
             "  }",
             "",
-            "  @Override",
-            "  public AllInjections get() {",
-            "    AllInjections instance = newInstance(sProvider.get());",
-            "    AllInjections_MembersInjector.injectS(instance, sProvider2.get());",
-            "    AllInjections_MembersInjector.injectS2(instance, sProvider3.get());",
+            "  @Override public AllInjections get() {",
+            "    AllInjections instance = new AllInjections(sProvider.get());",
+            "    AllInjections_MembersInjector.injectS(instance, sProvider.get());",
+            "    AllInjections_MembersInjector.injectS2(instance, sProvider.get());",
             "    return instance;",
             "  }",
             "",
-            "  public static AllInjections_Factory create(",
-            "      Provider<String> sProvider,",
-            "      Provider<String> sProvider2,",
-            "      Provider<String> sProvider3) {",
-            "    return new AllInjections_Factory(sProvider, sProvider2, sProvider3);",
+            "  public static AllInjections_Factory create(Provider<String> sProvider) {",
+            "    return new AllInjections_Factory(sProvider);",
             "  }",
             "",
             "  public static AllInjections newInstance(String s) {",
-            "    return new AllInjections(s);",
-            "  }",
+            "     return new AllInjections(s);",
+            "   }",
             "}");
     assertAbout(javaSource()).that(file).processedWith(new ComponentProcessor())
         .compilesWithoutError()
@@ -1180,7 +1118,7 @@ public final class InjectConstructorFactoryGeneratorTest {
             IMPORT_GENERATED_ANNOTATION,
             "import javax.inject.Provider;",
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class InjectConstructor_Factory ",
             "    implements Factory<InjectConstructor> {",
             "",
@@ -1191,7 +1129,7 @@ public final class InjectConstructorFactoryGeneratorTest {
             "  }",
             "",
             "  @Override public InjectConstructor get() {",
-            "    return newInstance(objectsProvider.get());",
+            "    return new InjectConstructor(objectsProvider.get());",
             "  }",
             "",
             "  public static InjectConstructor_Factory create(",
@@ -1232,7 +1170,7 @@ public final class InjectConstructorFactoryGeneratorTest {
             IMPORT_GENERATED_ANNOTATION,
             "import javax.inject.Provider;",
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class InjectConstructor_Factory ",
             "    implements Factory<InjectConstructor> {",
             "",
@@ -1243,7 +1181,7 @@ public final class InjectConstructorFactoryGeneratorTest {
             "  }",
             "",
             "  @Override public InjectConstructor get() {",
-            "    return newInstance(factoryProvider.get());",
+            "    return new InjectConstructor(factoryProvider.get());",
             "  }",
             "",
             "  public static InjectConstructor_Factory create(",
@@ -1289,7 +1227,7 @@ public final class InjectConstructorFactoryGeneratorTest {
             "import javax.inject.Provider;",
             "import other.pkg.Outer;",
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class InjectConstructor_Factory ",
             "    implements Factory<InjectConstructor> {",
             "",
@@ -1300,7 +1238,7 @@ public final class InjectConstructorFactoryGeneratorTest {
             "  }",
             "",
             "  @Override public InjectConstructor get() {",
-            "    return newInstance(factoryProvider.get());",
+            "    return new InjectConstructor(factoryProvider.get());",
             "  }",
             "",
             "  public static InjectConstructor_Factory create(",
@@ -1347,7 +1285,7 @@ public final class InjectConstructorFactoryGeneratorTest {
             IMPORT_GENERATED_ANNOTATION,
             "import javax.inject.Provider;",
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class InjectConstructor_Factory ",
             "    implements Factory<InjectConstructor> {",
             "",
@@ -1362,7 +1300,8 @@ public final class InjectConstructorFactoryGeneratorTest {
             "  }",
             "",
             "  @Override public InjectConstructor get() {",
-            "    return newInstance(otherPackageProvider.get(), samePackageProvider.get());",
+            "    return new InjectConstructor(",
+            "        otherPackageProvider.get(), samePackageProvider.get());",
             "  }",
             "",
             "  public static InjectConstructor_Factory create(",
@@ -1401,22 +1340,20 @@ public final class InjectConstructorFactoryGeneratorTest {
             "import dagger.internal.Factory;",
             IMPORT_GENERATED_ANNOTATION,
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class SimpleType_Factory implements Factory<SimpleType> {",
+            "  private static final SimpleType_Factory INSTANCE = new SimpleType_Factory();",
+            "",
             "  @Override public SimpleType get() {",
-            "    return newInstance();",
+            "    return new SimpleType();",
             "  }",
             "",
             "  public static SimpleType_Factory create() {",
-            "    return InstanceHolder.INSTANCE;",
+            "    return INSTANCE;",
             "  }",
             "",
             "  public static SimpleType newInstance() {",
             "    return new SimpleType();",
-            "  }",
-            "",
-            "  private static final class InstanceHolder {",
-            "    private static final SimpleType_Factory INSTANCE = new SimpleType_Factory();",
             "  }",
             "}");
     assertAbout(javaSource())
@@ -1449,22 +1386,20 @@ public final class InjectConstructorFactoryGeneratorTest {
             "import dagger.internal.Factory;",
             IMPORT_GENERATED_ANNOTATION,
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class OuterType_A_Factory implements Factory<OuterType.A> {",
+            "  private static final OuterType_A_Factory INSTANCE = new OuterType_A_Factory();",
+            "",
             "  @Override public OuterType.A get() {",
-            "    return newInstance();",
+            "    return new OuterType.A();",
             "  }",
             "",
             "  public static OuterType_A_Factory create() {",
-            "    return InstanceHolder.INSTANCE;",
+            "    return INSTANCE;",
             "  }",
             "",
             "  public static OuterType.A newInstance() {",
             "    return new OuterType.A();",
-            "  }",
-            "",
-            "  private static final class InstanceHolder {",
-            "    private static final OuterType_A_Factory INSTANCE = new OuterType_A_Factory();",
             "  }",
             "}");
     assertAbout(javaSources()).that(ImmutableList.of(nestedTypesFile))

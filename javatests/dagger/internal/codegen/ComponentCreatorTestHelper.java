@@ -16,16 +16,13 @@
 
 package dagger.internal.codegen;
 
-import static dagger.internal.codegen.Compilers.compilerWithOptions;
-import static dagger.internal.codegen.binding.ComponentCreatorKind.FACTORY;
-import static dagger.internal.codegen.binding.ErrorMessages.creatorMessagesFor;
+import static dagger.internal.codegen.Compilers.daggerCompiler;
+import static dagger.internal.codegen.ComponentCreatorKind.FACTORY;
+import static dagger.internal.codegen.ErrorMessages.creatorMessagesFor;
 import static java.util.stream.Collectors.joining;
 
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
-import dagger.internal.codegen.binding.ComponentCreatorAnnotation;
-import dagger.internal.codegen.binding.ComponentCreatorKind;
-import dagger.internal.codegen.binding.ErrorMessages;
 import java.util.Arrays;
 import java.util.stream.Stream;
 import javax.tools.JavaFileObject;
@@ -87,6 +84,6 @@ abstract class ComponentCreatorTestHelper {
 
   /** Compiles the given files with the set compiler mode's javacopts. */
   Compilation compile(JavaFileObject... files) {
-    return compilerWithOptions(compilerMode.javacopts()).compile(files);
+    return daggerCompiler().withOptions(compilerMode.javacopts()).compile(files);
   }
 }

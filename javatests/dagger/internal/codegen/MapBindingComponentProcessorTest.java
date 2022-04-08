@@ -17,9 +17,8 @@
 package dagger.internal.codegen;
 
 import static com.google.testing.compile.CompilationSubject.assertThat;
-import static dagger.internal.codegen.Compilers.compilerWithOptions;
 import static dagger.internal.codegen.Compilers.daggerCompiler;
-import static dagger.internal.codegen.GeneratedLines.GENERATED_CODE_ANNOTATIONS;
+import static dagger.internal.codegen.GeneratedLines.GENERATED_ANNOTATION;
 
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
@@ -129,7 +128,7 @@ public class MapBindingComponentProcessorTest {
                 "test.DaggerTestComponent",
                 "package test;",
                 "",
-                GENERATED_CODE_ANNOTATIONS,
+                GENERATED_ANNOTATION,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  private final MapModuleOne mapModuleOne;",
                 "  private final MapModuleTwo mapModuleTwo;",
@@ -138,7 +137,7 @@ public class MapBindingComponentProcessorTest {
                 "  private volatile Provider<Map<PathEnum, Provider<Handler>>>",
                 "      mapOfPathEnumAndProviderOfHandlerProvider;",
                 "",
-                "  private Provider<Handler> provideAdminHandlerProvider() {",
+                "  private Provider<Handler> getProvideAdminHandlerProvider() {",
                 "    Object local = provideAdminHandlerProvider;",
                 "    if (local == null) {",
                 "      local = new SwitchingProvider<>(1);",
@@ -147,7 +146,7 @@ public class MapBindingComponentProcessorTest {
                 "    return (Provider<Handler>) local;",
                 "  }",
                 "",
-                "  private Provider<Handler> provideLoginHandlerProvider() {",
+                "  private Provider<Handler> getProvideLoginHandlerProvider() {",
                 "    Object local = provideLoginHandlerProvider;",
                 "    if (local == null) {",
                 "      local = new SwitchingProvider<>(2);",
@@ -157,10 +156,10 @@ public class MapBindingComponentProcessorTest {
                 "  }",
                 "",
                 "  private Map<PathEnum, Provider<Handler>>",
-                "        mapOfPathEnumAndProviderOfHandler() {",
+                "        getMapOfPathEnumAndProviderOfHandler() {",
                 "    return ImmutableMap.<PathEnum, Provider<Handler>>of(",
-                "        PathEnum.ADMIN, provideAdminHandlerProvider(),",
-                "        PathEnum.LOGIN, provideLoginHandlerProvider());",
+                "        PathEnum.ADMIN, getProvideAdminHandlerProvider(),",
+                "        PathEnum.LOGIN, getProvideLoginHandlerProvider());",
                 "  }",
                 "",
                 "  @Override",
@@ -187,7 +186,7 @@ public class MapBindingComponentProcessorTest {
                 "      switch (id) {",
                 "        case 0:",
                 "            return (T) DaggerTestComponent.this",
-                "                 .mapOfPathEnumAndProviderOfHandler();",
+                "                 .getMapOfPathEnumAndProviderOfHandler();",
                 "        case 1:",
                 "            return (T) MapModuleOne_ProvideAdminHandlerFactory",
                 "                .provideAdminHandler(DaggerTestComponent.this.mapModuleOne);",
@@ -206,7 +205,7 @@ public class MapBindingComponentProcessorTest {
                 "test.DaggerTestComponent",
                 "package test;",
                 "",
-                GENERATED_CODE_ANNOTATIONS,
+                GENERATED_ANNOTATION,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  private Provider<Handler> provideAdminHandlerProvider;",
                 "  private Provider<Handler> provideLoginHandlerProvider;",
@@ -235,7 +234,8 @@ public class MapBindingComponentProcessorTest {
                 "}");
     }
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
+        daggerCompiler()
+            .withOptions(compilerMode.javacopts())
             .compile(
                 mapModuleOneFile,
                 mapModuleTwoFile,
@@ -357,7 +357,7 @@ public class MapBindingComponentProcessorTest {
                 "test.DaggerTestComponent",
                 "package test;",
                 "",
-                GENERATED_CODE_ANNOTATIONS,
+                GENERATED_ANNOTATION,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  private Provider<Map<Class<?>, Integer>> mapOfClassOfAndIntegerProvider;",
                 "",
@@ -367,7 +367,7 @@ public class MapBindingComponentProcessorTest {
                 "  private Provider<Map<MapKeys.ComplexKey, Integer>>",
                 "      mapOfComplexKeyAndIntegerProvider;",
                 "",
-                "  private Map mapOfPackagePrivateEnumAndInteger() {",
+                "  private Map getMapOfPackagePrivateEnumAndInteger() {",
                 "    return ImmutableMap.of(",
                 "        MapModule_EnumKeyMapKey.create(), MapModule.enumKey());",
                 "  }",
@@ -411,7 +411,7 @@ public class MapBindingComponentProcessorTest {
                 "",
                 "  @Override",
                 "  public Object inaccessibleEnum() {",
-                "    return mapOfPackagePrivateEnumAndInteger();",
+                "    return getMapOfPackagePrivateEnumAndInteger();",
                 "  }",
                 "",
                 "  @Override",
@@ -443,7 +443,7 @@ public class MapBindingComponentProcessorTest {
                 "mapkeys.MapModule_ComplexKeyWithInaccessibleAnnotationValueMapKey",
                 "package mapkeys;",
                 "",
-                GENERATED_CODE_ANNOTATIONS,
+                GENERATED_ANNOTATION,
                 "public final class MapModule_ComplexKeyWithInaccessibleAnnotationValueMapKey {",
                 "  public static MapKeys.ComplexKey create() {",
                 "    return MapKeys_ComplexKeyCreator.createComplexKey(",
@@ -459,7 +459,7 @@ public class MapBindingComponentProcessorTest {
                 "mapkeys.MapModule_ClassKeyMapKey",
                 "package mapkeys;",
                 "",
-                GENERATED_CODE_ANNOTATIONS,
+                GENERATED_ANNOTATION,
                 "public final class MapModule_ClassKeyMapKey {",
                 "  public static Class<?> create() {",
                 "    return MapKeys.Inaccessible.class;",
@@ -536,7 +536,7 @@ public class MapBindingComponentProcessorTest {
                 "test.DaggerTestComponent",
                 "package test;",
                 "",
-                GENERATED_CODE_ANNOTATIONS,
+                GENERATED_ANNOTATION,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  private final MapModuleOne mapModuleOne;",
                 "  private final MapModuleTwo mapModuleTwo;",
@@ -545,7 +545,7 @@ public class MapBindingComponentProcessorTest {
                 "  private volatile Provider<Map<String, Provider<Handler>>>",
                 "      mapOfStringAndProviderOfHandlerProvider;",
                 "",
-                "  private Provider<Handler> provideAdminHandlerProvider() {",
+                "  private Provider<Handler> getProvideAdminHandlerProvider() {",
                 "    Object local = provideAdminHandlerProvider;",
                 "    if (local == null) {",
                 "      local = new SwitchingProvider<>(1);",
@@ -554,7 +554,7 @@ public class MapBindingComponentProcessorTest {
                 "    return (Provider<Handler>) local;",
                 "  }",
                 "",
-                "  private Provider<Handler> provideLoginHandlerProvider() {",
+                "  private Provider<Handler> getProvideLoginHandlerProvider() {",
                 "    Object local = provideLoginHandlerProvider;",
                 "    if (local == null) {",
                 "      local = new SwitchingProvider<>(2);",
@@ -564,10 +564,10 @@ public class MapBindingComponentProcessorTest {
                 "  }",
                 "",
                 "  private Map<String, Provider<Handler>>",
-                "        mapOfStringAndProviderOfHandler() {",
+                "        getMapOfStringAndProviderOfHandler() {",
                 "    return ImmutableMap.<String, Provider<Handler>>of(",
-                "        \"Admin\", provideAdminHandlerProvider(),",
-                "        \"Login\", provideLoginHandlerProvider());",
+                "        \"Admin\", getProvideAdminHandlerProvider(),",
+                "        \"Login\", getProvideLoginHandlerProvider());",
                 "  }",
                 "",
                 "  @Override",
@@ -594,7 +594,7 @@ public class MapBindingComponentProcessorTest {
                 "      switch (id) {",
                 "        case 0:",
                 "            return (T) DaggerTestComponent.this",
-                "                 .mapOfStringAndProviderOfHandler();",
+                "                 .getMapOfStringAndProviderOfHandler();",
                 "        case 1:",
                 "            return (T) MapModuleOne_ProvideAdminHandlerFactory",
                 "                .provideAdminHandler(DaggerTestComponent.this.mapModuleOne);",
@@ -613,7 +613,7 @@ public class MapBindingComponentProcessorTest {
                 "test.DaggerTestComponent",
                 "package test;",
                 "",
-                GENERATED_CODE_ANNOTATIONS,
+                GENERATED_ANNOTATION,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  private Provider<Handler> provideAdminHandlerProvider;",
                 "  private Provider<Handler> provideLoginHandlerProvider;",
@@ -642,7 +642,8 @@ public class MapBindingComponentProcessorTest {
                 "}");
     }
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
+        daggerCompiler()
+            .withOptions(compilerMode.javacopts())
             .compile(
                 mapModuleOneFile,
                 mapModuleTwoFile,
@@ -736,7 +737,7 @@ public class MapBindingComponentProcessorTest {
                 "test.DaggerTestComponent",
                 "package test;",
                 "",
-                GENERATED_CODE_ANNOTATIONS,
+                GENERATED_ANNOTATION,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  private final MapModuleOne mapModuleOne;",
                 "  private final MapModuleTwo mapModuleTwo;",
@@ -752,7 +753,7 @@ public class MapBindingComponentProcessorTest {
                 "    this.mapModuleTwo = mapModuleTwoParam;",
                 "  }",
                 "",
-                "  private Provider<Handler> provideAdminHandlerProvider() {",
+                "  private Provider<Handler> getProvideAdminHandlerProvider() {",
                 "    Object local = provideAdminHandlerProvider;",
                 "    if (local == null) {",
                 "      local = new SwitchingProvider<>(1);",
@@ -761,7 +762,7 @@ public class MapBindingComponentProcessorTest {
                 "    return (Provider<Handler>) local;",
                 "  }",
                 "",
-                "  private Provider<Handler> provideLoginHandlerProvider() {",
+                "  private Provider<Handler> getProvideLoginHandlerProvider() {",
                 "    Object local = provideLoginHandlerProvider;",
                 "    if (local == null) {",
                 "      local = new SwitchingProvider<>(2);",
@@ -771,12 +772,12 @@ public class MapBindingComponentProcessorTest {
                 "  }",
                 "",
                 "  private Map<WrappedClassKey, Provider<Handler>>",
-                "      mapOfWrappedClassKeyAndProviderOfHandler() {",
+                "      getMapOfWrappedClassKeyAndProviderOfHandler() {",
                 "    return ImmutableMap.<WrappedClassKey, Provider<Handler>>of(",
                 "        WrappedClassKeyCreator.createWrappedClassKey(Integer.class),",
-                "        provideAdminHandlerProvider(),",
+                "        getProvideAdminHandlerProvider(),",
                 "        WrappedClassKeyCreator.createWrappedClassKey(Long.class),",
-                "        provideLoginHandlerProvider());",
+                "        getProvideLoginHandlerProvider());",
                 "  }",
                 "",
                 "  @Override",
@@ -803,7 +804,7 @@ public class MapBindingComponentProcessorTest {
                 "      switch (id) {",
                 "        case 0:",
                 "            return (T) DaggerTestComponent.this",
-                "                 .mapOfWrappedClassKeyAndProviderOfHandler();",
+                "                 .getMapOfWrappedClassKeyAndProviderOfHandler();",
                 "        case 1:",
                 "            return (T) MapModuleOne_ProvideAdminHandlerFactory",
                 "                .provideAdminHandler(DaggerTestComponent.this.mapModuleOne);",
@@ -822,7 +823,7 @@ public class MapBindingComponentProcessorTest {
                 "test.DaggerTestComponent",
                 "package test;",
                 "",
-                GENERATED_CODE_ANNOTATIONS,
+                GENERATED_ANNOTATION,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  private Provider<Handler> provideAdminHandlerProvider;",
                 "  private Provider<Handler> provideLoginHandlerProvider;",
@@ -853,7 +854,8 @@ public class MapBindingComponentProcessorTest {
                 "}");
     }
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
+        daggerCompiler()
+            .withOptions(compilerMode.javacopts())
             .compile(
                 mapModuleOneFile,
                 mapModuleTwoFile,
@@ -949,14 +951,14 @@ public class MapBindingComponentProcessorTest {
                 "test.DaggerTestComponent",
                 "package test;",
                 "",
-                GENERATED_CODE_ANNOTATIONS,
+                GENERATED_ANNOTATION,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  private final MapModuleOne mapModuleOne;",
                 "  private final MapModuleTwo mapModuleTwo;",
                 "  private volatile Provider<Map<PathEnum, Handler>>",
                 "      mapOfPathEnumAndHandlerProvider;",
                 "",
-                "  private Map<PathEnum, Handler> mapOfPathEnumAndHandler() {",
+                "  private Map<PathEnum, Handler> getMapOfPathEnumAndHandler() {",
                 "    return ImmutableMap.<PathEnum, Handler>of(",
                 "        PathEnum.ADMIN,",
                 "        MapModuleOne_ProvideAdminHandlerFactory.provideAdminHandler(",
@@ -987,7 +989,7 @@ public class MapBindingComponentProcessorTest {
                 "    @Override",
                 "    public T get() {",
                 "      switch (id) {",
-                "        case 0: return (T) DaggerTestComponent.this.mapOfPathEnumAndHandler();",
+                "        case 0: return (T) DaggerTestComponent.this.getMapOfPathEnumAndHandler();",
                 "        default: throw new AssertionError(id);",
                 "      }",
                 "    }",
@@ -1000,7 +1002,7 @@ public class MapBindingComponentProcessorTest {
                 "test.DaggerTestComponent",
                 "package test;",
                 "",
-                GENERATED_CODE_ANNOTATIONS,
+                GENERATED_ANNOTATION,
                 "final class DaggerTestComponent implements TestComponent {",
                 "  private Provider<Handler> provideAdminHandlerProvider;",
                 "  private Provider<Handler> provideLoginHandlerProvider;",
@@ -1028,7 +1030,8 @@ public class MapBindingComponentProcessorTest {
                 "}");
     }
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
+        daggerCompiler()
+            .withOptions(compilerMode.javacopts())
             .compile(
                 mapModuleOneFile,
                 mapModuleTwoFile,
@@ -1077,7 +1080,7 @@ public class MapBindingComponentProcessorTest {
             "test.DaggerTestComponent",
             "package test;",
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "final class DaggerTestComponent implements TestComponent {",
             "  private final MapModule mapModule;",
             "",
@@ -1087,7 +1090,8 @@ public class MapBindingComponentProcessorTest {
             "  }",
             "}");
     Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
+        daggerCompiler()
+            .withOptions(compilerMode.javacopts())
             .compile(mapModuleFile, componentFile);
     assertThat(compilation).succeeded();
     assertThat(compilation)

@@ -83,6 +83,7 @@ public final class FailingPlugin implements BindingGraphPlugin {
           .forEach(
               edge -> diagnosticReporter.reportDependency(ERROR, edge, "Bad Dependency: %s", edge));
     }
+
   }
 
   @Override

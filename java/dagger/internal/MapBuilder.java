@@ -50,9 +50,11 @@ public final class MapBuilder<K, V> {
   }
 
   public Map<K, V> build() {
-    if (contributions.isEmpty()) {
-      return Collections.emptyMap();
+    switch (contributions.size()) {
+      case 0:
+        return Collections.emptyMap();
+      default:
+        return Collections.unmodifiableMap(contributions);
     }
-    return Collections.unmodifiableMap(contributions);
   }
 }

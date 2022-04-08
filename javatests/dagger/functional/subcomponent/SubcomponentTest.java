@@ -50,7 +50,6 @@ public class SubcomponentTest {
     this.childComponent = childComponent;
   }
 
-
   @Test
   public void scopePropagatesUpward_class() {
     assertThat(childComponent.requiresSingleton().singletonType())

@@ -17,8 +17,7 @@
 package dagger.producers.monitoring.internal;
 
 import static com.google.common.truth.Truth.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -88,7 +87,7 @@ public final class MonitorsTest {
   public void singleMonitor_nullProducerMonitor() {
     when(mockProductionComponentMonitorFactory.create(any(Object.class)))
         .thenReturn(mockProductionComponentMonitor);
-    when(mockProductionComponentMonitor.producerMonitorFor(nullable(ProducerToken.class)))
+    when(mockProductionComponentMonitor.producerMonitorFor(any(ProducerToken.class)))
         .thenReturn(null);
     ProductionComponentMonitor.Factory factory =
         Monitors.delegatingProductionComponentMonitorFactory(
@@ -104,7 +103,7 @@ public final class MonitorsTest {
         .thenReturn(mockProductionComponentMonitor);
     doThrow(new RuntimeException("monkey"))
         .when(mockProductionComponentMonitor)
-        .producerMonitorFor(nullable(ProducerToken.class));
+        .producerMonitorFor(any(ProducerToken.class));
     ProductionComponentMonitor.Factory factory =
         Monitors.delegatingProductionComponentMonitorFactory(
             ImmutableList.of(mockProductionComponentMonitorFactory));
@@ -165,9 +164,7 @@ public final class MonitorsTest {
     doThrow(new RuntimeException("monkey")).when(mockProducerMonitor).requested();
     doThrow(new RuntimeException("monkey")).when(mockProducerMonitor).methodStarting();
     doThrow(new RuntimeException("monkey")).when(mockProducerMonitor).methodFinished();
-    doThrow(new RuntimeException("monkey"))
-        .when(mockProducerMonitor)
-        .succeeded(nullable(Object.class));
+    doThrow(new RuntimeException("monkey")).when(mockProducerMonitor).succeeded(any(Object.class));
     ProductionComponentMonitor.Factory factory =
         Monitors.delegatingProductionComponentMonitorFactory(
             ImmutableList.of(mockProductionComponentMonitorFactory));
@@ -255,7 +252,7 @@ public final class MonitorsTest {
         .thenReturn(mockProductionComponentMonitorA);
     when(mockProductionComponentMonitorFactoryB.create(any(Object.class))).thenReturn(null);
     when(mockProductionComponentMonitorFactoryC.create(any(Object.class))).thenReturn(null);
-    when(mockProductionComponentMonitorA.producerMonitorFor(nullable(ProducerToken.class)))
+    when(mockProductionComponentMonitorA.producerMonitorFor(any(ProducerToken.class)))
         .thenReturn(mockProducerMonitorA);
     ProductionComponentMonitor.Factory factory =
         Monitors.delegatingProductionComponentMonitorFactory(
@@ -291,7 +288,7 @@ public final class MonitorsTest {
     doThrow(new RuntimeException("monkey"))
         .when(mockProductionComponentMonitorFactoryC)
         .create(any(Object.class));
-    when(mockProductionComponentMonitorA.producerMonitorFor(nullable(ProducerToken.class)))
+    when(mockProductionComponentMonitorA.producerMonitorFor(any(ProducerToken.class)))
         .thenReturn(mockProducerMonitorA);
     ProductionComponentMonitor.Factory factory =
         Monitors.delegatingProductionComponentMonitorFactory(
@@ -393,9 +390,7 @@ public final class MonitorsTest {
     doThrow(new RuntimeException("monkey")).when(mockProducerMonitorA).requested();
     doThrow(new RuntimeException("monkey")).when(mockProducerMonitorA).methodStarting();
     doThrow(new RuntimeException("monkey")).when(mockProducerMonitorB).methodFinished();
-    doThrow(new RuntimeException("monkey"))
-        .when(mockProducerMonitorC)
-        .succeeded(nullable(Object.class));
+    doThrow(new RuntimeException("monkey")).when(mockProducerMonitorC).succeeded(any(Object.class));
     ProductionComponentMonitor.Factory factory =
         Monitors.delegatingProductionComponentMonitorFactory(
             ImmutableList.of(
@@ -470,7 +465,7 @@ public final class MonitorsTest {
   private void setUpNormalSingleMonitor() {
     when(mockProductionComponentMonitorFactory.create(any(Object.class)))
         .thenReturn(mockProductionComponentMonitor);
-    when(mockProductionComponentMonitor.producerMonitorFor(nullable(ProducerToken.class)))
+    when(mockProductionComponentMonitor.producerMonitorFor(any(ProducerToken.class)))
         .thenReturn(mockProducerMonitor);
   }
 
@@ -481,11 +476,11 @@ public final class MonitorsTest {
         .thenReturn(mockProductionComponentMonitorB);
     when(mockProductionComponentMonitorFactoryC.create(any(Object.class)))
         .thenReturn(mockProductionComponentMonitorC);
-    when(mockProductionComponentMonitorA.producerMonitorFor(nullable(ProducerToken.class)))
+    when(mockProductionComponentMonitorA.producerMonitorFor(any(ProducerToken.class)))
         .thenReturn(mockProducerMonitorA);
-    when(mockProductionComponentMonitorB.producerMonitorFor(nullable(ProducerToken.class)))
+    when(mockProductionComponentMonitorB.producerMonitorFor(any(ProducerToken.class)))
         .thenReturn(mockProducerMonitorB);
-    when(mockProductionComponentMonitorC.producerMonitorFor(nullable(ProducerToken.class)))
+    when(mockProductionComponentMonitorC.producerMonitorFor(any(ProducerToken.class)))
         .thenReturn(mockProducerMonitorC);
   }
 }

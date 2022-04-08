@@ -16,7 +16,9 @@
 
 package dagger.internal.codegen;
 
-import com.google.common.base.Joiner;
+import static dagger.internal.codegen.javapoet.CodeBlocks.stringLiteral;
+
+import com.squareup.javapoet.CodeBlock;
 
 /**
  * Common lines outputted during code generation.
@@ -26,12 +28,6 @@ public final class GeneratedLines {
      "@Generated("
         + "value = \"dagger.internal.codegen.ComponentProcessor\", "
         + "comments = \"https://dagger.dev\")";
-
-  private static final String SUPPRESS_WARNINGS_ANNOTATION =
-      "@SuppressWarnings({\"unchecked\", \"rawtypes\"})";
-
-  public static final String GENERATED_CODE_ANNOTATIONS =
-      Joiner.on('\n').join(GENERATED_ANNOTATION, SUPPRESS_WARNINGS_ANNOTATION);
 
   public static final String IMPORT_GENERATED_ANNOTATION =
       isBeforeJava9()
@@ -48,4 +44,10 @@ public final class GeneratedLines {
       return true;
     }
   }
+
+  public static final CodeBlock NPE_FROM_PROVIDES_METHOD =
+      stringLiteral("Cannot return null from a non-@Nullable @Provides method");
+
+  public static final CodeBlock NPE_FROM_COMPONENT_METHOD =
+      stringLiteral("Cannot return null from a non-@Nullable component method");
 }

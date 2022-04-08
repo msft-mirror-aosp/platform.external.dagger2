@@ -24,8 +24,9 @@ import static com.google.testing.compile.JavaSourcesSubjectFactory.javaSources;
 import static dagger.internal.codegen.Compilers.daggerCompiler;
 import static dagger.internal.codegen.DaggerModuleMethodSubject.Factory.assertThatMethodInUnannotatedClass;
 import static dagger.internal.codegen.DaggerModuleMethodSubject.Factory.assertThatModuleMethod;
-import static dagger.internal.codegen.GeneratedLines.GENERATED_CODE_ANNOTATIONS;
+import static dagger.internal.codegen.GeneratedLines.GENERATED_ANNOTATION;
 import static dagger.internal.codegen.GeneratedLines.IMPORT_GENERATED_ANNOTATION;
+import static dagger.internal.codegen.GeneratedLines.NPE_FROM_PROVIDES_METHOD;
 
 import com.google.common.collect.ImmutableList;
 import com.google.testing.compile.Compilation;
@@ -228,7 +229,7 @@ public class ModuleFactoryGeneratorTest {
             "import dagger.internal.Preconditions;",
             IMPORT_GENERATED_ANNOTATION,
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class TestModule_ProvideStringFactory implements Factory<String> {",
             "  private final TestModule module;",
             "",
@@ -245,7 +246,8 @@ public class ModuleFactoryGeneratorTest {
             "  }",
             "",
             "  public static String provideString(TestModule instance) {",
-            "    return Preconditions.checkNotNullFromProvides(instance.provideString());",
+            "    return Preconditions.checkNotNull(",
+            "        instance.provideString(), " + NPE_FROM_PROVIDES_METHOD + ");",
             "  }",
             "}");
     assertAbout(javaSource()).that(moduleFile)
@@ -275,7 +277,7 @@ public class ModuleFactoryGeneratorTest {
             "import dagger.internal.Factory;",
             IMPORT_GENERATED_ANNOTATION,
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class TestModule_ProvideStringFactory implements Factory<String> {",
             "  private final TestModule module;",
             "",
@@ -321,7 +323,7 @@ public class ModuleFactoryGeneratorTest {
             "import dagger.internal.Factory;",
             IMPORT_GENERATED_ANNOTATION,
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class TestModule_ProvideStringFactory implements Factory<String> {",
             "  private final TestModule module;",
             "",
@@ -395,7 +397,7 @@ public class ModuleFactoryGeneratorTest {
             IMPORT_GENERATED_ANNOTATION,
             "import javax.inject.Provider;",
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class TestModule_ProvideObjectsFactory",
             "    implements Factory<List<Object>> {",
             "  private final TestModule module;",
@@ -430,8 +432,8 @@ public class ModuleFactoryGeneratorTest {
             "",
             "  public static List<Object> provideObjects(",
             "      TestModule instance, Object a, Object b, MembersInjector<X> xInjector) {",
-            "    return Preconditions.checkNotNullFromProvides(",
-            "        instance.provideObjects(a, b, xInjector));",
+            "    return Preconditions.checkNotNull(",
+            "        instance.provideObjects(a, b, xInjector), " + NPE_FROM_PROVIDES_METHOD + ");",
             "  }",
             "}");
     assertAbout(javaSources()).that(
@@ -465,7 +467,7 @@ public class ModuleFactoryGeneratorTest {
             "import dagger.internal.Preconditions;",
             IMPORT_GENERATED_ANNOTATION,
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class TestModule_ProvideStringFactory implements Factory<String> {",
             "  private final TestModule module;",
             "",
@@ -482,7 +484,9 @@ public class ModuleFactoryGeneratorTest {
             "  }",
             "",
             "  public static String provideString(TestModule instance) {",
-            "    return Preconditions.checkNotNullFromProvides(instance.provideString());",
+            "    return Preconditions.checkNotNull(instance.provideString(), "
+                + NPE_FROM_PROVIDES_METHOD
+                + ");",
             "  }",
             "}");
     assertAbout(javaSource()).that(moduleFile)
@@ -518,7 +522,7 @@ public class ModuleFactoryGeneratorTest {
             "import java.util.List;",
             IMPORT_GENERATED_ANNOTATION,
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class TestModule_ProvideWildcardListFactory implements "
                 + "Factory<List<List<?>>> {",
             "  private final TestModule module;",
@@ -536,8 +540,8 @@ public class ModuleFactoryGeneratorTest {
             "  }",
             "",
             "  public static List<List<?>> provideWildcardList(TestModule instance) {",
-            "    return Preconditions.checkNotNullFromProvides(",
-            "        instance.provideWildcardList());",
+            "    return Preconditions.checkNotNull(",
+            "        instance.provideWildcardList(), " + NPE_FROM_PROVIDES_METHOD + ");",
             "  }",
             "}");
     assertAbout(javaSource()).that(moduleFile)
@@ -571,7 +575,7 @@ public class ModuleFactoryGeneratorTest {
             "import java.util.Set;",
             IMPORT_GENERATED_ANNOTATION,
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class TestModule_ProvideStringsFactory implements Factory<Set<String>> {",
             "  private final TestModule module;",
             "",
@@ -588,8 +592,8 @@ public class ModuleFactoryGeneratorTest {
             "  }",
             "",
             "  public static Set<String> provideStrings(TestModule instance) {",
-            "    return Preconditions.checkNotNullFromProvides(",
-            "        instance.provideStrings());",
+            "    return Preconditions.checkNotNull(",
+            "        instance.provideStrings(), " + NPE_FROM_PROVIDES_METHOD + ");",
             "  }",
             "}");
     assertAbout(javaSource()).that(moduleFile)
@@ -719,7 +723,6 @@ public class ModuleFactoryGeneratorTest {
         .inFile(moduleFile)
         .onLine(6);
   }
-
 
   @Test
   public void enclosedInPrivateModule() {
@@ -883,7 +886,7 @@ public class ModuleFactoryGeneratorTest {
             IMPORT_GENERATED_ANNOTATION,
             "import javax.inject.Provider;",
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class ParentModule_ProvideListBFactory<A extends CharSequence,",
             "    B, C extends Number & Comparable<C>> implements Factory<List<B>> {",
             "  private final ParentModule<A, B, C> module;",
@@ -908,7 +911,8 @@ public class ModuleFactoryGeneratorTest {
             "",
             "  public static <A extends CharSequence, B, C extends Number & Comparable<C>> List<B>",
             "      provideListB(ParentModule<A, B, C> instance, B b) {",
-            "    return Preconditions.checkNotNullFromProvides(instance.provideListB(b));",
+            "    return Preconditions.checkNotNull(",
+            "        instance.provideListB(b), " + NPE_FROM_PROVIDES_METHOD + ");",
             "  }",
             "}");
     JavaFileObject bElementFactory =
@@ -921,7 +925,7 @@ public class ModuleFactoryGeneratorTest {
             IMPORT_GENERATED_ANNOTATION,
             "import javax.inject.Provider;",
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class ParentModule_ProvideBElementFactory<A extends CharSequence,",
             "    B, C extends Number & Comparable<C>> implements Factory<B> {",
             "  private final ParentModule<A, B, C> module;",
@@ -947,7 +951,8 @@ public class ModuleFactoryGeneratorTest {
             "  public static <A extends CharSequence, B, C extends Number & Comparable<C>>",
             "      B provideBElement(",
             "          ParentModule<A, B, C> instance, B b) {",
-            "    return Preconditions.checkNotNullFromProvides(instance.provideBElement(b));",
+            "    return Preconditions.checkNotNull(",
+            "        instance.provideBElement(b), " + NPE_FROM_PROVIDES_METHOD + ");",
             "  }",
             "}");
     JavaFileObject bEntryFactory =
@@ -960,7 +965,7 @@ public class ModuleFactoryGeneratorTest {
             IMPORT_GENERATED_ANNOTATION,
             "import javax.inject.Provider;",
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class ParentModule_ProvideBEntryFactory<A extends CharSequence,",
             "    B, C extends Number & Comparable<C>> implements Factory<B>> {",
             "  private final ParentModule<A, B, C> module;",
@@ -986,7 +991,8 @@ public class ModuleFactoryGeneratorTest {
             "  public static <A extends CharSequence, B, C extends Number & Comparable<C>>",
             "      B provideBEntry(",
             "          ParentModule<A, B, C> instance, B b) {",
-            "    return Preconditions.checkNotNullFromProvides(instance.provideBEntry(b));",
+            "    return Preconditions.checkNotNull(",
+            "        instance.provideBEntry(b), " + NPE_FROM_PROVIDES_METHOD + ");",
             "  }",
             "}");
     JavaFileObject numberFactory =
@@ -998,7 +1004,7 @@ public class ModuleFactoryGeneratorTest {
             "import dagger.internal.Preconditions;",
             IMPORT_GENERATED_ANNOTATION,
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class ChildNumberModule_ProvideNumberFactory",
             "    implements Factory<Number> {",
             "  private final ChildNumberModule module;",
@@ -1018,7 +1024,8 @@ public class ModuleFactoryGeneratorTest {
             "  }",
             "",
             "  public static Number provideNumber(ChildNumberModule instance) {",
-            "    return Preconditions.checkNotNullFromProvides(instance.provideNumber());",
+            "    return Preconditions.checkNotNull(",
+            "        instance.provideNumber(), " + NPE_FROM_PROVIDES_METHOD + ");",
             "  }",
             "}");
     JavaFileObject integerFactory =
@@ -1030,7 +1037,7 @@ public class ModuleFactoryGeneratorTest {
             "import dagger.internal.Preconditions;",
             IMPORT_GENERATED_ANNOTATION,
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class ChildIntegerModule_ProvideIntegerFactory",
             "    implements Factory<Integer> {",
             "  private final ChildIntegerModule module;",
@@ -1050,8 +1057,8 @@ public class ModuleFactoryGeneratorTest {
             "  }",
             "",
             "  public static Integer provideInteger(ChildIntegerModule instance) {",
-            "    return Preconditions.checkNotNullFromProvides(",
-            "        instance.provideInteger());",
+            "    return Preconditions.checkNotNull(",
+            "        instance.provideInteger(), " + NPE_FROM_PROVIDES_METHOD + ");",
             "  }",
             "}");
     assertAbout(javaSources())
@@ -1104,26 +1111,24 @@ public class ModuleFactoryGeneratorTest {
             "import java.util.Map;",
             IMPORT_GENERATED_ANNOTATION,
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class ParameterizedModule_ProvideMapStringNumberFactory",
             "    implements Factory<Map<String, Number>> {",
+            "  private static final ParameterizedModule_ProvideMapStringNumberFactory INSTANCE =",
+            "      new ParameterizedModule_ProvideMapStringNumberFactory();",
+            "",
             "  @Override",
             "  public Map<String, Number> get() {",
             "    return provideMapStringNumber();",
             "  }",
             "",
             "  public static ParameterizedModule_ProvideMapStringNumberFactory create() {",
-            "    return InstanceHolder.INSTANCE;",
+            "    return INSTANCE;",
             "  }",
             "",
             "  public static Map<String, Number> provideMapStringNumber() {",
-            "    return Preconditions.checkNotNullFromProvides(",
-            "        ParameterizedModule.provideMapStringNumber());",
-            "  }",
-            "",
-            "  private static final class InstanceHolder {",
-            "    private static final ParameterizedModule_ProvideMapStringNumberFactory INSTANCE =",
-            "        new ParameterizedModule_ProvideMapStringNumberFactory();",
+            "    return Preconditions.checkNotNull(ParameterizedModule.provideMapStringNumber(),",
+            "        " + NPE_FROM_PROVIDES_METHOD + ");",
             "  }",
             "}");
 
@@ -1136,26 +1141,24 @@ public class ModuleFactoryGeneratorTest {
             "import dagger.internal.Preconditions;",
             IMPORT_GENERATED_ANNOTATION,
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class ParameterizedModule_ProvideNonGenericTypeFactory",
             "    implements Factory<Object> {",
+            "  private static final ParameterizedModule_ProvideNonGenericTypeFactory INSTANCE = ",
+            "      new ParameterizedModule_ProvideNonGenericTypeFactory();",
+            "",
             "  @Override",
             "  public Object get() {",
             "    return provideNonGenericType();",
             "  }",
             "",
             "  public static ParameterizedModule_ProvideNonGenericTypeFactory create() {",
-            "    return InstanceHolder.INSTANCE;",
+            "    return INSTANCE;",
             "  }",
             "",
             "  public static Object provideNonGenericType() {",
-            "    return Preconditions.checkNotNullFromProvides(",
-            "        ParameterizedModule.provideNonGenericType());",
-            "  }",
-            "",
-            "  private static final class InstanceHolder {",
-            "    private static final ParameterizedModule_ProvideNonGenericTypeFactory INSTANCE =",
-            "        new ParameterizedModule_ProvideNonGenericTypeFactory();",
+            "    return Preconditions.checkNotNull(ParameterizedModule.provideNonGenericType(),",
+            "        " + NPE_FROM_PROVIDES_METHOD + ");",
             "  }",
             "}");
 
@@ -1169,7 +1172,7 @@ public class ModuleFactoryGeneratorTest {
             IMPORT_GENERATED_ANNOTATION,
             "import javax.inject.Provider;",
             "",
-            GENERATED_CODE_ANNOTATIONS,
+            GENERATED_ANNOTATION,
             "public final class ParameterizedModule_ProvideNonGenericTypeWithDepsFactory",
             "    implements Factory<String> {",
             "  private final Provider<Object> oProvider;",
@@ -1190,8 +1193,9 @@ public class ModuleFactoryGeneratorTest {
             "  }",
             "",
             "  public static String provideNonGenericTypeWithDeps(Object o) {",
-            "    return Preconditions.checkNotNullFromProvides(",
-            "        ParameterizedModule.provideNonGenericTypeWithDeps(o));",
+            "    return Preconditions.checkNotNull(",
+            "        ParameterizedModule.provideNonGenericTypeWithDeps(o),",
+            "        " + NPE_FROM_PROVIDES_METHOD + ");",
             "  }",
             "}");
 
@@ -1406,7 +1410,7 @@ public class ModuleFactoryGeneratorTest {
                 "test.TestModule_GetFactory",
                 "package test;",
                 "",
-                GENERATED_CODE_ANNOTATIONS,
+                GENERATED_ANNOTATION,
                 "public final class TestModule_GetFactory implements Factory<Integer> {",
                 "  @Override",
                 "  public Integer get() {",
@@ -1414,7 +1418,7 @@ public class ModuleFactoryGeneratorTest {
                 "  }",
                 "",
                 "  public static TestModule_GetFactory create() {",
-                "    return InstanceHolder.INSTANCE;",
+                "    return INSTANCE;",
                 "  }",
                 "",
                 "  public static int proxyGet() {",
@@ -1429,7 +1433,7 @@ public class ModuleFactoryGeneratorTest {
                 "test.TestModule_CreateFactory",
                 "package test;",
                 "",
-                GENERATED_CODE_ANNOTATIONS,
+                GENERATED_ANNOTATION,
                 "public final class TestModule_CreateFactory implements Factory<Boolean> {",
                 "  @Override",
                 "  public Boolean get() {",
@@ -1437,7 +1441,7 @@ public class ModuleFactoryGeneratorTest {
                 "  }",
                 "",
                 "  public static TestModule_CreateFactory create() {",
-                "    return InstanceHolder.INSTANCE;",
+                "    return INSTANCE;",
                 "  }",
                 "",
                 "  public static boolean proxyCreate() {",

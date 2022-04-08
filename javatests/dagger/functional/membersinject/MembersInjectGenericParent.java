@@ -18,7 +18,6 @@ package dagger.functional.membersinject;
 
 import javax.inject.Inject;
 
-
 class MembersInjectGenericParent<T> {
   
   @Inject T t; 

@@ -17,10 +17,9 @@
 package dagger.internal.codegen;
 
 import static com.google.common.truth.Truth.assertThat;
-import static dagger.internal.codegen.binding.SourceFiles.simpleVariableName;
+import static dagger.internal.codegen.SourceFiles.simpleVariableName;
 
 import com.google.testing.compile.CompilationRule;
-import dagger.internal.codegen.binding.SourceFiles;
 import java.util.List;
 import javax.lang.model.element.TypeElement;
 import org.junit.Rule;

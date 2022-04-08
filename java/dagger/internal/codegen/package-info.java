@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-/** Apply {@link CheckReturnValue} by default to every method in this package. */
 @CheckReturnValue
 package dagger.internal.codegen;
 

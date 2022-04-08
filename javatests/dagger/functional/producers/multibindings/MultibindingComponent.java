@@ -30,7 +30,6 @@ import dagger.producers.ProductionComponent;
 import java.util.Map;
 import java.util.Set;
 
-
 @ProductionComponent(
   modules = {ExecutorModule.class, MultibindingProducerModule.class, MultibindingModule.class}
 )

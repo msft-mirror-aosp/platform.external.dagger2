@@ -61,12 +61,13 @@ public final class SetBuilder<T> {
   }
 
   public Set<T> build() {
-    if (contributions.isEmpty()) {
-      return Collections.emptySet();
-    } else if (contributions.size() == 1) {
-      return Collections.singleton(contributions.get(0));
-    } else {
-      return Collections.unmodifiableSet(new HashSet<>(contributions));
+    switch (contributions.size()) {
+      case 0:
+        return Collections.emptySet();
+      case 1:
+        return Collections.singleton(contributions.get(0));
+      default:
+        return Collections.unmodifiableSet(new HashSet<>(contributions));
     }
   }
 }

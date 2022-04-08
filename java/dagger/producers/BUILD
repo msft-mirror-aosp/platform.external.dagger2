@@ -15,17 +15,15 @@
 # Description:
 #   An asynchronous dependency injection system that extends JSR-330.
 
-load("@rules_java//java:defs.bzl", "java_library")
+package(default_visibility = ["//:src"])
+
 load(
     "//:build_defs.bzl",
     "DOCLINT_HTML_AND_SYNTAX",
     "DOCLINT_REFERENCES",
-    "POM_VERSION",
     "SOURCE_7_TARGET_7",
 )
-load("//tools:maven.bzl", "gen_maven_artifact")
-
-package(default_visibility = ["//:src"])
+load("//tools:maven.bzl", "pom_file", "POM_VERSION")
 
 # Work around b/70476182 which prevents Kythe from connecting :producers to the .java files it
 # contains.
@@ -42,38 +40,35 @@ java_library(
     javacopts = SOURCE_7_TARGET_7 + DOCLINT_HTML_AND_SYNTAX + DOCLINT_REFERENCES,
     tags = ["maven_coordinates=com.google.dagger:dagger-producers:" + POM_VERSION],
     exports = [
-        "//java/dagger/internal/guava:base",
-        "//java/dagger/internal/guava:concurrent",
+        # TODO(dpb): Don't export any of Guava.
+        "@google_bazel_common//third_party/java/guava",
         "@google_bazel_common//third_party/java/jsr330_inject",
     ],
     deps = [
         "//java/dagger:core",
-        "//java/dagger/internal/guava:base",
-        "//java/dagger/internal/guava:collect",
-        "//java/dagger/internal/guava:concurrent",
         "@google_bazel_common//third_party/java/checker_framework_annotations",
         "@google_bazel_common//third_party/java/error_prone:annotations",
+        "@google_bazel_common//third_party/java/guava",
         "@google_bazel_common//third_party/java/jsr330_inject",
     ],
 )
 
-gen_maven_artifact(
-    name = "artifact",
-    artifact_coordinates = "com.google.dagger:dagger-producers:" + POM_VERSION,
+pom_file(
+    name = "pom",
+    artifact_id = "dagger-producers",
     artifact_name = "Dagger Producers",
-    artifact_target = ":producers",
-    artifact_target_maven_deps = [
-        "com.google.dagger:dagger",
-        "com.google.guava:failureaccess",
-        "com.google.guava:guava",  # TODO(bcorso): Remove guava dependency and ban it?
-        "javax.inject:javax.inject",
-        "org.checkerframework:checker-compat-qual",
-    ],
-    javadoc_exclude_packages = [
+    targets = [":producers"],
+)
+
+load("@google_bazel_common//tools/javadoc:javadoc.bzl", "javadoc_library")
+
+javadoc_library(
+    name = "producers-javadoc",
+    srcs = SRCS,
+    exclude_packages = [
         "dagger.producers.internal",
         "dagger.producers.monitoring.internal",
     ],
-    javadoc_root_packages = ["dagger.producers"],
-    javadoc_srcs = SRCS,
-    # TODO(bcorso): Look more into why auto/common shading isn't needed here.
+    root_packages = ["dagger.producers"],
+    deps = [":producers"],
 )

@@ -17,7 +17,6 @@
 package dagger.internal.codegen;
 
 import static com.google.testing.compile.CompilationSubject.assertThat;
-import static dagger.internal.codegen.Compilers.compilerWithOptions;
 import static dagger.internal.codegen.Compilers.daggerCompiler;
 
 import com.google.testing.compile.Compilation;
@@ -78,7 +77,7 @@ public class ProductionGraphValidationTest {
     assertThat(compilation).failed();
     assertThat(compilation)
         .hadErrorContaining(
-            "Bar cannot be provided without an @Inject constructor or an @Provides- or "
+            "test.Bar cannot be provided without an @Inject constructor or an @Provides- or "
                 + "@Produces-annotated method.")
         .inFile(component)
         .onLineContaining("interface MyComponent");
@@ -104,7 +103,7 @@ public class ProductionGraphValidationTest {
     assertThat(compilation).failed();
     assertThat(compilation)
         .hadErrorContaining(
-            "TestClass.A cannot be provided without an @Provides- or @Produces-annotated "
+            "test.TestClass.A cannot be provided without an @Provides- or @Produces-annotated "
                 + "method.")
         .inFile(component)
         .onLineContaining("interface AComponent");
@@ -149,16 +148,17 @@ public class ProductionGraphValidationTest {
     Compilation compilation = daggerCompiler().compile(EXECUTOR_MODULE, component);
     assertThat(compilation).failed();
     assertThat(compilation)
-        .hadErrorContaining("TestClass.A is a provision, which cannot depend on a production.")
+        .hadErrorContaining("test.TestClass.A is a provision, which cannot depend on a production.")
         .inFile(component)
         .onLineContaining("interface AComponent");
 
     compilation =
-        compilerWithOptions("-Adagger.fullBindingGraphValidation=ERROR")
+        daggerCompiler()
+            .withOptions("-Adagger.fullBindingGraphValidation=ERROR")
             .compile(EXECUTOR_MODULE, component);
     assertThat(compilation).failed();
     assertThat(compilation)
-        .hadErrorContaining("TestClass.A is a provision, which cannot depend on a production.")
+        .hadErrorContaining("test.TestClass.A is a provision, which cannot depend on a production.")
         .inFile(component)
         .onLineContaining("class AModule");
   }
@@ -194,7 +194,7 @@ public class ProductionGraphValidationTest {
     assertThat(compilation).failed();
     assertThat(compilation)
         .hadErrorContaining(
-            "TestClass.A is a provision entry-point, which cannot depend on a production.")
+            "test.TestClass.A is a provision entry-point, which cannot depend on a production.")
         .inFile(component)
         .onLineContaining("interface AComponent");
   }
@@ -252,7 +252,7 @@ public class ProductionGraphValidationTest {
     Compilation compilation = daggerCompiler().compile(EXECUTOR_MODULE, component);
     assertThat(compilation).failed();
     assertThat(compilation)
-        .hadErrorContaining("TestClass.A is a provision, which cannot depend on a production")
+        .hadErrorContaining("test.TestClass.A is a provision, which cannot depend on a production")
         .inFile(component)
         .onLineContaining("interface AComponent");
   }
@@ -303,7 +303,7 @@ public class ProductionGraphValidationTest {
     assertThat(compilation).failed();
     assertThat(compilation)
         .hadErrorContaining(
-            "TestClass.A cannot be provided without an @Provides-annotated method.")
+            "test.TestClass.A cannot be provided without an @Provides-annotated method.")
         .inFile(component)
         .onLineContaining("interface StringComponent");
   }
@@ -357,8 +357,8 @@ public class ProductionGraphValidationTest {
     assertThat(compilation).failed();
     assertThat(compilation)
         .hadErrorContaining(
-            "Set<ProductionComponentMonitor.Factory>"
-                + " TestClass.MonitoringModule#monitorFactory is a provision,"
+            "java.util.Set<dagger.producers.monitoring.ProductionComponentMonitor.Factory>"
+                + " test.TestClass.MonitoringModule#monitorFactory is a provision,"
                 + " which cannot depend on a production.")
         .inFile(component)
         .onLineContaining("interface StringComponent");
@@ -488,7 +488,7 @@ public class ProductionGraphValidationTest {
     Compilation compilation = daggerCompiler().compile(badModule, badComponent);
     assertThat(compilation).failed();
     assertThat(compilation)
-        .hadErrorContaining("BadModule has errors")
+        .hadErrorContaining("test.BadModule has errors")
         .inFile(badComponent)
         .onLine(7);
   }

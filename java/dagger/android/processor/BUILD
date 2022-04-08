@@ -15,17 +15,14 @@
 # Description:
 #   Public Dagger API for Android
 
-load("@rules_java//java:defs.bzl", "java_import", "java_library", "java_plugin")
+package(default_visibility = ["//:src"])
+
 load(
     "//:build_defs.bzl",
     "DOCLINT_HTML_AND_SYNTAX",
     "DOCLINT_REFERENCES",
-    "POM_VERSION",
 )
-load("//tools:maven.bzl", "pom_file")
-load("@google_bazel_common//tools/javadoc:javadoc.bzl", "javadoc_library")
-
-package(default_visibility = ["//:src"])
+load("//tools:maven.bzl", "POM_VERSION", "pom_file")
 
 filegroup(
     name = "srcs",
@@ -38,15 +35,15 @@ java_library(
     javacopts = DOCLINT_HTML_AND_SYNTAX + DOCLINT_REFERENCES,
     tags = ["maven_coordinates=com.google.dagger:dagger-android-processor:" + POM_VERSION],
     deps = [
-        "//java/dagger/internal/guava:base",
-        "//java/dagger/internal/guava:collect",
+        "@google_bazel_common//third_party/java/guava",
         "@google_bazel_common//third_party/java/auto:service",
         "@google_bazel_common//third_party/java/auto:value",
-        "@maven//:com_google_auto_auto_common",
+        "@google_bazel_common//third_party/java/auto:common",
         "@google_bazel_common//third_party/java/incap",
         "@google_bazel_common//third_party/java/javapoet",
         "@google_bazel_common//third_party/java/google_java_format",
         "//java/dagger:core",
+        "//java/dagger/model",
         "//java/dagger/spi",
         # https://github.com/bazelbuild/bazel/issues/2517
         ":dagger-android-jar",
@@ -80,6 +77,8 @@ java_plugin(
     processor_class = "dagger.android.processor.AndroidProcessor",
     deps = [":processor"],
 )
+
+load("@google_bazel_common//tools/javadoc:javadoc.bzl", "javadoc_library")
 
 javadoc_library(
     name = "processor-javadoc",

@@ -17,9 +17,7 @@
 package dagger.android.support;
 
 import android.content.Context;
-import androidx.annotation.ContentView;
-import androidx.annotation.LayoutRes;
-import androidx.fragment.app.Fragment;
+import android.support.v4.app.Fragment;
 import dagger.android.AndroidInjector;
 import dagger.android.DispatchingAndroidInjector;
 import dagger.android.HasAndroidInjector;
@@ -35,15 +33,6 @@ import javax.inject.Inject;
 public abstract class DaggerFragment extends Fragment implements HasAndroidInjector {
 
   @Inject DispatchingAndroidInjector<Object> androidInjector;
-
-  public DaggerFragment() {
-    super();
-  }
-
-  @ContentView
-  public DaggerFragment(@LayoutRes int contentLayoutId) {
-    super(contentLayoutId);
-  }
 
   @Override
   public void onAttach(Context context) {
