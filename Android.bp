@@ -119,6 +119,11 @@ java_plugin {
     jarjar_rules: "jarjar-rules.txt",
 }
 
+// Dagger distributes its own copy of androidx.room.compiler.processing
+// while the API is unstable.  There are shading rules in jarjar-rules.txt
+// to prevent conflicts with official version.  When this is removed
+// in favor of the official version the shading rules should also be
+// removed.
 java_import_host {
     name: "dagger2-room-compiler-processing",
     jars: ["java/dagger/internal/codegen/xprocessing/xprocessing.jar"],
