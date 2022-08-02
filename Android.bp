@@ -84,6 +84,7 @@ java_library {
         "com.android.adservices",
         "com.android.ondevicepersonalization",
         "com.android.healthconnect",
+        "com.android.devicelock",
     ],
 
     sdk_version: "core_current",
