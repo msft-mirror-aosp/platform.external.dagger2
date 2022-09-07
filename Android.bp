@@ -228,6 +228,9 @@ java_library {
         "hilt_define_component_processor",
         "hilt_generates_root_input_processor",
     ],
+    apex_available: [
+        "com.android.ondevicepersonalization",
+    ],
 }
 
 // Build the android hilt library.  Depending on this will enable the Hilt annotation processors.
@@ -286,6 +289,9 @@ android_library {
         "hilt_originating_element_processor",
         "hilt_root_processor",
         "hilt_viewmodel_processor",
+    ],
+    apex_available: [
+        "com.android.ondevicepersonalization",
     ],
 }
 
