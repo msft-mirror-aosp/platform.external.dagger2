@@ -83,6 +83,7 @@ java_library {
         "//apex_available:platform",
         "com.android.adservices",
         "com.android.ondevicepersonalization",
+        "com.android.healthconnect",
     ],
 
     sdk_version: "core_current",
@@ -242,6 +243,7 @@ java_library {
     ],
     apex_available: [
         "com.android.ondevicepersonalization",
+        "com.android.healthconnect",
     ],
 }
 
@@ -311,6 +313,7 @@ android_library {
     ],
     apex_available: [
         "com.android.ondevicepersonalization",
+        "com.android.healthconnect",
     ],
 }
 
