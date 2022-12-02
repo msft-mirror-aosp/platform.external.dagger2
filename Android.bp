@@ -257,6 +257,7 @@ java_library {
         "hilt_generates_root_input_processor",
     ],
     apex_available: [
+        "//apex_available:platform",
         "com.android.ondevicepersonalization",
         "com.android.healthconnect",
     ],
@@ -327,6 +328,7 @@ android_library {
         "hilt_viewmodel_processor",
     ],
     apex_available: [
+        "//apex_available:platform",
         "com.android.ondevicepersonalization",
         "com.android.healthconnect",
     ],
