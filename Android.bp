@@ -81,6 +81,13 @@ java_library {
     ],
 
     sdk_version: "core_current",
+
+    errorprone: {
+        javacflags: [
+            "-Xep:FormatStringAnnotation:WARN",
+            "-Xep:NoCanIgnoreReturnValueOnClasses:WARN",
+        ],
+    },
 }
 
 // build dagger2 producers library
@@ -199,6 +206,13 @@ java_library_host {
         "--add-exports jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED",
         "--add-exports jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED",
     ],
+
+    errorprone: {
+        javacflags: [
+            "-Xep:FormatStringAnnotation:WARN",
+            "-Xep:NoCanIgnoreReturnValueOnClasses:WARN",
+        ],
+    },
 }
 
 // Compile  dummy implementations of annotations used by dagger2 but not
@@ -310,7 +324,9 @@ android_library {
     srcs: [
         "java/dagger/hilt/android/internal/testing/*.java",
         "java/dagger/hilt/android/internal/testing/root/*.java",
+        "java/dagger/hilt/android/internal/uninstallmodules/*.java",
         "java/dagger/hilt/android/testing/*.java",
+        "java/dagger/hilt/testing/*.java",
     ],
     manifest: "java/dagger/hilt/android/testing/AndroidManifest.xml",
     static_libs: [
