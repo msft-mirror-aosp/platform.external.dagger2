@@ -341,9 +341,7 @@ android_library {
     srcs: [
         "java/dagger/hilt/android/internal/testing/*.java",
         "java/dagger/hilt/android/internal/testing/root/*.java",
-        "java/dagger/hilt/android/internal/uninstallmodules/*.java",
         "java/dagger/hilt/android/testing/*.java",
-        "java/dagger/hilt/testing/*.java",
     ],
     manifest: "java/dagger/hilt/android/testing/AndroidManifest.xml",
     static_libs: [
