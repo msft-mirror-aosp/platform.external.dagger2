@@ -82,8 +82,9 @@ java_library {
     apex_available: [
         "//apex_available:platform",
         "com.android.adservices",
+        "com.android.extservices",
         "com.android.ondevicepersonalization",
-        "com.android.healthconnect",
+        "com.android.healthfitness",
         "com.android.devicelock",
     ],
 
@@ -259,7 +260,7 @@ java_library {
     apex_available: [
         "//apex_available:platform",
         "com.android.ondevicepersonalization",
-        "com.android.healthconnect",
+        "com.android.healthfitness",
     ],
 }
 
@@ -330,7 +331,7 @@ android_library {
     apex_available: [
         "//apex_available:platform",
         "com.android.ondevicepersonalization",
-        "com.android.healthconnect",
+        "com.android.healthfitness",
     ],
 }
 
