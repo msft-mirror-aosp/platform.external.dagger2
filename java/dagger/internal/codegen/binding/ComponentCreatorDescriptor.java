@@ -22,6 +22,7 @@ import static dagger.internal.codegen.base.ComponentCreatorAnnotation.getCreator
 import static dagger.internal.codegen.base.ModuleAnnotation.moduleAnnotations;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
 import static dagger.internal.codegen.xprocessing.XTypeElements.getAllUnimplementedMethods;
+import static dagger.internal.codegen.xprocessing.XTypes.isSubtype;
 
 import androidx.room.compiler.processing.XElement;
 import androidx.room.compiler.processing.XExecutableParameterElement;
@@ -39,7 +40,6 @@ import com.google.common.collect.Multimap;
 import dagger.internal.codegen.base.ComponentCreatorAnnotation;
 import dagger.internal.codegen.base.ComponentCreatorKind;
 import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.spi.model.DependencyRequest;
 import java.util.List;
 
@@ -152,7 +152,7 @@ public abstract class ComponentCreatorDescriptor {
 
   /** Creates a new {@link ComponentCreatorDescriptor} for the given creator {@code type}. */
   public static ComponentCreatorDescriptor create(
-      XTypeElement creator, DaggerTypes types, DependencyRequestFactory dependencyRequestFactory) {
+      XTypeElement creator, DependencyRequestFactory dependencyRequestFactory) {
     XType componentType = creator.getEnclosingTypeElement().getType();
 
     ImmutableSetMultimap.Builder<ComponentRequirement, XMethodElement> setterMethods =
@@ -160,7 +160,7 @@ public abstract class ComponentCreatorDescriptor {
     XMethodElement factoryMethod = null;
     for (XMethodElement method : getAllUnimplementedMethods(creator)) {
       XMethodType resolvedMethodType = method.asMemberOf(creator.getType());
-      if (types.isSubtype(componentType, resolvedMethodType.getReturnType())) {
+      if (isSubtype(componentType, resolvedMethodType.getReturnType())) {
         verify(factoryMethod == null); // validation should have ensured there's only 1.
         factoryMethod = method;
       } else {

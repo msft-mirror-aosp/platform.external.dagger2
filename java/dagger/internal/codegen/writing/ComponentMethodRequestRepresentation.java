@@ -17,15 +17,15 @@
 package dagger.internal.codegen.writing;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
 
+import androidx.room.compiler.processing.XProcessingEnv;
 import com.squareup.javapoet.CodeBlock;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
 import dagger.assisted.AssistedInject;
 import dagger.internal.codegen.binding.ComponentDescriptor.ComponentMethodDescriptor;
-import dagger.internal.codegen.langmodel.DaggerTypes;
-import javax.lang.model.type.TypeMirror;
+import dagger.internal.codegen.javapoet.Expression;
+import dagger.internal.codegen.javapoet.ExpressionType;
 
 /**
  * A binding expression that implements and uses a component method.
@@ -36,23 +36,21 @@ final class ComponentMethodRequestRepresentation extends MethodRequestRepresenta
   private final RequestRepresentation wrappedRequestRepresentation;
   private final ComponentImplementation componentImplementation;
   private final ComponentMethodDescriptor componentMethod;
-  private final DaggerTypes types;
 
   @AssistedInject
   ComponentMethodRequestRepresentation(
       @Assisted RequestRepresentation wrappedRequestRepresentation,
       @Assisted ComponentMethodDescriptor componentMethod,
       ComponentImplementation componentImplementation,
-      DaggerTypes types) {
-    super(componentImplementation.getComponentShard(), types);
+      XProcessingEnv processingEnv) {
+    super(componentImplementation.getComponentShard(), processingEnv);
     this.wrappedRequestRepresentation = checkNotNull(wrappedRequestRepresentation);
     this.componentMethod = checkNotNull(componentMethod);
     this.componentImplementation = componentImplementation;
-    this.types = types;
   }
 
   @Override
-  protected CodeBlock getComponentMethodImplementation(
+  protected Expression getDependencyExpressionForComponentMethod(
       ComponentMethodDescriptor componentMethod, ComponentImplementation component) {
     // There could be several methods on the component for the same request key and kind.
     // Only one should use the BindingMethodImplementation; the others can delegate that one.
@@ -62,22 +60,19 @@ final class ComponentMethodRequestRepresentation extends MethodRequestRepresenta
     // the child's can delegate to the parent. So use methodImplementation.body() only if
     // componentName equals the component for this instance.
     return componentMethod.equals(this.componentMethod) && component.equals(componentImplementation)
-        ? CodeBlock.of(
-            "return $L;",
-            wrappedRequestRepresentation
-                .getDependencyExpressionForComponentMethod(componentMethod, componentImplementation)
-                .codeBlock())
-        : super.getComponentMethodImplementation(componentMethod, component);
+        ? wrappedRequestRepresentation.getDependencyExpressionForComponentMethod(
+            componentMethod, componentImplementation)
+        : super.getDependencyExpressionForComponentMethod(componentMethod, component);
   }
 
   @Override
   protected CodeBlock methodCall() {
-    return CodeBlock.of("$N()", getSimpleName(componentMethod.methodElement()));
+    return CodeBlock.of("$N()", componentMethod.methodElement().getJvmName());
   }
 
   @Override
-  protected TypeMirror returnType() {
-    return componentMethod.resolvedReturnType(types);
+  protected ExpressionType returnType() {
+    return ExpressionType.create(componentMethod.methodElement().getReturnType());
   }
 
   @AssistedFactory

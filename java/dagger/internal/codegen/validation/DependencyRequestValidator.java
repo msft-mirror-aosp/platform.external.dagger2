@@ -18,7 +18,7 @@ package dagger.internal.codegen.validation;
 
 import static androidx.room.compiler.processing.XElementKt.isField;
 import static androidx.room.compiler.processing.XElementKt.isTypeElement;
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
+import static dagger.internal.codegen.base.FrameworkTypes.isFrameworkType;
 import static dagger.internal.codegen.base.RequestKinds.extractKeyType;
 import static dagger.internal.codegen.binding.AssistedInjectionAnnotations.isAssistedFactoryType;
 import static dagger.internal.codegen.binding.AssistedInjectionAnnotations.isAssistedInjectionType;
@@ -27,6 +27,7 @@ import static dagger.internal.codegen.xprocessing.XElements.asField;
 import static dagger.internal.codegen.xprocessing.XElements.asTypeElement;
 import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
 import static dagger.internal.codegen.xprocessing.XTypes.isDeclared;
+import static dagger.internal.codegen.xprocessing.XTypes.isRawParameterizedType;
 import static dagger.internal.codegen.xprocessing.XTypes.isTypeOf;
 import static dagger.internal.codegen.xprocessing.XTypes.isWildcard;
 
@@ -43,6 +44,7 @@ import dagger.internal.codegen.base.RequestKinds;
 import dagger.internal.codegen.binding.InjectionAnnotations;
 import dagger.internal.codegen.javapoet.TypeNames;
 import dagger.internal.codegen.kotlin.KotlinMetadataUtil;
+import dagger.internal.codegen.xprocessing.XTypes;
 import dagger.spi.model.RequestKind;
 import java.util.Optional;
 import javax.inject.Inject;
@@ -96,9 +98,10 @@ final class DependencyRequestValidator {
       XFieldElement fieldElement = asField(requestElement);
       // static/top-level injected fields are not supported,
       // so no need to get qualifier from kotlin metadata
-      if ((!fieldElement.isStatic() || !isTypeElement(fieldElement.getEnclosingElement()))
-          && metadataUtil.hasMetadata(toJavac(fieldElement))
-          && metadataUtil.isMissingSyntheticPropertyForAnnotations(toJavac(fieldElement))) {
+      if (!fieldElement.isStatic()
+          && isTypeElement(fieldElement.getEnclosingElement())
+          && metadataUtil.hasMetadata(fieldElement)
+          && metadataUtil.isMissingSyntheticPropertyForAnnotations(fieldElement)) {
         Optional<XTypeElement> membersInjector =
             Optional.ofNullable(
                 processingEnv.findTypeElement(
@@ -113,14 +116,12 @@ final class DependencyRequestValidator {
     private final ValidationReport.Builder report;
     private final XElement requestElement;
     private final XType requestType;
-    private final XType keyType;
     private final ImmutableSet<XAnnotation> qualifiers;
 
     Validator(ValidationReport.Builder report, XElement requestElement, XType requestType) {
       this.report = report;
       this.requestElement = requestElement;
       this.requestType = requestType;
-      this.keyType = extractKeyType(requestType);
       this.qualifiers = injectionAnnotations.getQualifiers(requestElement);
     }
 
@@ -141,12 +142,21 @@ final class DependencyRequestValidator {
     }
 
     private void checkType() {
+      if (isFrameworkType(requestType) && isRawParameterizedType(requestType)) {
+        report.addError(
+            "Dagger does not support injecting raw type: " + XTypes.toStableString(requestType),
+            requestElement);
+        // If the requested type is a raw framework type then skip the remaining checks as they
+        // will just be noise.
+        return;
+      }
+      XType keyType = extractKeyType(requestType);
       if (qualifiers.isEmpty() && isDeclared(keyType)) {
         XTypeElement typeElement = keyType.getTypeElement();
         if (isAssistedInjectionType(typeElement)) {
           report.addError(
               "Dagger does not support injecting @AssistedInject type, "
-                  + requestType
+                  + XTypes.toStableString(requestType)
                   + ". Did you mean to inject its assisted factory type instead?",
               requestElement);
         }
@@ -156,7 +166,7 @@ final class DependencyRequestValidator {
           report.addError(
               "Dagger does not support injecting Lazy<T>, Producer<T>, "
                   + "or Produced<T> when T is an @AssistedFactory-annotated type such as "
-                  + keyType,
+                  + XTypes.toStableString(keyType),
               requestElement);
         }
       }
@@ -165,7 +175,7 @@ final class DependencyRequestValidator {
         report.addError(
             "Dagger does not support injecting Provider<T>, Lazy<T>, Producer<T>, "
                 + "or Produced<T> when T is a wildcard type such as "
-                + keyType,
+                + XTypes.toStableString(keyType),
             requestElement);
       }
       if (isTypeOf(keyType, TypeNames.MEMBERS_INJECTOR)) {
