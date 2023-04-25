@@ -14,7 +14,7 @@
 # Description:
 #   Tests for internal code for implementing Hilt processors.
 
-load("//java/dagger/testing/compile:macros.bzl", "compiler_test")
+load("//java/dagger/testing/compile:macros.bzl", "compiler_test", "kt_compiler_test")
 
 package(default_visibility = ["//:src"])
 
@@ -23,13 +23,13 @@ compiler_test(
     srcs = ["ActivityGeneratorTest.java"],
     compiler_deps = [
         "//java/dagger/hilt/android:android_entry_point",
-        "@androidsdk//:platforms/android-30/android.jar",
+        "@androidsdk//:platforms/android-32/android.jar",
     ],
     deps = [
+        "//java/dagger/hilt/android/testing/compile",
         "//third_party/java/compile_testing",
         "//third_party/java/junit",
         "//third_party/java/truth",
-        "//java/dagger/hilt/android/testing/compile",
     ],
 )
 
@@ -39,29 +39,29 @@ compiler_test(
     compiler_deps = [
         "//java/dagger/hilt/android:hilt_android_app",
         "//java/dagger/hilt/android:android_entry_point",
-        "@androidsdk//:platforms/android-30/android.jar",
+        "@androidsdk//:platforms/android-32/android.jar",
     ],
     deps = [
+        "//java/dagger/hilt/android/testing/compile",
         "//third_party/java/compile_testing",
         "//third_party/java/junit",
         "//third_party/java/truth",
-        "//java/dagger/hilt/android/testing/compile",
     ],
 )
 
-compiler_test(
+kt_compiler_test(
     name = "KotlinAndroidEntryPointProcessorTest",
     srcs = ["KotlinAndroidEntryPointProcessorTest.java"],
     compiler_deps = [
         "//java/dagger/hilt/android:hilt_android_app",
         "//java/dagger/hilt/android:android_entry_point",
-        "@androidsdk//:platforms/android-30/android.jar",
+        "@androidsdk//:platforms/android-32/android.jar",
     ],
     deps = [
+        "//java/dagger/hilt/android/testing/compile",
+        "//java/dagger/internal/codegen/xprocessing:xprocessing-testing",
         "//third_party/java/guava/collect",
         "//third_party/java/junit",
         "//third_party/java/truth",
-        "//java/dagger/hilt/android/testing/compile",
-        "@maven//:com_github_tschuchortdev_kotlin_compile_testing",
     ],
 )
