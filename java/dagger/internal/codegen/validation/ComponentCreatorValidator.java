@@ -17,7 +17,6 @@
 package dagger.internal.codegen.validation;
 
 import static androidx.room.compiler.processing.XTypeKt.isVoid;
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static dagger.internal.codegen.base.ComponentCreatorAnnotation.getCreatorAnnotations;
 import static dagger.internal.codegen.base.Util.reentrantComputeIfAbsent;
@@ -25,6 +24,7 @@ import static dagger.internal.codegen.xprocessing.XMethodElements.hasTypeParamet
 import static dagger.internal.codegen.xprocessing.XTypeElements.getAllUnimplementedMethods;
 import static dagger.internal.codegen.xprocessing.XTypeElements.hasTypeParameters;
 import static dagger.internal.codegen.xprocessing.XTypes.isPrimitive;
+import static dagger.internal.codegen.xprocessing.XTypes.isSubtype;
 import static javax.lang.model.SourceVersion.isKeyword;
 
 import androidx.room.compiler.processing.XConstructorElement;
@@ -39,9 +39,9 @@ import dagger.internal.codegen.base.ClearableCache;
 import dagger.internal.codegen.base.ComponentCreatorAnnotation;
 import dagger.internal.codegen.binding.ErrorMessages;
 import dagger.internal.codegen.binding.ErrorMessages.ComponentCreatorMessages;
+import dagger.internal.codegen.binding.MethodSignatureFormatter;
 import dagger.internal.codegen.javapoet.TypeNames;
 import dagger.internal.codegen.kotlin.KotlinMetadataUtil;
-import dagger.internal.codegen.langmodel.DaggerTypes;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,12 +53,13 @@ import javax.inject.Singleton;
 public final class ComponentCreatorValidator implements ClearableCache {
 
   private final Map<XTypeElement, ValidationReport> reports = new HashMap<>();
-  private final DaggerTypes types;
+  private final MethodSignatureFormatter methodSignatureFormatter;
   private final KotlinMetadataUtil metadataUtil;
 
   @Inject
-  ComponentCreatorValidator(DaggerTypes types, KotlinMetadataUtil metadataUtil) {
-    this.types = types;
+  ComponentCreatorValidator(
+      MethodSignatureFormatter methodSignatureFormatter, KotlinMetadataUtil metadataUtil) {
+    this.methodSignatureFormatter = methodSignatureFormatter;
     this.metadataUtil = metadataUtil;
   }
 
@@ -128,8 +129,12 @@ public final class ComponentCreatorValidator implements ClearableCache {
     /** Validates the creator type. */
     final ValidationReport validate() {
       XTypeElement enclosingType = creator.getEnclosingTypeElement();
-      if (enclosingType == null || !enclosingType.hasAnnotation(annotation.componentAnnotation())) {
-        report.addError(messages.mustBeInComponent());
+
+      // If the type isn't enclosed in a component don't validate anything else since the rest of
+      // the messages will be bogus.
+      if (enclosingType == null
+              || !enclosingType.hasAnnotation(annotation.componentAnnotation())) {
+        return report.addError(messages.mustBeInComponent()).build();
       }
 
       // If the type isn't a class or interface, don't validate anything else since the rest of the
@@ -138,7 +143,12 @@ public final class ComponentCreatorValidator implements ClearableCache {
         return report.build();
       }
 
-      validateTypeRequirements();
+      // If the type isn't a valid creator type, don't validate anything else since the rest of the
+      // messages will be bogus.
+      if (!validateTypeRequirements()) {
+        return report.build();
+      }
+
       switch (annotation.creatorKind()) {
         case FACTORY:
           validateFactory();
@@ -180,21 +190,26 @@ public final class ComponentCreatorValidator implements ClearableCache {
     }
 
     /** Validates basic requirements about the type that are common to both creator kinds. */
-    private void validateTypeRequirements() {
+    private boolean validateTypeRequirements() {
+      boolean isClean = true;
       if (hasTypeParameters(creator)) {
         report.addError(messages.generics());
+        isClean = false;
       }
-
       if (creator.isPrivate()) {
         report.addError(messages.isPrivate());
+        isClean = false;
       }
       if (!creator.isStatic()) {
         report.addError(messages.mustBeStatic());
+        isClean = false;
       }
       // Note: Must be abstract, so no need to check for final.
       if (!creator.isAbstract()) {
         report.addError(messages.mustBeAbstract());
+        isClean = false;
       }
+      return isClean;
     }
 
     private void validateBuilder() {
@@ -210,7 +225,7 @@ public final class ComponentCreatorValidator implements ClearableCache {
                     method,
                     messages.twoFactoryMethods(),
                     messages.inheritedTwoFactoryMethods(),
-                    buildMethod);
+                    methodSignatureFormatter.format(buildMethod));
               }
             }
             // We set the buildMethod regardless of the return type to reduce error spam.
@@ -240,9 +255,9 @@ public final class ComponentCreatorValidator implements ClearableCache {
     private void validateClassMethodName() {
       // Only Kotlin class can have method name the same as a Java reserved keyword, so only check
       // the method name if this class is a Kotlin class.
-      if (metadataUtil.hasMetadata(toJavac(creator))) {
+      if (metadataUtil.hasMetadata(creator)) {
         metadataUtil
-            .getAllMethodNamesBySignature(toJavac(creator))
+            .getAllMethodNamesBySignature(creator)
             .forEach(
                 (signature, name) -> {
                   if (isKeyword(name)) {
@@ -254,7 +269,7 @@ public final class ComponentCreatorValidator implements ClearableCache {
 
     private void validateSetterMethod(XMethodElement method) {
       XType returnType = method.asMemberOf(creator.getType()).getReturnType();
-      if (!isVoid(returnType) && !types.isSubtype(creator.getType(), returnType)) {
+      if (!isVoid(returnType) && !isSubtype(creator.getType(), returnType)) {
         error(
             method,
             messages.setterMethodsMustReturnVoidOrBuilder(),
@@ -297,7 +312,7 @@ public final class ComponentCreatorValidator implements ClearableCache {
               abstractMethods.get(1),
               messages.twoFactoryMethods(),
               messages.inheritedTwoFactoryMethods(),
-              abstractMethods.get(0));
+              methodSignatureFormatter.format(abstractMethods.get(0)));
           return;
       }
 
@@ -332,7 +347,7 @@ public final class ComponentCreatorValidator implements ClearableCache {
     private boolean validateFactoryMethodReturnType(XMethodElement method) {
       XTypeElement component = creator.getEnclosingTypeElement();
       XType returnType = method.asMemberOf(creator.getType()).getReturnType();
-      if (!types.isSubtype(component.getType(), returnType)) {
+      if (!isSubtype(component.getType(), returnType)) {
         error(
             method,
             messages.factoryMethodMustReturnComponentType(),
@@ -387,7 +402,10 @@ public final class ComponentCreatorValidator implements ClearableCache {
       if (method.getEnclosingElement().equals(creator)) {
         report.addError(String.format(enclosedError, extraArgs), method);
       } else {
-        report.addError(String.format(inheritedError, ObjectArrays.concat(extraArgs, method)));
+        report.addError(
+            String.format(
+                inheritedError,
+                ObjectArrays.concat(extraArgs, methodSignatureFormatter.format(method))));
       }
     }
 

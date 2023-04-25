@@ -20,9 +20,9 @@ import static com.google.common.truth.Truth.assertThat;
 
 import android.os.Build;
 import android.os.Bundle;
-import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
+import androidx.annotation.Nullable;
 import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.test.core.app.ActivityScenario;
@@ -53,7 +53,18 @@ public class ViewModelScopedTest {
           activity -> {
             TestFragment fragment =
                 (TestFragment) activity.getSupportFragmentManager().findFragmentByTag("tag");
-            assertThat(fragment.vm.one.bar).isEqualTo(fragment.vm.two.bar);
+            // Check that the scoped bar is the same instance within the same view model.
+            assertThat(fragment.vm1.one.bar).isEqualTo(fragment.vm1.two.bar);
+            assertThat(fragment.vm2.one.bar).isEqualTo(fragment.vm2.two.bar);
+
+            // Check that the keyed viewmodels are separate by checking that the bar instances
+            // are different, and hence have different components.
+            assertThat(fragment.vm1.one.bar).isNotEqualTo(fragment.vm2.one.bar);
+
+            activity.getSupportFragmentManager().beginTransaction().remove(fragment).commitNow();
+
+            assertThat(fragment.vm1.cleared).isTrue();
+            assertThat(fragment.vm2.cleared).isTrue();
           });
     }
   }
@@ -76,12 +87,14 @@ public class ViewModelScopedTest {
 
   @AndroidEntryPoint(Fragment.class)
   public static class TestFragment extends Hilt_ViewModelScopedTest_TestFragment {
-    MyViewModel vm;
+    MyViewModel vm1;
+    MyViewModel vm2;
 
     @Override
     public void onCreate(@Nullable Bundle bundle) {
       super.onCreate(bundle);
-      vm = new ViewModelProvider(this).get(MyViewModel.class);
+      vm1 = new ViewModelProvider(this).get("foo", MyViewModel.class);
+      vm2 = new ViewModelProvider(this).get("bar", MyViewModel.class);
     }
   }
 
@@ -90,11 +103,13 @@ public class ViewModelScopedTest {
 
     final DependsOnBarOne one;
     final DependsOnBarTwo two;
+    boolean cleared = false;
 
     @Inject
-    MyViewModel(DependsOnBarOne one, DependsOnBarTwo two) {
+    MyViewModel(DependsOnBarOne one, DependsOnBarTwo two, ViewModelLifecycle lifecycle) {
       this.one = one;
       this.two = two;
+      lifecycle.addOnClearedListener(() -> cleared = true);
     }
   }
 
