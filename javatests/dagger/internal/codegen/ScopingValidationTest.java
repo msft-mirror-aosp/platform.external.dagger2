@@ -16,14 +16,10 @@
 
 package dagger.internal.codegen;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static dagger.internal.codegen.Compilers.compilerWithOptions;
-import static dagger.internal.codegen.Compilers.daggerCompiler;
-import static dagger.internal.codegen.TestUtils.message;
-
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
-import javax.tools.JavaFileObject;
+import androidx.room.compiler.processing.XProcessingEnv;
+import androidx.room.compiler.processing.util.Source;
+import com.google.common.collect.ImmutableMap;
+import dagger.testing.compile.CompilerTests;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -32,8 +28,8 @@ import org.junit.runners.JUnit4;
 public class ScopingValidationTest {
   @Test
   public void componentWithoutScopeIncludesScopedBindings_Fail() {
-    JavaFileObject componentFile =
-        JavaFileObjects.forSourceLines(
+    Source componentFile =
+        CompilerTests.javaSource(
             "test.MyComponent",
             "package test;",
             "",
@@ -44,8 +40,8 @@ public class ScopingValidationTest {
             "interface MyComponent {",
             "  ScopedType string();",
             "}");
-    JavaFileObject typeFile =
-        JavaFileObjects.forSourceLines(
+    Source typeFile =
+        CompilerTests.javaSource(
             "test.ScopedType",
             "package test;",
             "",
@@ -56,8 +52,8 @@ public class ScopingValidationTest {
             "class ScopedType {",
             "  @Inject ScopedType(String s, long l, float f) {}",
             "}");
-    JavaFileObject moduleFile =
-        JavaFileObjects.forSourceLines(
+    Source moduleFile =
+        CompilerTests.javaSource(
             "test.ScopedModule",
             "package test;",
             "",
@@ -72,23 +68,26 @@ public class ScopingValidationTest {
             "  @Provides float floatingPoint() { return 0.0f; }",
             "}");
 
-    Compilation compilation = daggerCompiler().compile(componentFile, typeFile, moduleFile);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining(
-            message(
-                "MyComponent (unscoped) may not reference scoped bindings:",
-                "    @Singleton class ScopedType",
-                "    ScopedType is requested at",
-                "        MyComponent.string()",
-                "",
-                "    @Provides @Singleton String ScopedModule.string()"));
+    CompilerTests.daggerCompiler(componentFile, typeFile, moduleFile)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(
+                  String.join(
+                      "\n",
+                      "MyComponent (unscoped) may not reference scoped bindings:",
+                      "    @Singleton class ScopedType",
+                      "    ScopedType is requested at",
+                      "        MyComponent.string()",
+                      "",
+                      "    @Provides @Singleton String ScopedModule.string()"));
+            });
   }
 
   @Test // b/79859714
   public void bindsWithChildScope_inParentModule_notAllowed() {
-    JavaFileObject childScope =
-        JavaFileObjects.forSourceLines(
+    Source childScope =
+        CompilerTests.javaSource(
             "test.ChildScope",
             "package test;",
             "",
@@ -97,16 +96,16 @@ public class ScopingValidationTest {
             "@Scope",
             "@interface ChildScope {}");
 
-    JavaFileObject foo =
-        JavaFileObjects.forSourceLines(
+    Source foo =
+        CompilerTests.javaSource(
             "test.Foo",
             "package test;",
             "", //
             "interface Foo {}");
 
-    JavaFileObject fooImpl =
-        JavaFileObjects.forSourceLines(
-            "test.ChildModule",
+    Source fooImpl =
+        CompilerTests.javaSource(
+            "test.FooImpl",
             "package test;",
             "",
             "import javax.inject.Inject;",
@@ -115,8 +114,8 @@ public class ScopingValidationTest {
             "  @Inject FooImpl() {}",
             "}");
 
-    JavaFileObject parentModule =
-        JavaFileObjects.forSourceLines(
+    Source parentModule =
+        CompilerTests.javaSource(
             "test.ParentModule",
             "package test;",
             "",
@@ -128,9 +127,9 @@ public class ScopingValidationTest {
             "  @Binds @ChildScope Foo bind(FooImpl fooImpl);",
             "}");
 
-    JavaFileObject parent =
-        JavaFileObjects.forSourceLines(
-            "test.ParentComponent",
+    Source parent =
+        CompilerTests.javaSource(
+            "test.Parent",
             "package test;",
             "",
             "import dagger.Component;",
@@ -142,8 +141,8 @@ public class ScopingValidationTest {
             "  Child child();",
             "}");
 
-    JavaFileObject child =
-        JavaFileObjects.forSourceLines(
+    Source child =
+        CompilerTests.javaSource(
             "test.Child",
             "package test;",
             "",
@@ -155,21 +154,23 @@ public class ScopingValidationTest {
             "  Foo foo();",
             "}");
 
-    Compilation compilation =
-        daggerCompiler().compile(childScope, foo, fooImpl, parentModule, parent, child);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining(
-            message(
-                "Parent scoped with @Singleton may not reference bindings with different "
-                    + "scopes:",
-                "    @Binds @ChildScope Foo ParentModule.bind(FooImpl)"));
+    CompilerTests.daggerCompiler(childScope, foo, fooImpl, parentModule, parent, child)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(
+                  String.join(
+                      "\n",
+                      "Parent scoped with @Singleton may not reference bindings with different "
+                          + "scopes:",
+                      "    @Binds @ChildScope Foo ParentModule.bind(FooImpl)"));
+            });
   }
 
   @Test
   public void componentWithScopeIncludesIncompatiblyScopedBindings_Fail() {
-    JavaFileObject componentFile =
-        JavaFileObjects.forSourceLines(
+    Source componentFile =
+        CompilerTests.javaSource(
             "test.MyComponent",
             "package test;",
             "",
@@ -181,8 +182,8 @@ public class ScopingValidationTest {
             "interface MyComponent {",
             "  ScopedType string();",
             "}");
-    JavaFileObject scopeFile =
-        JavaFileObjects.forSourceLines(
+    Source scopeFile =
+        CompilerTests.javaSource(
             "test.PerTest",
             "package test;",
             "",
@@ -190,8 +191,8 @@ public class ScopingValidationTest {
             "",
             "@Scope",
             "@interface PerTest {}");
-    JavaFileObject scopeWithAttribute =
-        JavaFileObjects.forSourceLines(
+    Source scopeWithAttribute =
+        CompilerTests.javaSource(
             "test.Per",
             "package test;",
             "",
@@ -201,8 +202,8 @@ public class ScopingValidationTest {
             "@interface Per {",
             "  Class<?> value();",
             "}");
-    JavaFileObject typeFile =
-        JavaFileObjects.forSourceLines(
+    Source typeFile =
+        CompilerTests.javaSource(
             "test.ScopedType",
             "package test;",
             "",
@@ -212,8 +213,8 @@ public class ScopingValidationTest {
             "class ScopedType {",
             "  @Inject ScopedType(String s, long l, float f, boolean b) {}",
             "}");
-    JavaFileObject moduleFile =
-        JavaFileObjects.forSourceLines(
+    Source moduleFile =
+        CompilerTests.javaSource(
             "test.ScopedModule",
             "package test;",
             "",
@@ -229,172 +230,191 @@ public class ScopingValidationTest {
             "  @Provides @Per(MyComponent.class) boolean bool() { return false; }", // incompatible
             "}");
 
-    Compilation compilation =
-        daggerCompiler()
-            .compile(componentFile, scopeFile, scopeWithAttribute, typeFile, moduleFile);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining(
-            message(
-                "MyComponent scoped with @Singleton "
-                    + "may not reference bindings with different scopes:",
-                "    @PerTest class ScopedType",
-                "    ScopedType is requested at",
-                "        MyComponent.string()",
-                "",
-                "    @Provides @PerTest String ScopedModule.string()",
-                "",
-                "    @Provides @Per(MyComponent.class) boolean "
-                    + "ScopedModule.bool()"))
-        .inFile(componentFile)
-        .onLineContaining("interface MyComponent");
+    CompilerTests.daggerCompiler(componentFile, scopeFile, scopeWithAttribute, typeFile, moduleFile)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject
+                  .hasErrorContaining(
+                      String.join(
+                          "\n",
+                          "MyComponent scoped with @Singleton may not reference bindings with "
+                              + "different scopes:",
+                          "    @PerTest class ScopedType",
+                          "    ScopedType is requested at",
+                          "        MyComponent.string()",
+                          "",
+                          "    @Provides @PerTest String ScopedModule.string()",
+                          "",
+                          // TODO(b/241293838): Remove dependency on backend once this bug is fixed.
+                          CompilerTests.backend(subject).equals(XProcessingEnv.Backend.JAVAC)
+                              ? "    @Provides @Per(MyComponent.class) boolean ScopedModule.bool()"
+                              : "    @Provides @Per(MyComponent) boolean ScopedModule.bool()"))
+                  .onSource(componentFile)
+                  .onLineContaining("interface MyComponent");
+            });
 
-    compilation =
-        compilerWithOptions("-Adagger.fullBindingGraphValidation=ERROR")
-            .compile(componentFile, scopeFile, scopeWithAttribute, typeFile, moduleFile);
     // The @Inject binding for ScopedType should not appear here, but the @Singleton binding should.
-    assertThat(compilation)
-        .hadErrorContaining(
-            message(
-                "ScopedModule contains bindings with different scopes:",
-                "    @Provides @PerTest String ScopedModule.string()",
-                "",
-                "    @Provides @Singleton float ScopedModule.floatingPoint()",
-                "",
-                "    @Provides @Per(MyComponent.class) boolean "
-                    + "ScopedModule.bool()"))
-        .inFile(moduleFile)
-        .onLineContaining("class ScopedModule");
+    CompilerTests.daggerCompiler(componentFile, scopeFile, scopeWithAttribute, typeFile, moduleFile)
+        .withProcessingOptions(ImmutableMap.of("dagger.fullBindingGraphValidation", "ERROR"))
+        .compile(
+            subject -> {
+              subject.hasErrorCount(2);
+              subject.hasErrorContaining(
+                      String.join(
+                          "\n",
+                          "ScopedModule contains bindings with different scopes:",
+                          "    @Provides @PerTest String ScopedModule.string()",
+                          "",
+                          "    @Provides @Singleton float ScopedModule.floatingPoint()",
+                          "",
+                          // TODO(b/241293838): Remove dependency on backend once this bug is fixed.
+                          CompilerTests.backend(subject).equals(XProcessingEnv.Backend.JAVAC)
+                              ? "    @Provides @Per(MyComponent.class) boolean ScopedModule.bool()"
+                              : "    @Provides @Per(MyComponent) boolean ScopedModule.bool()"))
+                  .onSource(moduleFile)
+                  .onLineContaining("class ScopedModule");
+            });
   }
 
   @Test
   public void fullBindingGraphValidationDoesNotReportForOneScope() {
-    Compilation compilation =
-        compilerWithOptions(
-                "-Adagger.fullBindingGraphValidation=ERROR",
-                "-Adagger.moduleHasDifferentScopesValidation=ERROR")
-            .compile(
-                JavaFileObjects.forSourceLines(
-                    "test.TestModule",
-                    "package test;",
-                    "",
-                    "import dagger.Module;",
-                    "import dagger.Provides;",
-                    "import javax.inject.Singleton;",
-                    "",
-                    "@Module",
-                    "interface TestModule {",
-                    "  @Provides @Singleton static Object object() { return \"object\"; }",
-                    "  @Provides @Singleton static String string() { return \"string\"; }",
-                    "  @Provides static int integer() { return 4; }",
-                    "}"));
-    assertThat(compilation).succeededWithoutWarnings();
+    CompilerTests.daggerCompiler(
+            CompilerTests.javaSource(
+                "test.TestModule",
+                "package test;",
+                "",
+                "import dagger.Module;",
+                "import dagger.Provides;",
+                "import javax.inject.Singleton;",
+                "",
+                "@Module",
+                "interface TestModule {",
+                "  @Provides @Singleton static Object object() { return \"object\"; }",
+                "  @Provides @Singleton static String string() { return \"string\"; }",
+                "  @Provides static int integer() { return 4; }",
+                "}"))
+        .withProcessingOptions(
+            ImmutableMap.<String, String>builder()
+                .put("dagger.fullBindingGraphValidation", "ERROR")
+                .put("dagger.moduleHasDifferentScopesValidation", "ERROR")
+                .buildOrThrow())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(0);
+              subject.hasWarningCount(0);
+            });
   }
 
   @Test
   public void fullBindingGraphValidationDoesNotReportInjectBindings() {
-    Compilation compilation =
-        compilerWithOptions(
-                "-Adagger.fullBindingGraphValidation=ERROR",
-                "-Adagger.moduleHasDifferentScopesValidation=ERROR")
-            .compile(
-                JavaFileObjects.forSourceLines(
-                    "test.UsedInRootRedScoped",
-                    "package test;",
-                    "",
-                    "import javax.inject.Inject;",
-                    "",
-                    "@RedScope",
-                    "final class UsedInRootRedScoped {",
-                    "  @Inject UsedInRootRedScoped() {}",
-                    "}"),
-                JavaFileObjects.forSourceLines(
-                    "test.UsedInRootBlueScoped",
-                    "package test;",
-                    "",
-                    "import javax.inject.Inject;",
-                    "",
-                    "@BlueScope",
-                    "final class UsedInRootBlueScoped {",
-                    "  @Inject UsedInRootBlueScoped() {}",
-                    "}"),
-                JavaFileObjects.forSourceLines(
-                    "test.RedScope",
-                    "package test;",
-                    "",
-                    "import javax.inject.Scope;",
-                    "",
-                    "@Scope",
-                    "@interface RedScope {}"),
-                JavaFileObjects.forSourceLines(
-                    "test.BlueScope",
-                    "package test;",
-                    "",
-                    "import javax.inject.Scope;",
-                    "",
-                    "@Scope",
-                    "@interface BlueScope {}"),
-                JavaFileObjects.forSourceLines(
-                    "test.TestModule",
-                    "package test;",
-                    "",
-                    "import dagger.Module;",
-                    "import dagger.Provides;",
-                    "import javax.inject.Singleton;",
-                    "",
-                    "@Module(subcomponents = Child.class)",
-                    "interface TestModule {",
-                    "  @Provides @Singleton",
-                    "  static Object object(",
-                    "      UsedInRootRedScoped usedInRootRedScoped,",
-                    "      UsedInRootBlueScoped usedInRootBlueScoped) {",
-                    "    return \"object\";",
-                    "  }",
-                    "}"),
-                JavaFileObjects.forSourceLines(
-                    "test.Child",
-                    "package test;",
-                    "",
-                    "import dagger.Subcomponent;",
-                    "",
-                    "@Subcomponent",
-                    "interface Child {",
-                    "  UsedInChildRedScoped usedInChildRedScoped();",
-                    "  UsedInChildBlueScoped usedInChildBlueScoped();",
-                    "",
-                    "  @Subcomponent.Builder",
-                    "  interface Builder {",
-                    "    Child child();",
-                    "  }",
-                    "}"),
-                JavaFileObjects.forSourceLines(
-                    "test.UsedInChildRedScoped",
-                    "package test;",
-                    "",
-                    "import javax.inject.Inject;",
-                    "",
-                    "@RedScope",
-                    "final class UsedInChildRedScoped {",
-                    "  @Inject UsedInChildRedScoped() {}",
-                    "}"),
-                JavaFileObjects.forSourceLines(
-                    "test.UsedInChildBlueScoped",
-                    "package test;",
-                    "",
-                    "import javax.inject.Inject;",
-                    "",
-                    "@BlueScope",
-                    "final class UsedInChildBlueScoped {",
-                    "  @Inject UsedInChildBlueScoped() {}",
-                    "}"));
-    assertThat(compilation).succeededWithoutWarnings();
+    CompilerTests.daggerCompiler(
+            CompilerTests.javaSource(
+                "test.UsedInRootRedScoped",
+                "package test;",
+                "",
+                "import javax.inject.Inject;",
+                "",
+                "@RedScope",
+                "final class UsedInRootRedScoped {",
+                "  @Inject UsedInRootRedScoped() {}",
+                "}"),
+            CompilerTests.javaSource(
+                "test.UsedInRootBlueScoped",
+                "package test;",
+                "",
+                "import javax.inject.Inject;",
+                "",
+                "@BlueScope",
+                "final class UsedInRootBlueScoped {",
+                "  @Inject UsedInRootBlueScoped() {}",
+                "}"),
+            CompilerTests.javaSource(
+                "test.RedScope",
+                "package test;",
+                "",
+                "import javax.inject.Scope;",
+                "",
+                "@Scope",
+                "@interface RedScope {}"),
+            CompilerTests.javaSource(
+                "test.BlueScope",
+                "package test;",
+                "",
+                "import javax.inject.Scope;",
+                "",
+                "@Scope",
+                "@interface BlueScope {}"),
+            CompilerTests.javaSource(
+                "test.TestModule",
+                "package test;",
+                "",
+                "import dagger.Module;",
+                "import dagger.Provides;",
+                "import javax.inject.Singleton;",
+                "",
+                "@Module(subcomponents = Child.class)",
+                "interface TestModule {",
+                "  @Provides @Singleton",
+                "  static Object object(",
+                "      UsedInRootRedScoped usedInRootRedScoped,",
+                "      UsedInRootBlueScoped usedInRootBlueScoped) {",
+                "    return \"object\";",
+                "  }",
+                "}"),
+            CompilerTests.javaSource(
+                "test.Child",
+                "package test;",
+                "",
+                "import dagger.Subcomponent;",
+                "",
+                "@Subcomponent",
+                "interface Child {",
+                "  UsedInChildRedScoped usedInChildRedScoped();",
+                "  UsedInChildBlueScoped usedInChildBlueScoped();",
+                "",
+                "  @Subcomponent.Builder",
+                "  interface Builder {",
+                "    Child child();",
+                "  }",
+                "}"),
+            CompilerTests.javaSource(
+                "test.UsedInChildRedScoped",
+                "package test;",
+                "",
+                "import javax.inject.Inject;",
+                "",
+                "@RedScope",
+                "final class UsedInChildRedScoped {",
+                "  @Inject UsedInChildRedScoped() {}",
+                "}"),
+            CompilerTests.javaSource(
+                "test.UsedInChildBlueScoped",
+                "package test;",
+                "",
+                "import javax.inject.Inject;",
+                "",
+                "@BlueScope",
+                "final class UsedInChildBlueScoped {",
+                "  @Inject UsedInChildBlueScoped() {}",
+                "}"))
+        .withProcessingOptions(
+            ImmutableMap.<String, String>builder()
+                .put("dagger.fullBindingGraphValidation", "ERROR")
+                .put("dagger.moduleHasDifferentScopesValidation", "ERROR")
+                .buildOrThrow())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(0);
+              subject.hasWarningCount(0);
+            });
   }
 
   @Test
   public void componentWithScopeCanDependOnMultipleScopedComponents() {
     // If a scoped component will have dependencies, they can include multiple scoped component
-    JavaFileObject type =
-        JavaFileObjects.forSourceLines(
+    Source type =
+        CompilerTests.javaSource(
             "test.SimpleType",
             "package test;",
             "",
@@ -405,16 +425,16 @@ public class ScopingValidationTest {
             "  static class A { @Inject A() {} }",
             "  static class B { @Inject B() {} }",
             "}");
-    JavaFileObject simpleScope =
-        JavaFileObjects.forSourceLines(
+    Source simpleScope =
+        CompilerTests.javaSource(
             "test.SimpleScope",
             "package test;",
             "",
             "import javax.inject.Scope;",
             "",
             "@Scope @interface SimpleScope {}");
-    JavaFileObject singletonScopedA =
-        JavaFileObjects.forSourceLines(
+    Source singletonScopedA =
+        CompilerTests.javaSource(
             "test.SingletonComponentA",
             "package test;",
             "",
@@ -426,8 +446,8 @@ public class ScopingValidationTest {
             "interface SingletonComponentA {",
             "  SimpleType.A type();",
             "}");
-    JavaFileObject singletonScopedB =
-        JavaFileObjects.forSourceLines(
+    Source singletonScopedB =
+        CompilerTests.javaSource(
             "test.SingletonComponentB",
             "package test;",
             "",
@@ -439,8 +459,8 @@ public class ScopingValidationTest {
             "interface SingletonComponentB {",
             "  SimpleType.B type();",
             "}");
-    JavaFileObject scopeless =
-        JavaFileObjects.forSourceLines(
+    Source scopeless =
+        CompilerTests.javaSource(
             "test.ScopelessComponent",
             "package test;",
             "",
@@ -450,8 +470,8 @@ public class ScopingValidationTest {
             "interface ScopelessComponent {",
             "  SimpleType type();",
             "}");
-    JavaFileObject simpleScoped =
-        JavaFileObjects.forSourceLines(
+    Source simpleScoped =
+        CompilerTests.javaSource(
             "test.SimpleScopedComponent",
             "package test;",
             "",
@@ -463,11 +483,13 @@ public class ScopingValidationTest {
             "  SimpleType.A type();",
             "}");
 
-    Compilation compilation =
-        daggerCompiler()
-            .compile(
-                type, simpleScope, simpleScoped, singletonScopedA, singletonScopedB, scopeless);
-    assertThat(compilation).succeededWithoutWarnings();
+    CompilerTests.daggerCompiler(
+            type, simpleScope, simpleScoped, singletonScopedA, singletonScopedB, scopeless)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(0);
+              subject.hasWarningCount(0);
+            });
   }
 
 
@@ -489,8 +511,8 @@ public class ScopingValidationTest {
   //         [SimpleType getSimpleType()]
   @Test
   public void componentWithScopeCanDependOnMultipleScopedComponentsEvenDoingADiamond() {
-    JavaFileObject type =
-        JavaFileObjects.forSourceLines(
+    Source type =
+        CompilerTests.javaSource(
             "test.SimpleType",
             "package test;",
             "",
@@ -499,32 +521,32 @@ public class ScopingValidationTest {
             "class SimpleType {",
             "  @Inject SimpleType() {}",
             "}");
-    JavaFileObject simpleScope =
-        JavaFileObjects.forSourceLines(
+    Source simpleScope =
+        CompilerTests.javaSource(
             "test.SimpleScope",
             "package test;",
             "",
             "import javax.inject.Scope;",
             "",
             "@Scope @interface SimpleScope {}");
-    JavaFileObject scopeA =
-        JavaFileObjects.forSourceLines(
+    Source scopeA =
+        CompilerTests.javaSource(
             "test.ScopeA",
             "package test;",
             "",
             "import javax.inject.Scope;",
             "",
             "@Scope @interface ScopeA {}");
-    JavaFileObject scopeB =
-        JavaFileObjects.forSourceLines(
+    Source scopeB =
+        CompilerTests.javaSource(
             "test.ScopeB",
             "package test;",
             "",
             "import javax.inject.Scope;",
             "",
             "@Scope @interface ScopeB {}");
-    JavaFileObject componentA =
-        JavaFileObjects.forSourceLines(
+    Source componentA =
+        CompilerTests.javaSource(
             "test.ComponentA",
             "package test;",
             "",
@@ -535,8 +557,8 @@ public class ScopingValidationTest {
             "interface ComponentA {",
             "  SimpleType type();",
             "}");
-    JavaFileObject componentB1 =
-        JavaFileObjects.forSourceLines(
+    Source componentB1 =
+        CompilerTests.javaSource(
             "test.ComponentB1",
             "package test;",
             "",
@@ -547,8 +569,8 @@ public class ScopingValidationTest {
             "interface ComponentB1 {",
             "  SimpleType type();",
             "}");
-    JavaFileObject componentB2 =
-        JavaFileObjects.forSourceLines(
+    Source componentB2 =
+        CompilerTests.javaSource(
             "test.ComponentB2",
             "package test;",
             "",
@@ -558,8 +580,8 @@ public class ScopingValidationTest {
             "@Component(dependencies = ComponentA.class)",
             "interface ComponentB2 {",
             "}");
-    JavaFileObject componentC =
-        JavaFileObjects.forSourceLines(
+    Source componentC =
+        CompilerTests.javaSource(
             "test.ComponentC",
             "package test;",
             "",
@@ -571,18 +593,19 @@ public class ScopingValidationTest {
             "  SimpleType type();",
             "}");
 
-    Compilation compilation =
-        daggerCompiler()
-            .compile(
-                type, simpleScope, scopeA, scopeB,
-                componentA, componentB1, componentB2, componentC);
-    assertThat(compilation).succeededWithoutWarnings();
+    CompilerTests.daggerCompiler(
+            type, simpleScope, scopeA, scopeB, componentA, componentB1, componentB2, componentC)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(0);
+              subject.hasWarningCount(0);
+            });
   }
 
   @Test
   public void componentWithoutScopeCannotDependOnScopedComponent() {
-    JavaFileObject type =
-        JavaFileObjects.forSourceLines(
+    Source type =
+        CompilerTests.javaSource(
             "test.SimpleType",
             "package test;",
             "",
@@ -591,8 +614,8 @@ public class ScopingValidationTest {
             "class SimpleType {",
             "  @Inject SimpleType() {}",
             "}");
-    JavaFileObject scopedComponent =
-        JavaFileObjects.forSourceLines(
+    Source scopedComponent =
+        CompilerTests.javaSource(
             "test.ScopedComponent",
             "package test;",
             "",
@@ -604,8 +627,8 @@ public class ScopingValidationTest {
             "interface ScopedComponent {",
             "  SimpleType type();",
             "}");
-    JavaFileObject unscopedComponent =
-        JavaFileObjects.forSourceLines(
+    Source unscopedComponent =
+        CompilerTests.javaSource(
             "test.UnscopedComponent",
             "package test;",
             "",
@@ -617,20 +640,23 @@ public class ScopingValidationTest {
             "  SimpleType type();",
             "}");
 
-    Compilation compilation = daggerCompiler().compile(type, scopedComponent, unscopedComponent);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining(
-            message(
-                "test.UnscopedComponent (unscoped) cannot depend on scoped components:",
-                "    @Singleton test.ScopedComponent"));
+    CompilerTests.daggerCompiler(type, scopedComponent, unscopedComponent)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(
+                  String.join(
+                      "\n",
+                      "test.UnscopedComponent (unscoped) cannot depend on scoped components:",
+                      "    @Singleton test.ScopedComponent"));
+            });
   }
 
   @Test
   public void componentWithSingletonScopeMayNotDependOnOtherScope() {
     // Singleton must be the widest lifetime of present scopes.
-    JavaFileObject type =
-        JavaFileObjects.forSourceLines(
+    Source type =
+        CompilerTests.javaSource(
             "test.SimpleType",
             "package test;",
             "",
@@ -639,16 +665,16 @@ public class ScopingValidationTest {
             "class SimpleType {",
             "  @Inject SimpleType() {}",
             "}");
-    JavaFileObject simpleScope =
-        JavaFileObjects.forSourceLines(
+    Source simpleScope =
+        CompilerTests.javaSource(
             "test.SimpleScope",
             "package test;",
             "",
             "import javax.inject.Scope;",
             "",
             "@Scope @interface SimpleScope {}");
-    JavaFileObject simpleScoped =
-        JavaFileObjects.forSourceLines(
+    Source simpleScoped =
+        CompilerTests.javaSource(
             "test.SimpleScopedComponent",
             "package test;",
             "",
@@ -659,8 +685,8 @@ public class ScopingValidationTest {
             "interface SimpleScopedComponent {",
             "  SimpleType type();",
             "}");
-    JavaFileObject singletonScoped =
-        JavaFileObjects.forSourceLines(
+    Source singletonScoped =
+        CompilerTests.javaSource(
             "test.SingletonComponent",
             "package test;",
             "",
@@ -673,20 +699,22 @@ public class ScopingValidationTest {
             "  SimpleType type();",
             "}");
 
-    Compilation compilation =
-        daggerCompiler().compile(type, simpleScope, simpleScoped, singletonScoped);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining(
-            message(
-                "This @Singleton component cannot depend on scoped components:",
-                "    @test.SimpleScope test.SimpleScopedComponent"));
+    CompilerTests.daggerCompiler(type, simpleScope, simpleScoped, singletonScoped)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(
+                  String.join(
+                      "\n",
+                      "This @Singleton component cannot depend on scoped components:",
+                      "    @test.SimpleScope test.SimpleScopedComponent"));
+            });
   }
 
   @Test
   public void componentScopeWithMultipleScopedDependenciesMustNotCycle() {
-    JavaFileObject type =
-        JavaFileObjects.forSourceLines(
+    Source type =
+        CompilerTests.javaSource(
             "test.SimpleType",
             "package test;",
             "",
@@ -695,24 +723,24 @@ public class ScopingValidationTest {
             "class SimpleType {",
             "  @Inject SimpleType() {}",
             "}");
-    JavaFileObject scopeA =
-        JavaFileObjects.forSourceLines(
+    Source scopeA =
+        CompilerTests.javaSource(
             "test.ScopeA",
             "package test;",
             "",
             "import javax.inject.Scope;",
             "",
             "@Scope @interface ScopeA {}");
-    JavaFileObject scopeB =
-        JavaFileObjects.forSourceLines(
+    Source scopeB =
+        CompilerTests.javaSource(
             "test.ScopeB",
             "package test;",
             "",
             "import javax.inject.Scope;",
             "",
             "@Scope @interface ScopeB {}");
-    JavaFileObject longLifetime =
-        JavaFileObjects.forSourceLines(
+    Source longLifetime =
+        CompilerTests.javaSource(
             "test.ComponentLong",
             "package test;",
             "",
@@ -723,8 +751,8 @@ public class ScopingValidationTest {
             "interface ComponentLong {",
             "  SimpleType type();",
             "}");
-    JavaFileObject mediumLifetime1 =
-        JavaFileObjects.forSourceLines(
+    Source mediumLifetime1 =
+        CompilerTests.javaSource(
             "test.ComponentMedium1",
             "package test;",
             "",
@@ -735,8 +763,8 @@ public class ScopingValidationTest {
             "interface ComponentMedium1 {",
             "  SimpleType type();",
             "}");
-    JavaFileObject mediumLifetime2 =
-        JavaFileObjects.forSourceLines(
+    Source mediumLifetime2 =
+        CompilerTests.javaSource(
             "test.ComponentMedium2",
             "package test;",
             "",
@@ -746,8 +774,8 @@ public class ScopingValidationTest {
             "@Component",
             "interface ComponentMedium2 {",
             "}");
-    JavaFileObject shortLifetime =
-        JavaFileObjects.forSourceLines(
+    Source shortLifetime =
+        CompilerTests.javaSource(
             "test.ComponentShort",
             "package test;",
             "",
@@ -759,20 +787,20 @@ public class ScopingValidationTest {
             "  SimpleType type();",
             "}");
 
-    Compilation compilation =
-        daggerCompiler()
-            .compile(
-                type, scopeA, scopeB,
-                longLifetime, mediumLifetime1, mediumLifetime2, shortLifetime);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining(
-            message(
-                "test.ComponentShort depends on scoped components in a non-hierarchical scope "
-                    + "ordering:",
-                "    @test.ScopeA test.ComponentLong",
-                "    @test.ScopeB test.ComponentMedium1",
-                "    @test.ScopeA test.ComponentShort"));
+    CompilerTests.daggerCompiler(
+            type, scopeA, scopeB, longLifetime, mediumLifetime1, mediumLifetime2, shortLifetime)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(
+                  String.join(
+                      "\n",
+                      "test.ComponentShort depends on scoped components in a non-hierarchical "
+                          + "scope ordering:",
+                      "    @test.ScopeA test.ComponentLong",
+                      "    @test.ScopeB test.ComponentMedium1",
+                      "    @test.ScopeA test.ComponentShort"));
+            });
   }
 
   @Test
@@ -780,8 +808,8 @@ public class ScopingValidationTest {
     // The dependency relationship of components is necessarily from shorter lifetimes to
     // longer lifetimes.  The scoping annotations must reflect this, and so one cannot declare
     // scopes on components such that they cycle.
-    JavaFileObject type =
-        JavaFileObjects.forSourceLines(
+    Source type =
+        CompilerTests.javaSource(
             "test.SimpleType",
             "package test;",
             "",
@@ -790,24 +818,24 @@ public class ScopingValidationTest {
             "class SimpleType {",
             "  @Inject SimpleType() {}",
             "}");
-    JavaFileObject scopeA =
-        JavaFileObjects.forSourceLines(
+    Source scopeA =
+        CompilerTests.javaSource(
             "test.ScopeA",
             "package test;",
             "",
             "import javax.inject.Scope;",
             "",
             "@Scope @interface ScopeA {}");
-    JavaFileObject scopeB =
-        JavaFileObjects.forSourceLines(
+    Source scopeB =
+        CompilerTests.javaSource(
             "test.ScopeB",
             "package test;",
             "",
             "import javax.inject.Scope;",
             "",
             "@Scope @interface ScopeB {}");
-    JavaFileObject longLifetime =
-        JavaFileObjects.forSourceLines(
+    Source longLifetime =
+        CompilerTests.javaSource(
             "test.ComponentLong",
             "package test;",
             "",
@@ -818,8 +846,8 @@ public class ScopingValidationTest {
             "interface ComponentLong {",
             "  SimpleType type();",
             "}");
-    JavaFileObject mediumLifetime =
-        JavaFileObjects.forSourceLines(
+    Source mediumLifetime =
+        CompilerTests.javaSource(
             "test.ComponentMedium",
             "package test;",
             "",
@@ -830,8 +858,8 @@ public class ScopingValidationTest {
             "interface ComponentMedium {",
             "  SimpleType type();",
             "}");
-    JavaFileObject shortLifetime =
-        JavaFileObjects.forSourceLines(
+    Source shortLifetime =
+        CompilerTests.javaSource(
             "test.ComponentShort",
             "package test;",
             "",
@@ -843,31 +871,32 @@ public class ScopingValidationTest {
             "  SimpleType type();",
             "}");
 
-    Compilation compilation =
-        daggerCompiler().compile(type, scopeA, scopeB, longLifetime, mediumLifetime, shortLifetime);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining(
-            message(
-                "test.ComponentShort depends on scoped components in a non-hierarchical scope "
-                    + "ordering:",
-                "    @test.ScopeA test.ComponentLong",
-                "    @test.ScopeB test.ComponentMedium",
-                "    @test.ScopeA test.ComponentShort"));
-
+    CompilerTests.daggerCompiler(type, scopeA, scopeB, longLifetime, mediumLifetime, shortLifetime)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(
+                  String.join(
+                      "\n",
+                      "test.ComponentShort depends on scoped components in a non-hierarchical "
+                          + "scope ordering:",
+                      "    @test.ScopeA test.ComponentLong",
+                      "    @test.ScopeB test.ComponentMedium",
+                      "    @test.ScopeA test.ComponentShort"));
+            });
 
     // Test that compilation succeeds when transitive validation is disabled because the scope cycle
     // cannot be detected.
-    compilation =
-        compilerWithOptions("-Adagger.validateTransitiveComponentDependencies=DISABLED")
-            .compile(type, scopeA, scopeB, longLifetime, mediumLifetime, shortLifetime);
-    assertThat(compilation).succeeded();
+    CompilerTests.daggerCompiler(type, scopeA, scopeB, longLifetime, mediumLifetime, shortLifetime)
+        .withProcessingOptions(
+            ImmutableMap.of("dagger.validateTransitiveComponentDependencies", "DISABLED"))
+        .compile(subject -> subject.hasErrorCount(0));
   }
 
   @Test
   public void reusableNotAllowedOnComponent() {
-    JavaFileObject someComponent =
-        JavaFileObjects.forSourceLines(
+    Source someComponent =
+        CompilerTests.javaSource(
             "test.SomeComponent",
             "package test;",
             "",
@@ -877,18 +906,21 @@ public class ScopingValidationTest {
             "@Reusable",
             "@Component",
             "interface SomeComponent {}");
-    Compilation compilation = daggerCompiler().compile(someComponent);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining("@Reusable cannot be applied to components or subcomponents")
-        .inFile(someComponent)
-        .onLine(6);
+    CompilerTests.daggerCompiler(someComponent)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(
+                      "@Reusable cannot be applied to components or subcomponents")
+                  .onSource(someComponent)
+                  .onLine(6);
+            });
   }
 
   @Test
   public void reusableNotAllowedOnSubcomponent() {
-    JavaFileObject someSubcomponent =
-        JavaFileObjects.forSourceLines(
+    Source someSubcomponent =
+        CompilerTests.javaSource(
             "test.SomeComponent",
             "package test;",
             "",
@@ -898,11 +930,14 @@ public class ScopingValidationTest {
             "@Reusable",
             "@Subcomponent",
             "interface SomeSubcomponent {}");
-    Compilation compilation = daggerCompiler().compile(someSubcomponent);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining("@Reusable cannot be applied to components or subcomponents")
-        .inFile(someSubcomponent)
-        .onLine(6);
+    CompilerTests.daggerCompiler(someSubcomponent)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(
+                      "@Reusable cannot be applied to components or subcomponents")
+                  .onSource(someSubcomponent)
+                  .onLine(6);
+            });
   }
 }

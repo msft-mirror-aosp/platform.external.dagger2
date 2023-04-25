@@ -21,8 +21,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static dagger.internal.codegen.binding.AssistedInjectionAnnotations.assistedFactoryMethod;
 import static dagger.internal.codegen.writing.AssistedInjectionParameters.assistedFactoryParameterSpecs;
+import static dagger.internal.codegen.xprocessing.MethodSpecs.overriding;
 import static dagger.internal.codegen.xprocessing.XElements.asTypeElement;
-import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
 
 import androidx.room.compiler.processing.XMethodElement;
 import androidx.room.compiler.processing.XType;
@@ -38,7 +38,6 @@ import dagger.internal.codegen.binding.Binding;
 import dagger.internal.codegen.binding.BindingGraph;
 import dagger.internal.codegen.binding.ProvisionBinding;
 import dagger.internal.codegen.javapoet.Expression;
-import dagger.internal.codegen.xprocessing.MethodSpecs;
 import dagger.spi.model.DependencyRequest;
 import java.util.Optional;
 
@@ -89,11 +88,12 @@ final class AssistedFactoryRequestRepresentation extends RequestRepresentation {
     XMethodElement factoryMethod = assistedFactoryMethod(factory);
 
     // We can't use MethodSpec.overriding directly because we need to control the parameter names.
-    MethodSpec factoryOverride = MethodSpecs.overriding(factoryMethod, factoryType).build();
+    MethodSpec factoryOverride = overriding(factoryMethod, factoryType).build();
     TypeSpec.Builder builder =
         TypeSpec.anonymousClassBuilder("")
             .addMethod(
-                MethodSpec.methodBuilder(getSimpleName(factoryMethod))
+                // We're overriding the method so we have to use the jvm name here.
+                MethodSpec.methodBuilder(factoryMethod.getJvmName())
                     .addModifiers(factoryOverride.modifiers)
                     .addTypeVariables(factoryOverride.typeVariables)
                     .returns(factoryOverride.returnType)
