@@ -16,6 +16,8 @@
 
 package dagger.internal.codegen.binding;
 
+import static androidx.room.compiler.processing.compat.XConverters.toJavac;
+import static androidx.room.compiler.processing.compat.XConverters.toXProcessing;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -25,8 +27,9 @@ import static dagger.internal.codegen.base.RequestKinds.frameworkClassName;
 import static dagger.internal.codegen.base.RequestKinds.getRequestKind;
 import static dagger.internal.codegen.binding.AssistedInjectionAnnotations.isAssistedParameter;
 import static dagger.internal.codegen.binding.ConfigurationAnnotations.getNullableType;
+import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
+import static dagger.internal.codegen.langmodel.DaggerTypes.unwrapType;
 import static dagger.internal.codegen.xprocessing.XTypes.isTypeOf;
-import static dagger.internal.codegen.xprocessing.XTypes.unwrapType;
 import static dagger.spi.model.RequestKind.FUTURE;
 import static dagger.spi.model.RequestKind.INSTANCE;
 import static dagger.spi.model.RequestKind.MEMBERS_INJECTION;
@@ -37,8 +40,10 @@ import androidx.room.compiler.processing.XAnnotation;
 import androidx.room.compiler.processing.XElement;
 import androidx.room.compiler.processing.XMethodElement;
 import androidx.room.compiler.processing.XMethodType;
+import androidx.room.compiler.processing.XProcessingEnv;
 import androidx.room.compiler.processing.XType;
 import androidx.room.compiler.processing.XVariableElement;
+import androidx.room.compiler.processing.compat.XConverters;
 import com.google.common.collect.ImmutableSet;
 import dagger.Lazy;
 import dagger.internal.codegen.base.MapType;
@@ -52,6 +57,11 @@ import java.util.List;
 import java.util.Optional;
 import javax.inject.Inject;
 import javax.inject.Provider;
+import javax.lang.model.element.AnnotationMirror;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeMirror;
 
 /**
  * Factory for {@link DependencyRequest}s.
@@ -60,17 +70,29 @@ import javax.inject.Provider;
  * may mean that the type will be generated in a later round of processing.
  */
 public final class DependencyRequestFactory {
+  private final XProcessingEnv processingEnv;
   private final KeyFactory keyFactory;
   private final InjectionAnnotations injectionAnnotations;
 
   @Inject
-  DependencyRequestFactory(KeyFactory keyFactory, InjectionAnnotations injectionAnnotations) {
+  DependencyRequestFactory(
+      XProcessingEnv processingEnv,
+      KeyFactory keyFactory,
+      InjectionAnnotations injectionAnnotations) {
+    this.processingEnv = processingEnv;
     this.keyFactory = keyFactory;
     this.injectionAnnotations = injectionAnnotations;
   }
 
-  ImmutableSet<DependencyRequest> forRequiredResolvedVariables(
+  ImmutableSet<DependencyRequest> forRequiredResolvedXVariables(
       List<? extends XVariableElement> variables, List<XType> resolvedTypes) {
+    return forRequiredResolvedVariables(
+        variables.stream().map(XConverters::toJavac).collect(toImmutableList()),
+        resolvedTypes.stream().map(XConverters::toJavac).collect(toImmutableList()));
+  }
+
+  ImmutableSet<DependencyRequest> forRequiredResolvedVariables(
+      List<? extends VariableElement> variables, List<? extends TypeMirror> resolvedTypes) {
     checkState(resolvedTypes.size() == variables.size());
     ImmutableSet.Builder<DependencyRequest> builder = ImmutableSet.builder();
     for (int i = 0; i < variables.size(); i++) {
@@ -132,11 +154,16 @@ public final class DependencyRequestFactory {
 
   DependencyRequest forRequiredResolvedVariable(
       XVariableElement variableElement, XType resolvedType) {
+    return forRequiredResolvedVariable(toJavac(variableElement), toJavac(resolvedType));
+  }
+
+  DependencyRequest forRequiredResolvedVariable(
+      VariableElement variableElement, TypeMirror resolvedType) {
     checkNotNull(variableElement);
     checkNotNull(resolvedType);
     // Ban @Assisted parameters, they are not considered dependency requests.
-    checkArgument(!isAssistedParameter(variableElement));
-    Optional<XAnnotation> qualifier = injectionAnnotations.getQualifier(variableElement);
+    checkArgument(!isAssistedParameter(toXProcessing(variableElement, processingEnv)));
+    Optional<AnnotationMirror> qualifier = injectionAnnotations.getQualifier(variableElement);
     return newDependencyRequest(variableElement, resolvedType, qualifier);
   }
 
@@ -220,11 +247,17 @@ public final class DependencyRequestFactory {
 
   private DependencyRequest newDependencyRequest(
       XElement requestElement, XType type, Optional<XAnnotation> qualifier) {
+    return newDependencyRequest(
+        toJavac(requestElement), toJavac(type), qualifier.map(XConverters::toJavac));
+  }
+
+  private DependencyRequest newDependencyRequest(
+      Element requestElement, TypeMirror type, Optional<AnnotationMirror> qualifier) {
     RequestKind requestKind = getRequestKind(type);
     return DependencyRequest.builder()
         .kind(requestKind)
         .key(keyFactory.forQualifiedType(qualifier, extractKeyType(type)))
-        .requestElement(DaggerElement.from(requestElement))
+        .requestElement(DaggerElement.from(toXProcessing(requestElement, processingEnv)))
         .isNullable(allowsNull(requestKind, getNullableType(requestElement)))
         .build();
   }
@@ -235,7 +268,7 @@ public final class DependencyRequestFactory {
    * values. All other request kinds implicitly allow null values because they are are wrapped
    * inside {@link Provider}, {@link Lazy}, etc.
    */
-  private boolean allowsNull(RequestKind kind, Optional<XType> nullableType) {
+  private boolean allowsNull(RequestKind kind, Optional<DeclaredType> nullableType) {
     return nullableType.isPresent() || !kind.equals(INSTANCE);
   }
 }

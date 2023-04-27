@@ -16,6 +16,7 @@
 
 package dagger.internal.codegen.xprocessing;
 
+import static androidx.room.compiler.processing.compat.XConverters.toJavac;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
 import static kotlin.streams.jdk8.StreamsKt.asStream;
@@ -23,10 +24,8 @@ import static kotlin.streams.jdk8.StreamsKt.asStream;
 import androidx.room.compiler.processing.XHasModifiers;
 import androidx.room.compiler.processing.XMethodElement;
 import androidx.room.compiler.processing.XTypeElement;
-import androidx.room.compiler.processing.XTypeParameterElement;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.squareup.javapoet.TypeVariableName;
 
 // TODO(bcorso): Consider moving these methods into XProcessing library.
 /** A utility class for {@link XTypeElement} helper methods. */
@@ -49,59 +48,24 @@ public final class XTypeElements {
     }
   }
 
-  // TODO(bcorso): Consider XParameterizable interface to handle both methods and types.
-  /** Returns the type arguments for the given type as a list of {@link TypeVariableName}. */
-  public static ImmutableList<TypeVariableName> typeVariableNames(XTypeElement typeElement) {
-    return typeElement.getTypeParameters().stream()
-        .map(XTypeParameterElement::getTypeVariableName)
-        .collect(toImmutableList());
-  }
-
   /** Returns {@code true} if the given element is nested. */
   public static boolean isNested(XTypeElement typeElement) {
     return typeElement.getEnclosingTypeElement() != null;
   }
 
   /** Returns {@code true} if the given {@code type} has type parameters. */
-  public static boolean hasTypeParameters(XTypeElement typeElement) {
-    return !typeElement.getTypeParameters().isEmpty();
+  public static boolean hasTypeParameters(XTypeElement type) {
+    // TODO(bcorso): Add support for XTypeElement#getTypeParameters() or at least
+    // XTypeElement#hasTypeParameters() in XProcessing. XTypes#getTypeArguments() isn't quite the
+    // same -- it tells you if the declared type has parameters rather than the element itself.
+    return !toJavac(type).getTypeParameters().isEmpty();
   }
 
   /** Returns all non-private, non-static, abstract methods in {@code type}. */
   public static ImmutableList<XMethodElement> getAllUnimplementedMethods(XTypeElement type) {
-    return getAllNonPrivateInstanceMethods(type).stream()
+    return asStream(type.getAllNonPrivateInstanceMethods())
         .filter(XHasModifiers::isAbstract)
         .collect(toImmutableList());
-  }
-
-  /** Returns all non-private, non-static methods in {@code type}. */
-  public static ImmutableList<XMethodElement> getAllNonPrivateInstanceMethods(XTypeElement type) {
-    return getAllMethods(type).stream()
-        .filter(method -> !method.isPrivate() && !method.isStatic())
-        .collect(toImmutableList());
-  }
-
-  // TODO(b/229784604): This is needed until the XProcessing getAllMethods fix is upstreamed. Due
-  // to the existing bug, XTypeElement#getAllMethods() will currently contain some inaccessible
-  // package-private methods from base classes, so we filter them manually here.
-  public static ImmutableList<XMethodElement> getAllMethods(XTypeElement type) {
-    return asStream(type.getAllMethods())
-        .filter(method -> isAccessibleFrom(method, type))
-        .collect(toImmutableList());
-  }
-
-  private static boolean isAccessibleFrom(XMethodElement method, XTypeElement type) {
-    if (method.isPublic() || method.isProtected()) {
-      return true;
-    }
-    if (method.isPrivate()) {
-      return false;
-    }
-    return method
-        .getClosestMemberContainer()
-        .getClassName()
-        .packageName()
-        .equals(type.getClassName().packageName());
   }
 
   public static boolean isEffectivelyPublic(XTypeElement element) {

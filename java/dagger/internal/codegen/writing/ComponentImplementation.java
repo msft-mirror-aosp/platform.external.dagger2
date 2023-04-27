@@ -16,12 +16,13 @@
 
 package dagger.internal.codegen.writing;
 
+import static androidx.room.compiler.processing.compat.XConverters.toJavac;
+import static com.google.auto.common.MoreTypes.asDeclared;
 import static com.google.common.base.CaseFormat.LOWER_CAMEL;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.google.common.base.CaseFormat.UPPER_UNDERSCORE;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.base.Suppliers.memoize;
 import static com.squareup.javapoet.MethodSpec.constructorBuilder;
 import static com.squareup.javapoet.MethodSpec.methodBuilder;
 import static com.squareup.javapoet.TypeSpec.classBuilder;
@@ -33,9 +34,11 @@ import static dagger.internal.codegen.extension.DaggerStreams.toImmutableMap;
 import static dagger.internal.codegen.javapoet.AnnotationSpecs.Suppression.UNCHECKED;
 import static dagger.internal.codegen.javapoet.AnnotationSpecs.suppressWarnings;
 import static dagger.internal.codegen.javapoet.CodeBlocks.parameterNames;
+import static dagger.internal.codegen.langmodel.Accessibility.isProtectedMemberOf;
+import static dagger.internal.codegen.langmodel.Accessibility.isTypeAccessibleFrom;
 import static dagger.internal.codegen.writing.ComponentImplementation.MethodSpecKind.COMPONENT_METHOD;
-import static dagger.internal.codegen.xprocessing.MethodSpecs.overriding;
 import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
+import static dagger.producers.CancellationPolicy.Propagation.PROPAGATE;
 import static javax.lang.model.element.Modifier.FINAL;
 import static javax.lang.model.element.Modifier.PRIVATE;
 import static javax.lang.model.element.Modifier.PUBLIC;
@@ -43,11 +46,11 @@ import static javax.lang.model.element.Modifier.STATIC;
 import static javax.tools.Diagnostic.Kind.ERROR;
 
 import androidx.room.compiler.processing.XMessager;
-import androidx.room.compiler.processing.XMethodElement;
-import androidx.room.compiler.processing.XProcessingEnv;
 import androidx.room.compiler.processing.XType;
 import androidx.room.compiler.processing.XTypeElement;
-import androidx.room.compiler.processing.XVariableElement;
+import androidx.room.compiler.processing.compat.XConverters;
+import com.google.auto.common.MoreElements;
+import com.google.auto.common.MoreTypes;
 import com.google.common.base.Function;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
@@ -56,6 +59,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.Sets;
 import com.squareup.javapoet.ClassName;
@@ -74,7 +78,6 @@ import dagger.internal.codegen.binding.BindingNode;
 import dagger.internal.codegen.binding.BindingRequest;
 import dagger.internal.codegen.binding.ComponentCreatorDescriptor;
 import dagger.internal.codegen.binding.ComponentDescriptor;
-import dagger.internal.codegen.binding.ComponentDescriptor.CancellationPolicy;
 import dagger.internal.codegen.binding.ComponentDescriptor.ComponentMethodDescriptor;
 import dagger.internal.codegen.binding.ComponentRequirement;
 import dagger.internal.codegen.binding.KeyVariableNamer;
@@ -83,12 +86,13 @@ import dagger.internal.codegen.compileroption.CompilerOptions;
 import dagger.internal.codegen.javapoet.CodeBlocks;
 import dagger.internal.codegen.javapoet.TypeNames;
 import dagger.internal.codegen.javapoet.TypeSpecs;
-import dagger.internal.codegen.langmodel.Accessibility;
-import dagger.internal.codegen.xprocessing.XTypeElements;
+import dagger.internal.codegen.langmodel.DaggerElements;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.spi.model.BindingGraph.Node;
 import dagger.spi.model.Key;
 import dagger.spi.model.RequestKind;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -97,7 +101,11 @@ import java.util.Optional;
 import java.util.Set;
 import javax.inject.Inject;
 import javax.inject.Provider;
+import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
+import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeMirror;
 
 /** The implementation of a component type. */
 @PerComponentImplementation
@@ -181,11 +189,11 @@ public final class ComponentImplementation {
     /** A provider class for a component provision. */
     COMPONENT_PROVISION_FACTORY,
 
-    /** A class for the component/subcomponent or subcomponent builder implementation. */
-    COMPONENT_IMPL,
-
     /** A class for a component shard. */
-    COMPONENT_SHARD_TYPE
+    COMPONENT_SHARD_TYPE,
+
+    /** A class for the subcomponent or subcomponent builder. */
+    SUBCOMPONENT
   }
 
   /**
@@ -203,7 +211,7 @@ public final class ComponentImplementation {
     ImmutableList<ImmutableList<Binding>> partitions = bindingPartitions(graph, compilerOptions);
     ImmutableMap.Builder<Binding, ShardImplementation> builder = ImmutableMap.builder();
     for (int i = 0; i < partitions.size(); i++) {
-      ShardImplementation shard = i == 0 ? componentShard : componentShard.createShard();
+      ShardImplementation shard = i == 0 ? componentShard : componentShard.createShard("Shard" + i);
       partitions.get(i).forEach(binding -> builder.put(binding, shard));
     }
     return builder.build();
@@ -252,58 +260,56 @@ public final class ComponentImplementation {
   private static final int STATEMENTS_PER_METHOD = 100;
 
   private final ShardImplementation componentShard;
-  private final Supplier<ImmutableMap<Binding, ShardImplementation>> shardsByBinding;
+  private final ImmutableMap<Binding, ShardImplementation> shardsByBinding;
   private final Map<ShardImplementation, FieldSpec> shardFieldsByImplementation = new HashMap<>();
   private final List<CodeBlock> shardInitializations = new ArrayList<>();
   private final List<CodeBlock> shardCancellations = new ArrayList<>();
   private final Optional<ComponentImplementation> parent;
   private final ChildComponentImplementationFactory childComponentImplementationFactory;
-  private final Provider<GeneratedImplementation> topLevelImplementationProvider;
-  private final Provider<ComponentRequestRepresentations> componentRequestRepresentationsProvider;
+  private final Provider<ComponentRequestRepresentations> bindingExpressionsProvider;
   private final Provider<ComponentCreatorImplementationFactory>
       componentCreatorImplementationFactoryProvider;
   private final BindingGraph graph;
   private final ComponentNames componentNames;
-  private final CompilerOptions compilerOptions;
+  private final DaggerElements elements;
+  private final DaggerTypes types;
   private final ImmutableMap<ComponentImplementation, FieldSpec> componentFieldsByImplementation;
   private final XMessager messager;
   private final CompilerMode compilerMode;
-  private final XProcessingEnv processingEnv;
 
   @Inject
   ComponentImplementation(
       @ParentComponent Optional<ComponentImplementation> parent,
       ChildComponentImplementationFactory childComponentImplementationFactory,
       // Inject as Provider<> to prevent a cycle.
-      @TopLevel Provider<GeneratedImplementation> topLevelImplementationProvider,
-      Provider<ComponentRequestRepresentations> componentRequestRepresentationsProvider,
+      Provider<ComponentRequestRepresentations> bindingExpressionsProvider,
       Provider<ComponentCreatorImplementationFactory> componentCreatorImplementationFactoryProvider,
       BindingGraph graph,
       ComponentNames componentNames,
       CompilerOptions compilerOptions,
-      XMessager messager,
-      XProcessingEnv processingEnv) {
+      DaggerElements elements,
+      DaggerTypes types,
+      XMessager messager) {
     this.parent = parent;
     this.childComponentImplementationFactory = childComponentImplementationFactory;
-    this.topLevelImplementationProvider = topLevelImplementationProvider;
-    this.componentRequestRepresentationsProvider = componentRequestRepresentationsProvider;
+    this.bindingExpressionsProvider = bindingExpressionsProvider;
     this.componentCreatorImplementationFactoryProvider =
         componentCreatorImplementationFactoryProvider;
     this.graph = graph;
     this.componentNames = componentNames;
-    this.compilerOptions = compilerOptions;
-    this.processingEnv = processingEnv;
+    this.elements = elements;
+    this.types = types;
 
     // The first group of keys belong to the component itself. We call this the componentShard.
     this.componentShard = new ShardImplementation(componentNames.get(graph.componentPath()));
 
     // Claim the method names for all local and inherited methods on the component type.
-    XTypeElements.getAllNonPrivateInstanceMethods(graph.componentTypeElement()).stream()
-        .forEach(method -> componentShard.componentMethodNames.claim(getSimpleName(method)));
+    elements
+        .getLocalAndInheritedMethods(toJavac(graph.componentTypeElement()))
+        .forEach(method -> componentShard.componentMethodNames.claim(method.getSimpleName()));
 
     // Create the shards for this component, indexed by binding.
-    this.shardsByBinding =
-        memoize(() -> createShardsByBinding(componentShard, graph, compilerOptions));
+    this.shardsByBinding = createShardsByBinding(componentShard, graph, compilerOptions);
 
     // Create and claim the fields for this and all ancestor components stored as fields.
     this.componentFieldsByImplementation =
@@ -324,18 +330,12 @@ public final class ComponentImplementation {
    * <p>Each set of {@link CompilerOptions#keysPerShard()} will get its own shard instance.
    */
   public ShardImplementation shardImplementation(Binding binding) {
-    checkState(
-        shardsByBinding.get().containsKey(binding), "No shard in %s for: %s", name(), binding);
-    return shardsByBinding.get().get(binding);
-  }
-
-  /** Returns the {@link GeneratedImplementation} for the top-level generated class. */
-  private GeneratedImplementation topLevelImplementation() {
-    return topLevelImplementationProvider.get();
+    checkState(shardsByBinding.containsKey(binding), "No shard in %s for: %s", name(), binding);
+    return shardsByBinding.get(binding);
   }
 
   /** Returns the root {@link ComponentImplementation}. */
-  public ComponentImplementation rootComponentImplementation() {
+  ComponentImplementation rootComponentImplementation() {
     return parent.map(ComponentImplementation::rootComponentImplementation).orElse(this);
   }
 
@@ -386,14 +386,7 @@ public final class ComponentImplementation {
                       componentImpl.isNested()
                           ? simpleVariableName(componentImpl.name())
                           : simpleVariableName(component);
-                  FieldSpec.Builder field =
-                      FieldSpec.builder(
-                          fieldType,
-                          fieldName.equals(componentImpl.name().simpleName())
-                              ? "_" + fieldName
-                              : fieldName,
-                          PRIVATE,
-                          FINAL);
+                  FieldSpec.Builder field = FieldSpec.builder(fieldType, fieldName, PRIVATE, FINAL);
                   componentImplementation.componentShard.componentFieldNames.claim(fieldName);
 
                   return field.build();
@@ -456,17 +449,15 @@ public final class ComponentImplementation {
    * nested "shard" class within the component implementation (e.g. {@code
    * MySubcomponentImpl.Shard1}, {@code MySubcomponentImpl.Shard2}, etc).
    */
-  public final class ShardImplementation implements GeneratedImplementation {
+  public final class ShardImplementation {
     private final ClassName name;
     private final UniqueNameSet componentFieldNames = new UniqueNameSet();
     private final UniqueNameSet componentMethodNames = new UniqueNameSet();
     private final UniqueNameSet componentClassNames = new UniqueNameSet();
     private final UniqueNameSet assistedParamNames = new UniqueNameSet();
     private final List<CodeBlock> initializations = new ArrayList<>();
-    private final SwitchingProviders switchingProviders;
-    private final ExperimentalSwitchingProviders experimentalSwitchingProviders;
     private final Map<Key, CodeBlock> cancellations = new LinkedHashMap<>();
-    private final Map<XVariableElement, String> uniqueAssistedName = new LinkedHashMap<>();
+    private final Map<VariableElement, String> uniqueAssistedName = new LinkedHashMap<>();
     private final List<CodeBlock> componentRequirementInitializations = new ArrayList<>();
     private final ImmutableMap<ComponentRequirement, ParameterSpec> constructorParameters;
     private final ListMultimap<FieldSpecKind, FieldSpec> fieldSpecsMap =
@@ -480,10 +471,6 @@ public final class ComponentImplementation {
 
     private ShardImplementation(ClassName name) {
       this.name = name;
-      this.switchingProviders = new SwitchingProviders(this, processingEnv);
-      this.experimentalSwitchingProviders =
-          new ExperimentalSwitchingProviders(this, componentRequestRepresentationsProvider);
-
       if (graph.componentDescriptor().isProduction()) {
         claimMethodName(CANCELLATION_LISTENER_METHOD_NAME);
       }
@@ -502,24 +489,9 @@ public final class ComponentImplementation {
                               .build()));
     }
 
-    private ShardImplementation createShard() {
+    private ShardImplementation createShard(String shardName) {
       checkState(isComponentShard(), "Only the componentShard can create other shards.");
-      return new ShardImplementation(
-          topLevelImplementation()
-              .name()
-              .nestedClass(
-                  topLevelImplementation()
-                      .getUniqueClassName(getComponentShard().name().simpleName() + "Shard")));
-    }
-
-    /** Returns the {@link SwitchingProviders} class for this shard. */
-    public SwitchingProviders getSwitchingProviders() {
-      return switchingProviders;
-    }
-
-    /** Returns the {@link ExperimentalSwitchingProviders} class for this shard. */
-    public ExperimentalSwitchingProviders getExperimentalSwitchingProviders() {
-      return experimentalSwitchingProviders;
+      return new ShardImplementation(name.nestedClass(shardName));
     }
 
     /** Returns the {@link ComponentImplementation} that owns this shard. */
@@ -570,7 +542,7 @@ public final class ComponentImplementation {
       return graph.componentDescriptor();
     }
 
-    @Override
+    /** Returns the name of the component. */
     public ClassName name() {
       return name;
     }
@@ -587,37 +559,54 @@ public final class ComponentImplementation {
      * Returns an accessible type for this shard implementation, returns Object if the type is not
      * accessible.
      *
-     * <p>This method checks accessibility for public types and package private types.
+     * <p>This method checks accessibility for public types and package private types, and it also
+     * checks protected types' accessibility.
      */
-    TypeName accessibleTypeName(XType type) {
-      return Accessibility.accessibleTypeName(type, name(), processingEnv);
+    TypeMirror accessibleType(TypeMirror type) {
+      // Returns the original type if the type is accessible from this shard, or returns original
+      // type's raw type if only its raw type is accessible. Otherwise, returns Object.
+      TypeMirror castedType = types.accessibleType(type, name());
+      // Previous check marks protected type as inaccessible, so a second check is needed to check
+      // if the type is protected type and accessible.
+      if (TypeName.get(castedType).equals(TypeName.OBJECT) && isTypeAccessible(type)) {
+        castedType = type;
+      }
+      return castedType;
     }
 
     /**
      * Returns {@code true} if {@code type} is accessible from the generated component.
      *
-     * <p>This method checks accessibility for public types and package private types.
+     * <p>This method checks accessibility for public types and package private types, and it also
+     * checks protected types' accessibility.
      */
-    boolean isTypeAccessible(XType type) {
-      return Accessibility.isTypeAccessibleFrom(type, name.packageName());
+    boolean isTypeAccessible(TypeMirror type) {
+      if (isTypeAccessibleFrom(type, name.packageName())) {
+        return true;
+      }
+      // Check if the type is protected and accessible from current component.
+      if (type instanceof DeclaredType
+          && isProtectedMemberOf(
+              MoreTypes.asDeclared(type),
+              getComponentImplementation().componentDescriptor().typeElement())) {
+        return true;
+      }
+      return false;
     }
 
     // TODO(dpb): Consider taking FieldSpec, and returning identical FieldSpec with unique name?
     /** Adds the given field to the component. */
-    @Override
     public void addField(FieldSpecKind fieldKind, FieldSpec fieldSpec) {
       fieldSpecsMap.put(fieldKind, fieldSpec);
     }
 
     // TODO(dpb): Consider taking MethodSpec, and returning identical MethodSpec with unique name?
     /** Adds the given method to the component. */
-    @Override
     public void addMethod(MethodSpecKind methodKind, MethodSpec methodSpec) {
       methodSpecsMap.put(methodKind, methodSpec);
     }
 
     /** Adds the given type to the component. */
-    @Override
     public void addType(TypeSpecKind typeKind, TypeSpec typeSpec) {
       typeSpecsMap.put(typeKind, typeSpec);
     }
@@ -665,11 +654,11 @@ public final class ComponentImplementation {
       return assistedParamNames.getUniqueName(name);
     }
 
-    public String getUniqueFieldNameForAssistedParam(XVariableElement element) {
+    public String getUniqueFieldNameForAssistedParam(VariableElement element) {
       if (uniqueAssistedName.containsKey(element)) {
         return uniqueAssistedName.get(element);
       }
-      String name = getUniqueAssistedParamName(getSimpleName(element));
+      String name = getUniqueAssistedParamName(element.getSimpleName().toString());
       uniqueAssistedName.put(element, name);
       return name;
     }
@@ -684,7 +673,7 @@ public final class ComponentImplementation {
       return uniqueMethodName(request, KeyVariableNamer.name(request.key()));
     }
 
-    @Override
+    /** Returns a new, unique method name for the component based on the given name. */
     public String getUniqueClassName(String name) {
       return componentClassNames.getUniqueName(name);
     }
@@ -713,8 +702,8 @@ public final class ComponentImplementation {
       componentMethodNames.claim(name);
     }
 
-    @Override
-    public TypeSpec generate() {
+    /** Generates the component and returns the resulting {@link TypeSpec.Builder}. */
+    private TypeSpec generate() {
       TypeSpec.Builder builder = classBuilder(name);
 
       if (isComponentShard()) {
@@ -731,7 +720,7 @@ public final class ComponentImplementation {
       if (graph.componentDescriptor().isProduction()) {
         if (isComponentShard() || !cancellations.isEmpty()) {
           TypeSpecs.addSupertype(
-              builder, processingEnv.requireTypeElement(TypeNames.CANCELLATION_LISTENER));
+              builder, elements.getTypeElement(TypeNames.CANCELLATION_LISTENER.canonicalName()));
           addCancellationListenerImplementation();
         }
       }
@@ -741,24 +730,20 @@ public final class ComponentImplementation {
       methodSpecsMap.asMap().values().forEach(builder::addMethods);
       typeSpecsMap.asMap().values().forEach(builder::addTypes);
       typeSuppliers.stream().map(Supplier::get).forEach(builder::addType);
-
-      if (!compilerOptions.generatedClassExtendsComponent()
-          && isComponentShard()
-          && graph.componentPath().atRoot()) {
-        topLevelImplementation().addType(TypeSpecKind.COMPONENT_IMPL, builder.build());
-        return topLevelImplementation().generate();
-      }
-
       return builder.build();
     }
 
     private ImmutableSet<Modifier> modifiers() {
-      return isNested() || !isComponentShard()
-          ? ImmutableSet.of(PRIVATE, STATIC, FINAL)
-          : graph.componentTypeElement().isPublic()
-              // TODO(ronshapiro): perhaps all generated components should be non-public?
-              ? ImmutableSet.of(PUBLIC, FINAL)
-              : ImmutableSet.of(FINAL);
+      if (!isComponentShard()) {
+        // TODO(bcorso): Consider making shards static and unnested too?
+        return ImmutableSet.of(PRIVATE, FINAL);
+      } else if (isNested()) {
+        return ImmutableSet.of(PRIVATE, STATIC, FINAL);
+      }
+      return graph.componentTypeElement().isPublic()
+          // TODO(ronshapiro): perhaps all generated components should be non-public?
+          ? ImmutableSet.of(PUBLIC, FINAL)
+          : ImmutableSet.of(FINAL);
     }
 
     private void addCreator() {
@@ -767,12 +752,18 @@ public final class ComponentImplementation {
           .create()
           .map(ComponentCreatorImplementation::spec)
           .ifPresent(
-              creator -> topLevelImplementation().addType(TypeSpecKind.COMPONENT_CREATOR, creator));
+              creator ->
+                  rootComponentImplementation()
+                      .getComponentShard()
+                      .addType(TypeSpecKind.COMPONENT_CREATOR, creator));
     }
 
     private void addFactoryMethods() {
       if (parent.isPresent()) {
-        graph.factoryMethod().ifPresent(this::createSubcomponentFactoryMethod);
+        graph
+            .factoryMethod()
+            .map(XConverters::toJavac)
+            .ifPresent(this::createSubcomponentFactoryMethod);
       } else {
         createRootComponentFactoryMethod();
       }
@@ -807,45 +798,39 @@ public final class ComponentImplementation {
       }
       validateMethodNameDoesNotOverrideGeneratedCreator(creatorKind.methodName());
       claimMethodName(creatorKind.methodName());
-      topLevelImplementation()
-          .addMethod(
-              MethodSpecKind.BUILDER_METHOD,
-              methodBuilder(creatorKind.methodName())
-                  .addModifiers(PUBLIC, STATIC)
-                  .returns(creatorType)
-                  .addStatement("return new $T()", getCreatorName())
-                  .build());
+      MethodSpec creatorFactoryMethod =
+          methodBuilder(creatorKind.methodName())
+              .addModifiers(PUBLIC, STATIC)
+              .returns(creatorType)
+              .addStatement("return new $T()", getCreatorName())
+              .build();
+      addMethod(MethodSpecKind.BUILDER_METHOD, creatorFactoryMethod);
       if (noArgFactoryMethod && canInstantiateAllRequirements()) {
         validateMethodNameDoesNotOverrideGeneratedCreator("create");
         claimMethodName("create");
-        topLevelImplementation()
-            .addMethod(
-                MethodSpecKind.BUILDER_METHOD,
-                methodBuilder("create")
-                    .returns(graph.componentTypeElement().getClassName())
-                    .addModifiers(PUBLIC, STATIC)
-                    .addStatement("return new $L().$L()", creatorKind.typeName(), factoryMethodName)
-                    .build());
+        addMethod(
+            MethodSpecKind.BUILDER_METHOD,
+            methodBuilder("create")
+                .returns(graph.componentTypeElement().getClassName())
+                .addModifiers(PUBLIC, STATIC)
+                .addStatement("return new $L().$L()", creatorKind.typeName(), factoryMethodName)
+                .build());
       }
     }
 
-    // TODO(bcorso): This can be removed once we delete generatedClassExtendsComponent flag.
     private void validateMethodNameDoesNotOverrideGeneratedCreator(String creatorName) {
       // Check if there is any client added method has the same signature as generated creatorName.
-      XTypeElements.getAllMethods(graph.componentTypeElement()).stream()
-          .filter(method -> getSimpleName(method).contentEquals(creatorName))
+      MoreElements.getAllMethods(toJavac(graph.componentTypeElement()), types, elements).stream()
+          .filter(method -> method.getSimpleName().contentEquals(creatorName))
           .filter(method -> method.getParameters().isEmpty())
-          .filter(method -> !method.isStatic())
+          .filter(method -> !method.getModifiers().contains(Modifier.STATIC))
           .forEach(
-              (XMethodElement method) ->
+              (ExecutableElement method) ->
                   messager.printMessage(
                       ERROR,
                       String.format(
-                          "The method %s.%s() conflicts with a method of the same name Dagger is "
-                          + "trying to generate as a way to instantiate the component. Please "
-                              + "choose a different name for your method.",
-                          method.getEnclosingElement().getClassName().canonicalName(),
-                          getSimpleName(method))));
+                          "Cannot override generated method: %s.%s()",
+                          method.getEnclosingElement().getSimpleName(), method.getSimpleName())));
     }
 
     /** {@code true} if all of the graph's required dependencies can be automatically constructed */
@@ -854,14 +839,17 @@ public final class ComponentImplementation {
           graph.componentRequirements(), ComponentRequirement::requiresAPassedInstance);
     }
 
-    private void createSubcomponentFactoryMethod(XMethodElement factoryMethod) {
+    private void createSubcomponentFactoryMethod(ExecutableElement factoryMethod) {
       checkState(parent.isPresent());
-      XType parentType = parent.get().graph().componentTypeElement().getType();
-      MethodSpec.Builder method = overriding(factoryMethod, parentType);
-      // Use the parameter names from the overriding method, which may be different from the
-      // parameter names at the declaration site if it is pulled in as a class dependency from a
-      // separate build unit (see https://github.com/google/dagger/issues/3401).
-      method.parameters.forEach(
+      Collection<ParameterSpec> params =
+          Maps.transformValues(
+                  graph.factoryMethodParameters(),
+                  parameter -> ParameterSpec.get(toJavac(parameter)))
+              .values();
+      DeclaredType parentType =
+          asDeclared(toJavac(parent.get().graph().componentTypeElement()).asType());
+      MethodSpec.Builder method = MethodSpec.overriding(factoryMethod, parentType, types);
+      params.forEach(
           param -> method.addStatement("$T.checkNotNull($N)", Preconditions.class, param));
       method.addStatement(
           "return new $T($L)",
@@ -872,7 +860,7 @@ public final class ComponentImplementation {
                       creatorComponentFields().stream()
                           .map(field -> ParameterSpec.builder(field.type, field.name).build())
                           .collect(toImmutableList()))
-                  .addAll(method.parameters)
+                  .addAll(params)
                   .build()));
 
       parent.get().getComponentShard().addMethod(COMPONENT_METHOD, method.build());
@@ -884,31 +872,29 @@ public final class ComponentImplementation {
       XType componentType = graph.componentTypeElement().getType();
       Set<MethodSignature> signatures = Sets.newHashSet();
       for (ComponentMethodDescriptor method : graph.componentDescriptor().entryPointMethods()) {
-        if (signatures.add(
-            MethodSignature.forComponentMethod(method, componentType, processingEnv))) {
-          addMethod(
-              COMPONENT_METHOD,
-              componentRequestRepresentationsProvider.get().getComponentMethod(method));
+        if (signatures.add(MethodSignature.forComponentMethod(method, componentType))) {
+          addMethod(COMPONENT_METHOD, bindingExpressionsProvider.get().getComponentMethod(method));
         }
       }
     }
 
     private void addChildComponents() {
       for (BindingGraph subgraph : graph.subgraphs()) {
-        topLevelImplementation()
+        rootComponentImplementation()
+            .getComponentShard()
             .addType(
-                TypeSpecKind.COMPONENT_IMPL,
+                TypeSpecKind.SUBCOMPONENT,
                 childComponentImplementationFactory.create(subgraph).generate());
       }
     }
 
     private void addShards() {
       // Generate all shards and add them to this component implementation.
-      for (ShardImplementation shard : ImmutableSet.copyOf(shardsByBinding.get().values())) {
+      for (ShardImplementation shard : ImmutableSet.copyOf(shardsByBinding.values())) {
         if (shardFieldsByImplementation.containsKey(shard)) {
           addField(FieldSpecKind.COMPONENT_SHARD_FIELD, shardFieldsByImplementation.get(shard));
           TypeSpec shardTypeSpec = shard.generate();
-          topLevelImplementation().addType(TypeSpecKind.COMPONENT_SHARD_TYPE, shardTypeSpec);
+          addType(TypeSpecKind.COMPONENT_SHARD_TYPE, shardTypeSpec);
         }
       }
     }
@@ -918,26 +904,25 @@ public final class ComponentImplementation {
       MethodSpec.Builder constructor = constructorBuilder().addModifiers(PRIVATE);
       ImmutableList<ParameterSpec> parameters = constructorParameters.values().asList();
 
-      // Add a constructor parameter and initialization for each component field. We initialize
-      // these fields immediately so that we don't need to be pass them to each initialize method
-      // and shard constructor.
-      componentFieldsByImplementation()
-          .forEach(
-              (componentImplementation, field) -> {
-                if (isComponentShard()
-                    && componentImplementation.equals(ComponentImplementation.this)) {
-                  // For the self-referenced component field,
-                  // just initialize it in the initializer.
-                  addField(
-                      FieldSpecKind.COMPONENT_REQUIREMENT_FIELD,
-                      field.toBuilder().initializer("this").build());
-                } else {
-                  addField(FieldSpecKind.COMPONENT_REQUIREMENT_FIELD, field);
-                  constructor.addStatement("this.$1N = $1N", field);
-                  constructor.addParameter(field.type, field.name);
-                }
-              });
       if (isComponentShard()) {
+        // Add a constructor parameter and initialization for each component field. We initialize
+        // these fields immediately so that we don't need to be pass them to each initialize method
+        // and shard constructor.
+        componentFieldsByImplementation()
+            .forEach(
+                (componentImplementation, field) -> {
+                  if (componentImplementation.equals(ComponentImplementation.this)) {
+                    // For the self-referenced component field,
+                    // just initialize it in the initializer.
+                    addField(
+                        FieldSpecKind.COMPONENT_REQUIREMENT_FIELD,
+                        field.toBuilder().initializer("this").build());
+                  } else {
+                    addField(FieldSpecKind.COMPONENT_REQUIREMENT_FIELD, field);
+                    constructor.addStatement("this.$1N = $1N", field);
+                    constructor.addParameter(field.type, field.name);
+                  }
+                });
         constructor.addCode(CodeBlocks.concat(componentRequirementInitializations));
       }
       constructor.addParameters(parameters);
@@ -980,19 +965,8 @@ public final class ComponentImplementation {
         // This initialization is called from the componentShard, so we need to use those args.
         CodeBlock componentArgs =
             parameterNames(componentShard.constructorParameters.values().asList());
-        CodeBlock componentFields =
-            componentFieldsByImplementation().values().stream()
-                .map(field -> CodeBlock.of("$N", field))
-                .collect(CodeBlocks.toParametersCodeBlock());
-        shardInitializations.add(
-            CodeBlock.of(
-                "$N = new $T($L);",
-                shardFieldsByImplementation.get(this),
-                name,
-                componentArgs.isEmpty()
-                    ? componentFields
-                    : CodeBlocks.makeParametersCodeBlock(
-                        ImmutableList.of(componentFields, componentArgs))));
+        FieldSpec shardField = shardFieldsByImplementation.get(this);
+        shardInitializations.add(CodeBlock.of("$N = new $T($L);", shardField, name, componentArgs));
       }
 
       addMethod(MethodSpecKind.CONSTRUCTOR, constructor.build());
@@ -1071,7 +1045,7 @@ public final class ComponentImplementation {
               .get()
               .componentDescriptor()
               .cancellationPolicy()
-              .map(policy -> policy.equals(CancellationPolicy.PROPAGATE))
+              .map(policy -> policy.fromSubcomponents().equals(PROPAGATE))
               .orElse(false);
     }
 

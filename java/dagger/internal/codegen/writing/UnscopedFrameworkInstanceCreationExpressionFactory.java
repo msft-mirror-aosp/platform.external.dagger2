@@ -104,7 +104,7 @@ final class UnscopedFrameworkInstanceCreationExpressionFactory {
             () ->
                 CodeBlock.of(
                     "($T) $L",
-                    binding.key().type().xprocessing().getTypeName(),
+                    binding.key().type().java(),
                     componentImplementation.componentFieldReference()));
 
       case BOUND_INSTANCE:

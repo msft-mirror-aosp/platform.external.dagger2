@@ -16,16 +16,18 @@
 
 package dagger.internal.codegen;
 
+import static com.google.testing.compile.CompilationSubject.assertThat;
+import static dagger.internal.codegen.Compilers.daggerCompiler;
 import static dagger.internal.codegen.DaggerModuleMethodSubject.Factory.assertThatModuleMethod;
 
-import androidx.room.compiler.processing.XProcessingEnv;
-import androidx.room.compiler.processing.util.Source;
+import com.google.testing.compile.Compilation;
+import com.google.testing.compile.JavaFileObjects;
 import dagger.Module;
 import dagger.producers.ProducerModule;
-import dagger.testing.compile.CompilerTests;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.Collection;
+import javax.tools.JavaFileObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -70,8 +72,8 @@ public final class ModuleValidationTest {
 
   @Test
   public void moduleSubcomponents_notASubcomponent() {
-    Source module =
-        CompilerTests.javaSource(
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -79,27 +81,22 @@ public final class ModuleValidationTest {
             "",
             moduleType.annotationWithSubcomponent("NotASubcomponent.class"),
             "class TestModule {}");
-    Source notASubcomponent =
-        CompilerTests.javaSource(
-            "test.NotASubcomponent",
-            "package test;",
-            "",
-            "class NotASubcomponent {}");
-    CompilerTests.daggerCompiler(module, notASubcomponent)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      "test.NotASubcomponent is not a @Subcomponent or @ProductionSubcomponent")
-                  .onSource(module)
-                  .onLine(5);
-            });
+    JavaFileObject notASubcomponent =
+        JavaFileObjects.forSourceLines(
+            "test.NotASubcomponent", "package test;", "", "class NotASubcomponent {}");
+    Compilation compilation = daggerCompiler().compile(module, notASubcomponent);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            "test.NotASubcomponent is not a @Subcomponent or @ProductionSubcomponent")
+        .inFile(module)
+        .onLine(5);
   }
 
   @Test
   public void moduleSubcomponents_listsSubcomponentBuilder() {
-    Source module =
-        CompilerTests.javaSource(
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -107,8 +104,8 @@ public final class ModuleValidationTest {
             "",
             moduleType.annotationWithSubcomponent("Sub.Builder.class"),
             "class TestModule {}");
-    Source subcomponent =
-        CompilerTests.javaSource(
+    JavaFileObject subcomponent =
+        JavaFileObjects.forSourceLines(
             "test.Sub",
             "package test;",
             "",
@@ -121,21 +118,19 @@ public final class ModuleValidationTest {
             "    Sub build();",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(module, subcomponent)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      "test.Sub.Builder is a @Subcomponent.Builder. Did you mean to use test.Sub?")
-                  .onSource(module)
-                  .onLine(5);
-            });
+    Compilation compilation = daggerCompiler().compile(module, subcomponent);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            "test.Sub.Builder is a @Subcomponent.Builder. Did you mean to use test.Sub?")
+        .inFile(module)
+        .onLine(5);
   }
 
   @Test
   public void moduleSubcomponents_listsSubcomponentFactory() {
-    Source module =
-        CompilerTests.javaSource(
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -143,8 +138,8 @@ public final class ModuleValidationTest {
             "",
             moduleType.annotationWithSubcomponent("Sub.Factory.class"),
             "class TestModule {}");
-    Source subcomponent =
-        CompilerTests.javaSource(
+    JavaFileObject subcomponent =
+        JavaFileObjects.forSourceLines(
             "test.Sub",
             "package test;",
             "",
@@ -157,21 +152,19 @@ public final class ModuleValidationTest {
             "    Sub creator();",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(module, subcomponent)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      "test.Sub.Factory is a @Subcomponent.Factory. Did you mean to use test.Sub?")
-                  .onSource(module)
-                  .onLine(5);
-            });
+    Compilation compilation = daggerCompiler().compile(module, subcomponent);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            "test.Sub.Factory is a @Subcomponent.Factory. Did you mean to use test.Sub?")
+        .inFile(module)
+        .onLine(5);
   }
 
   @Test
   public void moduleSubcomponents_listsProductionSubcomponentBuilder() {
-    Source module =
-        CompilerTests.javaSource(
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -179,8 +172,8 @@ public final class ModuleValidationTest {
             "",
             moduleType.annotationWithSubcomponent("Sub.Builder.class"),
             "class TestModule {}");
-    Source subcomponent =
-        CompilerTests.javaSource(
+    JavaFileObject subcomponent =
+        JavaFileObjects.forSourceLines(
             "test.Sub",
             "package test;",
             "",
@@ -193,22 +186,19 @@ public final class ModuleValidationTest {
             "    Sub build();",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(module, subcomponent)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      "test.Sub.Builder is a @ProductionSubcomponent.Builder. "
-                          + "Did you mean to use test.Sub?")
-                  .onSource(module)
-                  .onLine(5);
-            });
+    Compilation compilation = daggerCompiler().compile(module, subcomponent);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            "test.Sub.Builder is a @ProductionSubcomponent.Builder. Did you mean to use test.Sub?")
+        .inFile(module)
+        .onLine(5);
   }
 
   @Test
   public void moduleSubcomponents_listsProductionSubcomponentFactory() {
-    Source module =
-        CompilerTests.javaSource(
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -216,8 +206,8 @@ public final class ModuleValidationTest {
             "",
             moduleType.annotationWithSubcomponent("Sub.Factory.class"),
             "class TestModule {}");
-    Source subcomponent =
-        CompilerTests.javaSource(
+    JavaFileObject subcomponent =
+        JavaFileObjects.forSourceLines(
             "test.Sub",
             "package test;",
             "",
@@ -230,22 +220,19 @@ public final class ModuleValidationTest {
             "    Sub create();",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(module, subcomponent)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      "test.Sub.Factory is a @ProductionSubcomponent.Factory. "
-                          + "Did you mean to use test.Sub?")
-                  .onSource(module)
-                  .onLine(5);
-            });
+    Compilation compilation = daggerCompiler().compile(module, subcomponent);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            "test.Sub.Factory is a @ProductionSubcomponent.Factory. Did you mean to use test.Sub?")
+        .inFile(module)
+        .onLine(5);
   }
 
   @Test
   public void moduleSubcomponents_noSubcomponentCreator() {
-    Source module =
-        CompilerTests.javaSource(
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -253,8 +240,8 @@ public final class ModuleValidationTest {
             "",
             moduleType.annotationWithSubcomponent("NoBuilder.class"),
             "class TestModule {}");
-    Source subcomponent =
-        CompilerTests.javaSource(
+    JavaFileObject subcomponent =
+        JavaFileObjects.forSourceLines(
             "test.NoBuilder",
             "package test;",
             "",
@@ -262,24 +249,22 @@ public final class ModuleValidationTest {
             "",
             "@Subcomponent",
             "interface NoBuilder {}");
-    CompilerTests.daggerCompiler(module, subcomponent)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      "test.NoBuilder doesn't have a @Subcomponent.Builder or "
-                          + "@Subcomponent.Factory, which is required when used with @"
-                          + moduleType.simpleName()
-                          + ".subcomponents")
-                  .onSource(module)
-                  .onLine(5);
-            });
+    Compilation compilation = daggerCompiler().compile(module, subcomponent);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            "test.NoBuilder doesn't have a @Subcomponent.Builder or @Subcomponent.Factory, which "
+                + "is required when used with @"
+                + moduleType.simpleName()
+                + ".subcomponents")
+        .inFile(module)
+        .onLine(5);
   }
 
   @Test
   public void moduleSubcomponents_noProductionSubcomponentCreator() {
-    Source module =
-        CompilerTests.javaSource(
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -287,8 +272,8 @@ public final class ModuleValidationTest {
             "",
             moduleType.annotationWithSubcomponent("NoBuilder.class"),
             "class TestModule {}");
-    Source subcomponent =
-        CompilerTests.javaSource(
+    JavaFileObject subcomponent =
+        JavaFileObjects.forSourceLines(
             "test.NoBuilder",
             "package test;",
             "",
@@ -296,24 +281,22 @@ public final class ModuleValidationTest {
             "",
             "@ProductionSubcomponent",
             "interface NoBuilder {}");
-    CompilerTests.daggerCompiler(module, subcomponent)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      "test.NoBuilder doesn't have a @ProductionSubcomponent.Builder or "
-                          + "@ProductionSubcomponent.Factory, which is required when used with @"
-                          + moduleType.simpleName()
-                          + ".subcomponents")
-                  .onSource(module)
-                  .onLine(5);
-            });
+    Compilation compilation = daggerCompiler().compile(module, subcomponent);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            "test.NoBuilder doesn't have a @ProductionSubcomponent.Builder or "
+                + "@ProductionSubcomponent.Factory, which is required when used with @"
+                + moduleType.simpleName()
+                + ".subcomponents")
+        .inFile(module)
+        .onLine(5);
   }
 
   @Test
   public void moduleSubcomponentsAreTypes() {
-    Source module =
-        CompilerTests.javaSource(
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -321,27 +304,12 @@ public final class ModuleValidationTest {
             "",
             "@Module(subcomponents = int.class)",
             "class TestModule {}");
-    CompilerTests.daggerCompiler(module)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              switch (CompilerTests.backend(subject)) {
-                case JAVAC:
-                  subject.hasErrorContaining("int is not a valid subcomponent type")
-                      .onSource(module)
-                      .onLine(5);
-                  break;
-                case KSP:
-                  // TODO(b/245954367): Remove this pathway once this bug is fixed.
-                  // KSP interprets the int.class type as a boxed type so we get a slightly
-                  // different error message for now.
-                  subject.hasErrorContaining(
-                          "java.lang.Integer is not a @Subcomponent or @ProductionSubcomponent")
-                      .onSource(module)
-                      .onLine(5);
-                  break;
-              }
-            });
+    Compilation compilation = daggerCompiler().compile(module);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining("int is not a valid subcomponent type")
+        .inFile(module)
+        .onLine(5);
   }
 
   @Test
@@ -353,8 +321,8 @@ public final class ModuleValidationTest {
 
   @Test
   public void invalidIncludedModule() {
-    Source badModule =
-        CompilerTests.javaSource(
+    JavaFileObject badModule =
+        JavaFileObjects.forSourceLines(
             "test.BadModule",
             "package test;",
             "",
@@ -365,8 +333,8 @@ public final class ModuleValidationTest {
             "abstract class BadModule {",
             "  @Binds abstract Object noParameters();",
             "}");
-    Source module =
-        CompilerTests.javaSource(
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "test.IncludesBadModule",
             "package test;",
             "",
@@ -374,25 +342,24 @@ public final class ModuleValidationTest {
             "",
             "@Module(includes = BadModule.class)",
             "abstract class IncludesBadModule {}");
-    CompilerTests.daggerCompiler(badModule, module)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(2);
-              subject.hasErrorContaining("test.BadModule has errors")
-                  .onSource(module)
-                  .onLine(5);
-              subject.hasErrorContaining(
-                      "@Binds methods must have exactly one parameter, whose type is "
-                          + "assignable to the return type")
-                  .onSource(badModule)
-                  .onLine(8);
-            });
+    Compilation compilation = daggerCompiler().compile(badModule, module);
+    assertThat(compilation).hadErrorCount(2);
+    assertThat(compilation)
+        .hadErrorContaining("test.BadModule has errors")
+        .inFile(module)
+        .onLine(5);
+    assertThat(compilation)
+        .hadErrorContaining(
+            "@Binds methods must have exactly one parameter, whose type is assignable to the "
+                + "return type")
+        .inFile(badModule)
+        .onLine(8);
   }
 
   @Test
   public void scopeOnModule() {
-    Source badModule =
-        CompilerTests.javaSource(
+    JavaFileObject badModule =
+        JavaFileObjects.forSourceLines(
             "test.BadModule",
             "package test;",
             "",
@@ -402,20 +369,18 @@ public final class ModuleValidationTest {
             "@Singleton",
             "@Module",
             "interface BadModule {}");
-    CompilerTests.daggerCompiler(badModule)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining("@Modules cannot be scoped")
-                  .onSource(badModule)
-                  .onLineContaining("@Singleton");
-            });
+    Compilation compilation = daggerCompiler().compile(badModule);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining("@Modules cannot be scoped")
+        .inFile(badModule)
+        .onLineContaining("@Singleton");
   }
 
   @Test
   public void moduleIncludesSelfCycle() {
-    Source module =
-        CompilerTests.javaSource(
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -433,8 +398,8 @@ public final class ModuleValidationTest {
             "  @Provides int i() { return 0; }",
             "}");
 
-    Source otherModule =
-        CompilerTests.javaSource(
+    JavaFileObject otherModule =
+        JavaFileObjects.forSourceLines(
             "test.OtherModule",
             "package test;",
             "",
@@ -443,138 +408,9 @@ public final class ModuleValidationTest {
             "@Module",
             "class OtherModule {}");
 
-    CompilerTests.daggerCompiler(module, otherModule)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(2);
-              String error =
-                  String.format("@%s cannot include themselves", moduleType.simpleName());
-              switch (CompilerTests.backend(subject)) {
-                case JAVAC:
-                  subject.hasErrorContaining(error).onSource(module).onLineContaining("// first");
-                  subject.hasErrorContaining(error).onSource(module).onLineContaining("// second");
-                  break;
-                case KSP:
-                  // KSP doesn't support reporting errors on individual annotation values, so both
-                  // errors will be reported on the annotation itself.
-                  subject.hasErrorContaining(error)
-                      .onSource(module)
-                      .onLineContaining("@" + moduleType.simpleName());
-                  break;
-              }
-            });
-  }
-
-  // Regression test for b/264618194.
-  @Test
-  public void objectModuleInheritsInstanceBindingFails() {
-    Source objectModule =
-        CompilerTests.kotlinSource(
-            "test.ObjectModule.kt",
-            "package test",
-            "",
-            "import dagger.Module",
-            "import dagger.Provides",
-            "",
-            "@Module",
-            "object ObjectModule : ClassModule() {",
-            "  @Provides fun provideString(): String = \"\"",
-            "}");
-    Source classModule =
-        CompilerTests.kotlinSource(
-            "test.ClassModule.kt",
-            "package test",
-            "",
-            "import dagger.Module",
-            "import dagger.Provides",
-            "",
-            "@Module",
-            "abstract class ClassModule {",
-            "  @Provides fun provideInt(): Int = 1",
-            "}");
-    Source component =
-        CompilerTests.kotlinSource(
-            "test.TestComponent.kt",
-            "package test",
-            "",
-            "import dagger.Component",
-            "",
-            "@Component(modules = [ObjectModule::class])",
-            "interface TestComponent {",
-            "  fun getInt(): Int",
-            "  fun getString(): String",
-            "}");
-
-    CompilerTests.daggerCompiler(component, objectModule, classModule)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(2);
-              subject.hasErrorContaining("test.ObjectModule has errors")
-                  .onSource(component)
-                  .onLineContaining("ObjectModule::class");
-              subject.hasErrorContaining(
-                      "@Module-annotated Kotlin object cannot inherit instance "
-                          + "(i.e. non-abstract, non-JVM static) binding method: "
-                          + "@Provides int test.ClassModule.provideInt()")
-                  .onSource(objectModule)
-                  .onLineContaining(
-                      // TODO(b/267223703): KAPT incorrectly reports the error on the annotation.
-                      CompilerTests.backend(subject) == XProcessingEnv.Backend.JAVAC
-                          ? "@Module"
-                          : "object ObjectModule");
-            });
-  }
-
-  // Regression test for b/264618194.
-  @Test
-  public void objectModuleInheritsNonInstanceBindingSucceeds() {
-    Source objectModule =
-        CompilerTests.kotlinSource(
-            "test.ObjectModule.kt",
-            "package test",
-            "",
-            "import dagger.Module",
-            "import dagger.Provides",
-            "",
-            "@Module",
-            "object ObjectModule : ClassModule() {",
-            "  @Provides fun provideString(): String = \"\"",
-            "}");
-    Source classModule =
-        CompilerTests.javaSource(
-            "test.ClassModule",
-            "package test;",
-            "",
-            "import dagger.Binds;",
-            "import dagger.Module;",
-            "import dagger.Provides;",
-            "",
-            "@Module",
-            "public abstract class ClassModule {",
-            "  // A non-binding instance method is okay.",
-            "  public int nonBindingMethod() {",
-            "    return 1;",
-            "  }",
-            "",
-            "  // A static binding method is also okay.",
-            "  @Provides",
-            "  public static int provideInt() {",
-            "    return 1;",
-            "  }",
-            "}");
-    Source component =
-        CompilerTests.kotlinSource(
-            "test.TestComponent.kt",
-            "package test",
-            "",
-            "import dagger.Component",
-            "",
-            "@Component(modules = [ObjectModule::class])",
-            "interface TestComponent {",
-            "  fun getInt(): Int",
-            "  fun getString(): String",
-            "}");
-    CompilerTests.daggerCompiler(component, objectModule, classModule)
-        .compile(subject -> subject.hasErrorCount(0));
+    Compilation compilation = daggerCompiler().compile(module, otherModule);
+    assertThat(compilation).failed();
+    String error = String.format("@%s cannot include themselves", moduleType.simpleName());
+    assertThat(compilation).hadErrorContaining(error).inFile(module).onLineContaining("Module(");
   }
 }

@@ -16,28 +16,38 @@
 
 package dagger.internal.codegen.kotlin;
 
+import static dagger.internal.codegen.base.MoreAnnotationValues.getIntArrayValue;
+import static dagger.internal.codegen.base.MoreAnnotationValues.getIntValue;
+import static dagger.internal.codegen.base.MoreAnnotationValues.getOptionalIntValue;
+import static dagger.internal.codegen.base.MoreAnnotationValues.getOptionalStringValue;
+import static dagger.internal.codegen.base.MoreAnnotationValues.getStringArrayValue;
+import static dagger.internal.codegen.base.MoreAnnotationValues.getStringValue;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableMap;
-import static dagger.internal.codegen.xprocessing.XElements.getFieldDescriptor;
-import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
+import static dagger.internal.codegen.langmodel.DaggerElements.getAnnotationMirror;
+import static dagger.internal.codegen.langmodel.DaggerElements.getFieldDescriptor;
+import static dagger.internal.codegen.langmodel.DaggerElements.getMethodDescriptor;
+import static kotlinx.metadata.Flag.ValueParameter.DECLARES_DEFAULT_VALUE;
 
-import androidx.room.compiler.processing.XAnnotation;
-import androidx.room.compiler.processing.XFieldElement;
-import androidx.room.compiler.processing.XMethodElement;
-import androidx.room.compiler.processing.XTypeElement;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.squareup.javapoet.ClassName;
 import dagger.internal.codegen.extension.DaggerCollectors;
-import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.internal.codegen.xprocessing.XElements;
+import dagger.internal.codegen.langmodel.DaggerElements;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import javax.annotation.Nullable;
+import javax.lang.model.element.AnnotationMirror;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
+import javax.lang.model.util.ElementFilter;
+import kotlin.Metadata;
 import kotlinx.metadata.Flag;
 import kotlinx.metadata.KmClassVisitor;
 import kotlinx.metadata.KmConstructorExtensionVisitor;
@@ -65,25 +75,33 @@ abstract class KotlinMetadata {
   private static final String DELEGATED_PROPERTY_NAME_SUFFIX = "$delegate";
 
   // Map that associates field elements with its Kotlin synthetic method for annotations.
-  private final Map<XFieldElement, Optional<MethodForAnnotations>> elementFieldAnnotationMethodMap =
-      new HashMap<>();
+  private final Map<VariableElement, Optional<MethodForAnnotations>>
+      elementFieldAnnotationMethodMap = new HashMap<>();
 
   // Map that associates field elements with its Kotlin getter method.
-  private final Map<XFieldElement, Optional<XMethodElement>> elementFieldGetterMethodMap =
+  private final Map<VariableElement, Optional<ExecutableElement>> elementFieldGetterMethodMap =
       new HashMap<>();
 
-  abstract XTypeElement typeElement();
+  abstract TypeElement typeElement();
 
   abstract ClassMetadata classMetadata();
 
   @Memoized
-  ImmutableMap<String, XMethodElement> methodDescriptors() {
-    return typeElement().getDeclaredMethods().stream()
-        .collect(toImmutableMap(XElements::getMethodDescriptor, Function.identity()));
+  ImmutableMap<String, ExecutableElement> methodDescriptors() {
+    return ElementFilter.methodsIn(typeElement().getEnclosedElements()).stream()
+        .collect(toImmutableMap(DaggerElements::getMethodDescriptor, Function.identity()));
+  }
+
+  /** Returns true if any constructor of the defined a default parameter. */
+  @Memoized
+  boolean containsConstructorWithDefaultParam() {
+    return classMetadata().constructors().stream()
+        .flatMap(constructor -> constructor.parameters().stream())
+        .anyMatch(parameter -> parameter.flags(DECLARES_DEFAULT_VALUE));
   }
 
   /** Gets the synthetic method for annotations of a given field element. */
-  Optional<XMethodElement> getSyntheticAnnotationMethod(XFieldElement fieldElement) {
+  Optional<ExecutableElement> getSyntheticAnnotationMethod(VariableElement fieldElement) {
     return getAnnotationMethod(fieldElement)
         .map(
             methodForAnnotations -> {
@@ -99,7 +117,7 @@ abstract class KotlinMetadata {
    * Returns true if the synthetic method for annotations is missing. This can occur when inspecting
    * the Kotlin metadata of a property from another compilation unit.
    */
-  boolean isMissingSyntheticAnnotationMethod(XFieldElement fieldElement) {
+  boolean isMissingSyntheticAnnotationMethod(VariableElement fieldElement) {
     return getAnnotationMethod(fieldElement)
         .map(methodForAnnotations -> methodForAnnotations == MethodForAnnotations.MISSING)
         // This can be missing if there was no property annotation at all (e.g. no annotations or
@@ -108,12 +126,12 @@ abstract class KotlinMetadata {
         .orElse(false);
   }
 
-  private Optional<MethodForAnnotations> getAnnotationMethod(XFieldElement fieldElement) {
+  private Optional<MethodForAnnotations> getAnnotationMethod(VariableElement fieldElement) {
     return elementFieldAnnotationMethodMap.computeIfAbsent(
         fieldElement, this::getAnnotationMethodUncached);
   }
 
-  private Optional<MethodForAnnotations> getAnnotationMethodUncached(XFieldElement fieldElement) {
+  private Optional<MethodForAnnotations> getAnnotationMethodUncached(VariableElement fieldElement) {
     return findProperty(fieldElement)
         .methodForAnnotationsSignature()
         .map(
@@ -126,18 +144,18 @@ abstract class KotlinMetadata {
   }
 
   /** Gets the getter method of a given field element corresponding to a property. */
-  Optional<XMethodElement> getPropertyGetter(XFieldElement fieldElement) {
+  Optional<ExecutableElement> getPropertyGetter(VariableElement fieldElement) {
     return elementFieldGetterMethodMap.computeIfAbsent(
         fieldElement, this::getPropertyGetterUncached);
   }
 
-  private Optional<XMethodElement> getPropertyGetterUncached(XFieldElement fieldElement) {
+  private Optional<ExecutableElement> getPropertyGetterUncached(VariableElement fieldElement) {
     return findProperty(fieldElement)
         .getterSignature()
         .flatMap(signature -> Optional.ofNullable(methodDescriptors().get(signature)));
   }
 
-  private PropertyMetadata findProperty(XFieldElement field) {
+  private PropertyMetadata findProperty(VariableElement field) {
     String fieldDescriptor = getFieldDescriptor(field);
     if (classMetadata().propertiesByFieldSignature().containsKey(fieldDescriptor)) {
       return classMetadata().propertiesByFieldSignature().get(fieldDescriptor);
@@ -150,8 +168,8 @@ abstract class KotlinMetadata {
     }
   }
 
-  private static String getPropertyNameFromField(XFieldElement field) {
-    String name = getSimpleName(field);
+  private static String getPropertyNameFromField(VariableElement field) {
+    String name = field.getSimpleName().toString();
     if (name.endsWith(DELEGATED_PROPERTY_NAME_SUFFIX)) {
       return name.substring(0, name.length() - DELEGATED_PROPERTY_NAME_SUFFIX.length());
     } else {
@@ -159,28 +177,29 @@ abstract class KotlinMetadata {
     }
   }
 
+  FunctionMetadata getFunctionMetadata(ExecutableElement method) {
+    return classMetadata().functionsBySignature().get(getMethodDescriptor(method));
+  }
+
   /** Parse Kotlin class metadata from a given type element * */
-  static KotlinMetadata from(XTypeElement typeElement) {
+  static KotlinMetadata from(TypeElement typeElement) {
     return new AutoValue_KotlinMetadata(
         typeElement, ClassVisitor.createClassMetadata(metadataOf(typeElement)));
   }
 
-  private static KotlinClassMetadata.Class metadataOf(XTypeElement typeElement) {
-    XAnnotation metadataAnnotation = typeElement.getAnnotation(TypeNames.KOTLIN_METADATA);
-    Preconditions.checkNotNull(metadataAnnotation);
+  private static KotlinClassMetadata.Class metadataOf(TypeElement typeElement) {
+    Optional<AnnotationMirror> metadataAnnotation =
+        getAnnotationMirror(typeElement, ClassName.get(Metadata.class));
+    Preconditions.checkState(metadataAnnotation.isPresent());
     KotlinClassHeader header =
         new KotlinClassHeader(
-            metadataAnnotation.getAsInt("k"),
-            metadataAnnotation.getAsIntList("mv").stream().mapToInt(Integer::intValue).toArray(),
-            metadataAnnotation.getAsStringList("d1").toArray(new String[0]),
-            metadataAnnotation.getAsStringList("d2").toArray(new String[0]),
-            metadataAnnotation.getAsString("xs"),
-            metadataAnnotation.getAnnotationValue("pn").hasStringValue()
-                ? metadataAnnotation.getAsString("pn")
-                : null,
-            metadataAnnotation.getAnnotationValue("xi").hasIntValue()
-                ? metadataAnnotation.getAsInt("xi")
-                : null);
+            getIntValue(metadataAnnotation.get(), "k"),
+            getIntArrayValue(metadataAnnotation.get(), "mv"),
+            getStringArrayValue(metadataAnnotation.get(), "d1"),
+            getStringArrayValue(metadataAnnotation.get(), "d2"),
+            getStringValue(metadataAnnotation.get(), "xs"),
+            getOptionalStringValue(metadataAnnotation.get(), "pn").orElse(null),
+            getOptionalIntValue(metadataAnnotation.get(), "xi").orElse(null));
     KotlinClassMetadata metadata = KotlinClassMetadata.read(header);
     if (metadata == null) {
       // Should only happen on Kotlin < 1.0 (i.e. metadata version < 1.1)
@@ -442,13 +461,13 @@ abstract class KotlinMetadata {
 
   @AutoValue
   abstract static class MethodForAnnotations {
-    static MethodForAnnotations create(XMethodElement method) {
+    static MethodForAnnotations create(ExecutableElement method) {
       return new AutoValue_KotlinMetadata_MethodForAnnotations(method);
     }
 
     static final MethodForAnnotations MISSING = MethodForAnnotations.create(null);
 
     @Nullable
-    abstract XMethodElement method();
+    abstract ExecutableElement method();
   }
 }

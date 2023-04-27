@@ -32,9 +32,7 @@ import java.util.List;
 import java.util.Optional;
 import javax.inject.Inject;
 
-/** Validates {@link BindsInstance} usages on builder methods. */
-public final class BindsInstanceMethodValidator
-    extends BindsInstanceElementValidator<XMethodElement> {
+final class BindsInstanceMethodValidator extends BindsInstanceElementValidator<XMethodElement> {
   private final DaggerSuperficialValidation superficialValidation;
 
   @Inject

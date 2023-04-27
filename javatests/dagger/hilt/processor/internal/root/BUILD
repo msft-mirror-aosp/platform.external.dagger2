@@ -22,7 +22,6 @@ android_library(
     name = "MyAppPreviousCompilation",
     srcs = ["MyAppPreviousCompilation.java"],
     deps = [
-        "//:android_local_test_exports",
         "//java/dagger/hilt/android:hilt_android_app",
     ],
 )
@@ -34,7 +33,7 @@ compiler_test(
         ":MyAppPreviousCompilation",
         "//java/dagger/hilt/android:hilt_android_app",
         "//java/dagger/hilt/android/testing:hilt_android_test",
-        "@androidsdk//:platforms/android-32/android.jar",
+        "@androidsdk//:platforms/android-30/android.jar",
         "@maven//:androidx_annotation_annotation",
         "@maven//:org_robolectric_robolectric",
         "@maven//:androidx_test_ext_junit",
@@ -65,7 +64,7 @@ compiler_test(
         ":MyTestPreviousCompilation",
         "//java/dagger/hilt/android:hilt_android_app",
         "//java/dagger/hilt/android/testing:hilt_android_test",
-        "@androidsdk//:platforms/android-32/android.jar",
+        "@androidsdk//:platforms/android-30/android.jar",
         "@maven//:androidx_annotation_annotation",
         "@maven//:org_robolectric_robolectric",
         "@maven//:androidx_test_ext_junit",
@@ -86,7 +85,7 @@ compiler_test(
     compiler_deps = [
         "//java/dagger/hilt/android:hilt_android_app",
         "//java/dagger/hilt/android/testing:hilt_android_test",
-        "@androidsdk//:platforms/android-32/android.jar",
+        "@androidsdk//:platforms/android-30/android.jar",
         "@maven//:androidx_annotation_annotation",
         "@maven//:org_robolectric_robolectric",
         "@maven//:androidx_test_ext_junit",
@@ -107,7 +106,7 @@ compiler_test(
     compiler_deps = [
         "//java/dagger/hilt/android:hilt_android_app",
         "//java/dagger/hilt/android/testing:hilt_android_test",
-        "@androidsdk//:platforms/android-32/android.jar",
+        "@androidsdk//:platforms/android-30/android.jar",
         "@maven//:androidx_annotation_annotation",
         "@maven//:org_robolectric_robolectric",
         "@maven//:androidx_test_ext_junit",

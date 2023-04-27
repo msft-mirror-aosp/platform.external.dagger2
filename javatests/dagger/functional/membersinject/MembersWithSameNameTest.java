@@ -22,7 +22,7 @@ import dagger.Binds;
 import dagger.Component;
 import dagger.Module;
 import dagger.Provides;
-import dagger.functional.membersinject.subpackage.MembersWithSameNameParent;
+import dagger.functional.membersinject.subpackage.ExtendsMembersWithSameName;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -31,40 +31,32 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class MembersWithSameNameTest {
   @Test
-  public void parentInjectsMaskedMembers() {
-    MembersWithSameNameParent parent = new MembersWithSameNameParent();
+  public void injectsMaskedMembers() {
+    MembersWithSameName membersWithSameName = new MembersWithSameName();
     TestComponent component = DaggerMembersWithSameNameTest_TestComponent.create();
-    component.injectParent(parent);
-    assertThat(parent.parentSameName()).isNotNull();
-    assertThat(parent.parentSameNameStringWasInvoked()).isTrue();
-    assertThat(parent.parentSameNameObjectWasInvoked()).isTrue();
+    component.inject(membersWithSameName);
+    verifyBaseClassInjection(membersWithSameName);
   }
 
   @Test
-  public void childInjectsMaskedMembers() {
-    MembersWithSameNameChild child = new MembersWithSameNameChild();
+  public void subclassInjectsMaskedMembers() {
+    ExtendsMembersWithSameName extendsMembersWithSameName = new ExtendsMembersWithSameName();
     TestComponent component = DaggerMembersWithSameNameTest_TestComponent.create();
-    component.injectChild(child);
-    assertThat(child.parentSameName()).isNotNull();
-    assertThat(child.parentSameNameStringWasInvoked()).isTrue();
-    assertThat(child.parentSameNameObjectWasInvoked()).isTrue();
-    assertThat(child.childSameName()).isNotNull();
-    assertThat(child.childSameNameStringWasInvoked()).isTrue();
-    assertThat(child.childSameNameObjectWasInvoked()).isTrue();
+    component.inject(extendsMembersWithSameName);
+    verifyBaseClassInjection(extendsMembersWithSameName);
+    verifySubclassInjection(extendsMembersWithSameName);
   }
 
-  @Test
-  public void childInjectsParentMaskedMembersOnly() {
-    MembersWithSameNameChild child = new MembersWithSameNameChild();
-    TestComponent component = DaggerMembersWithSameNameTest_TestComponent.create();
-    // Purposely only inject the parent members
-    component.injectParent(child);
-    assertThat(child.parentSameName()).isNotNull();
-    assertThat(child.parentSameNameStringWasInvoked()).isTrue();
-    assertThat(child.parentSameNameObjectWasInvoked()).isTrue();
-    assertThat(child.childSameName()).isNull();
-    assertThat(child.childSameNameStringWasInvoked()).isFalse();
-    assertThat(child.childSameNameObjectWasInvoked()).isFalse();
+  private void verifyBaseClassInjection(MembersWithSameName membersWithSameName) {
+    assertThat(membersWithSameName.sameName).isNotNull();
+    assertThat(membersWithSameName.sameNameStringWasInvoked).isTrue();
+    assertThat(membersWithSameName.sameNameObjectWasInvoked).isTrue();
+  }
+
+  private void verifySubclassInjection(ExtendsMembersWithSameName extendsMembersWithSameName) {
+    assertThat(extendsMembersWithSameName.sameName()).isNotNull();
+    assertThat(extendsMembersWithSameName.sameNameStringWasInvoked()).isTrue();
+    assertThat(extendsMembersWithSameName.sameNameObjectWasInvoked()).isTrue();
   }
 
   @Module
@@ -80,7 +72,7 @@ public class MembersWithSameNameTest {
 
   @Component(modules = TestModule.class)
   interface TestComponent {
-    void injectParent(MembersWithSameNameParent parent);
-    void injectChild(MembersWithSameNameChild child);
+    void inject(MembersWithSameName membersWithSameName);
+    void inject(ExtendsMembersWithSameName extendsMembersWithSameName);
   }
 }

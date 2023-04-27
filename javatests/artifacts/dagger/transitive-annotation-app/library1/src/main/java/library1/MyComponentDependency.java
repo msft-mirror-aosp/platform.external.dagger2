@@ -23,7 +23,7 @@ import library2.MyTransitiveType;
  * A class used to test that Dagger won't fail on unresolvable transitive types used in non-dagger
  * related elements and annotations.
  */
-// TODO(b/219587431): Support @MyTransitiveAnnotation (We shouldn't need scope/qualifier here).
+// @MyTransitiveAnnotation: Not yet supported
 @MyAnnotation(MyTransitiveType.VALUE)
 @MyOtherAnnotation(MyTransitiveType.class)
 public final class MyComponentDependency {
@@ -37,15 +37,15 @@ public final class MyComponentDependency {
   @MyOtherAnnotation(MyTransitiveType.class)
   public MyComponentDependency() {}
 
-  // @MyTransitiveAnnotation cannot be used here.
   @MyQualifier
+  // @MyTransitiveAnnotation: Not yet supported
   @MyAnnotation(MyTransitiveType.VALUE)
   @MyOtherAnnotation(MyTransitiveType.class)
   public MyComponentDependencyBinding qualifiedMyComponentDependencyBinding() {
     return qualifiedMyComponentDependencyBinding;
   }
 
-  // @MyTransitiveAnnotation cannot be used here.
+  // @MyTransitiveAnnotation: Not yet supported
   @MyAnnotation(MyTransitiveType.VALUE)
   @MyOtherAnnotation(MyTransitiveType.class)
   public MyComponentDependencyBinding unqualifiedMyComponentDependencyBinding() {

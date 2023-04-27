@@ -16,6 +16,7 @@
 
 package dagger.internal.codegen.writing;
 
+import static androidx.room.compiler.processing.compat.XConverters.toJavac;
 import static com.google.common.base.Preconditions.checkArgument;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
 import static dagger.internal.codegen.xprocessing.XElements.asConstructor;
@@ -90,7 +91,7 @@ final class AssistedInjectionParameters {
         assistedParameterSpecs.add(
             ParameterSpec.builder(
                     paramType.getTypeName(),
-                    shardImplementation.getUniqueFieldNameForAssistedParam(paramElement))
+                    shardImplementation.getUniqueFieldNameForAssistedParam(toJavac(paramElement)))
                 .build());
       }
     }

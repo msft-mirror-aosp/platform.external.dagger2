@@ -28,7 +28,6 @@ import androidx.room.compiler.processing.XElement;
 import androidx.room.compiler.processing.XMethodElement;
 import androidx.room.compiler.processing.XType;
 import dagger.internal.codegen.binding.InjectionAnnotations;
-import dagger.internal.codegen.xprocessing.XTypes;
 import javax.inject.Inject;
 
 /**
@@ -79,7 +78,7 @@ final class MembersInjectionValidator {
   private void checkMembersInjectedType(ValidationReport.Builder report, XType type) {
     // Only declared types can be members-injected.
     if (!isDeclared(type)) {
-      report.addError("Cannot inject members into " + XTypes.toStableString(type));
+      report.addError("Cannot inject members into " + type);
       return;
     }
 
@@ -87,7 +86,7 @@ final class MembersInjectionValidator {
     // Foo<T> as just 'Foo', which we don't allow.  (This is a judgement call; we
     // *could* allow it and instantiate the type bounds, but we don't.)
     if (isRawParameterizedType(type)) {
-      report.addError("Cannot inject members into raw type " + XTypes.toStableString(type));
+      report.addError("Cannot inject members into raw type " + type);
       return;
     }
 
@@ -95,9 +94,7 @@ final class MembersInjectionValidator {
     // Otherwise the type argument may be a wildcard (or other type), and we can't
     // resolve that to actual types.  For array type arguments, validate the type of the array.
     if (!type.getTypeArguments().stream().allMatch(this::isResolvableTypeArgument)) {
-      report.addError(
-          "Cannot inject members into types with unbounded type arguments: "
-              + XTypes.toStableString(type));
+      report.addError("Cannot inject members into types with unbounded type arguments: " + type);
     }
   }
 

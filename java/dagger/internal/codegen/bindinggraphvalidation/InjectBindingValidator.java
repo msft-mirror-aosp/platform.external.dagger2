@@ -16,23 +16,29 @@
 
 package dagger.internal.codegen.bindinggraphvalidation;
 
+import static androidx.room.compiler.processing.compat.XConverters.toXProcessing;
+import static com.google.auto.common.MoreTypes.asTypeElement;
 import static dagger.spi.model.BindingKind.INJECTION;
 
+import androidx.room.compiler.processing.XProcessingEnv;
 import dagger.internal.codegen.validation.InjectValidator;
-import dagger.internal.codegen.validation.ValidationBindingGraphPlugin;
 import dagger.internal.codegen.validation.ValidationReport;
 import dagger.internal.codegen.validation.ValidationReport.Item;
 import dagger.spi.model.Binding;
 import dagger.spi.model.BindingGraph;
+import dagger.spi.model.BindingGraphPlugin;
 import dagger.spi.model.DiagnosticReporter;
 import javax.inject.Inject;
 
 /** Validates bindings from {@code @Inject}-annotated constructors. */
-final class InjectBindingValidator extends ValidationBindingGraphPlugin {
+final class InjectBindingValidator implements BindingGraphPlugin {
+
+  private final XProcessingEnv processingEnv;
   private final InjectValidator injectValidator;
 
   @Inject
-  InjectBindingValidator(InjectValidator injectValidator) {
+  InjectBindingValidator(XProcessingEnv processingEnv, InjectValidator injectValidator) {
+    this.processingEnv = processingEnv;
     this.injectValidator = injectValidator.whenGeneratingCode();
   }
 
@@ -50,7 +56,8 @@ final class InjectBindingValidator extends ValidationBindingGraphPlugin {
 
   private void validateInjectionBinding(Binding node, DiagnosticReporter diagnosticReporter) {
     ValidationReport typeReport =
-        injectValidator.validate(node.key().type().xprocessing().getTypeElement());
+        injectValidator.validate(
+            toXProcessing(asTypeElement(node.key().type().java()), processingEnv));
     for (Item item : typeReport.allItems()) {
       diagnosticReporter.reportBinding(item.kind(), node, item.message());
     }

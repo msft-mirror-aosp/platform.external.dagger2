@@ -32,9 +32,7 @@ public final class GeneratedLines {
         + "comments = \"https://dagger.dev\")";
 
   private static final String SUPPRESS_WARNINGS_ANNOTATION =
-      "@SuppressWarnings({"
-          + "\"unchecked\", \"rawtypes\", \"KotlinInternal\", \"KotlinInternalInJava\""
-          + "})";
+      "@SuppressWarnings({\"unchecked\", \"rawtypes\"})";
 
   private static final String IMPORT_DAGGER_GENERATED = "import dagger.internal.DaggerGenerated;";
 
@@ -76,6 +74,4 @@ public final class GeneratedLines {
       return true;
     }
   }
-
-  private GeneratedLines() {}
 }
