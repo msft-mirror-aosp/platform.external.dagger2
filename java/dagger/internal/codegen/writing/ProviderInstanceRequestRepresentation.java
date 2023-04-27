@@ -16,12 +16,13 @@
 
 package dagger.internal.codegen.writing;
 
-import androidx.room.compiler.processing.XProcessingEnv;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
 import dagger.assisted.AssistedInject;
 import dagger.internal.codegen.binding.ContributionBinding;
 import dagger.internal.codegen.binding.FrameworkType;
+import dagger.internal.codegen.langmodel.DaggerElements;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 
 /** Binding expression for provider instances. */
 final class ProviderInstanceRequestRepresentation extends FrameworkInstanceRequestRepresentation {
@@ -30,8 +31,9 @@ final class ProviderInstanceRequestRepresentation extends FrameworkInstanceReque
   ProviderInstanceRequestRepresentation(
       @Assisted ContributionBinding binding,
       @Assisted FrameworkInstanceSupplier frameworkInstanceSupplier,
-      XProcessingEnv processingEnv) {
-    super(binding, frameworkInstanceSupplier, processingEnv);
+      DaggerTypes types,
+      DaggerElements elements) {
+    super(binding, frameworkInstanceSupplier, types, elements);
   }
 
   @Override

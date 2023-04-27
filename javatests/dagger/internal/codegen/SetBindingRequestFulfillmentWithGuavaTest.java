@@ -16,11 +16,13 @@
 
 package dagger.internal.codegen;
 
-import androidx.room.compiler.processing.util.Source;
-import dagger.testing.compile.CompilerTests;
-import dagger.testing.golden.GoldenFileRule;
+import static com.google.testing.compile.CompilationSubject.assertThat;
+import static dagger.internal.codegen.Compilers.compilerWithOptions;
+
+import com.google.testing.compile.Compilation;
+import com.google.testing.compile.JavaFileObjects;
 import java.util.Collection;
-import org.junit.Rule;
+import javax.tools.JavaFileObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -33,8 +35,6 @@ public class SetBindingRequestFulfillmentWithGuavaTest {
     return CompilerMode.TEST_PARAMETERS;
   }
 
-  @Rule public GoldenFileRule goldenFileRule = new GoldenFileRule();
-
   private final CompilerMode compilerMode;
 
   public SetBindingRequestFulfillmentWithGuavaTest(CompilerMode compilerMode) {
@@ -42,87 +42,108 @@ public class SetBindingRequestFulfillmentWithGuavaTest {
   }
 
   @Test
-  public void setBindings() throws Exception {
-    Source emptySetModuleFile =
-        CompilerTests.javaSource(
-            "test.EmptySetModule",
+  public void setBindings() {
+    JavaFileObject emptySetModuleFile = JavaFileObjects.forSourceLines("test.EmptySetModule",
+        "package test;",
+        "",
+        "import dagger.Module;",
+        "import dagger.Provides;",
+        "import dagger.multibindings.ElementsIntoSet;",
+        "import dagger.multibindings.Multibinds;",
+        "import java.util.Collections;",
+        "import java.util.Set;",
+        "",
+        "@Module",
+        "abstract class EmptySetModule {",
+        "  @Multibinds abstract Set<Object> objects();",
+        "",
+        "  @Provides @ElementsIntoSet",
+        "  static Set<String> emptySet() { ",
+        "    return Collections.emptySet();",
+        "  }",
+        "  @Provides @ElementsIntoSet",
+        "  static Set<Integer> onlyContributionIsElementsIntoSet() { ",
+        "    return Collections.emptySet();",
+        "  }",
+        "}");
+    JavaFileObject setModuleFile = JavaFileObjects.forSourceLines("test.SetModule",
+        "package test;",
+        "",
+        "import dagger.Module;",
+        "import dagger.Provides;",
+        "import dagger.multibindings.IntoSet;",
+        "",
+        "@Module",
+        "final class SetModule {",
+        "  @Provides @IntoSet static String string() { return \"\"; }",
+        "}");
+    JavaFileObject componentFile = JavaFileObjects.forSourceLines("test.TestComponent",
+        "package test;",
+        "",
+        "import dagger.Component;",
+        "import java.util.Set;",
+        "import javax.inject.Provider;",
+        "",
+        "@Component(modules = {EmptySetModule.class, SetModule.class})",
+        "interface TestComponent {",
+        "  Set<String> strings();",
+        "  Set<Object> objects();",
+        "  Set<Integer> onlyContributionIsElementsIntoSet();",
+        "}");
+    JavaFileObject generatedComponent =
+        JavaFileObjects.forSourceLines(
+            "test.DaggerTestComponent",
             "package test;",
             "",
-            "import dagger.Module;",
-            "import dagger.Provides;",
-            "import dagger.multibindings.ElementsIntoSet;",
-            "import dagger.multibindings.Multibinds;",
-            "import java.util.Collections;",
-            "import java.util.Set;",
+            "import com.google.common.collect.ImmutableSet;",
             "",
-            "@Module",
-            "abstract class EmptySetModule {",
-            "  @Multibinds abstract Set<Object> objects();",
-            "",
-            "  @Provides @ElementsIntoSet",
-            "  static Set<String> emptySet() { ",
-            "    return Collections.emptySet();",
+            GeneratedLines.generatedAnnotations(),
+            "final class DaggerTestComponent implements TestComponent {",
+            "  @Override",
+            "  public Set<String> strings() {",
+            "    return ImmutableSet.<String>builderWithExpectedSize(2)",
+            "        .addAll(EmptySetModule_EmptySetFactory.emptySet())",
+            "        .add(SetModule_StringFactory.string())",
+            "        .build();",
             "  }",
-            "  @Provides @ElementsIntoSet",
-            "  static Set<Integer> onlyContributionIsElementsIntoSet() { ",
-            "    return Collections.emptySet();",
+            "",
+            "  @Override",
+            "  public Set<Object> objects() {",
+            "    return ImmutableSet.<Object>of();",
+            "  }",
+            "",
+            "  @Override",
+            "  public Set<Integer> onlyContributionIsElementsIntoSet() {",
+            "    return ImmutableSet.<Integer>copyOf(",
+            "        EmptySetModule_OnlyContributionIsElementsIntoSetFactory",
+            "            .onlyContributionIsElementsIntoSet());",
             "  }",
             "}");
-    Source setModuleFile =
-        CompilerTests.javaSource(
-            "test.SetModule",
-            "package test;",
-            "",
-            "import dagger.Module;",
-            "import dagger.Provides;",
-            "import dagger.multibindings.IntoSet;",
-            "",
-            "@Module",
-            "final class SetModule {",
-            "  @Provides @IntoSet static String string() { return \"\"; }",
-            "}");
-    Source componentFile =
-        CompilerTests.javaSource(
-            "test.TestComponent",
-            "package test;",
-            "",
-            "import dagger.Component;",
-            "import java.util.Set;",
-            "import javax.inject.Provider;",
-            "",
-            "@Component(modules = {EmptySetModule.class, SetModule.class})",
-            "interface TestComponent {",
-            "  Set<String> strings();",
-            "  Set<Object> objects();",
-            "  Set<Integer> onlyContributionIsElementsIntoSet();",
-            "}");
-
-    CompilerTests.daggerCompiler(emptySetModuleFile, setModuleFile, componentFile)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/DaggerTestComponent"));
-            });
+    Compilation compilation =
+        compilerWithOptions(compilerMode.javacopts())
+            .compile(emptySetModuleFile, setModuleFile, componentFile);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .generatedSourceFile("test.DaggerTestComponent")
+        .containsElementsIn(generatedComponent);
   }
 
   @Test
-  public void inaccessible() throws Exception {
-    Source inaccessible =
-        CompilerTests.javaSource(
+  public void inaccessible() {
+    JavaFileObject inaccessible =
+        JavaFileObjects.forSourceLines(
             "other.Inaccessible",
             "package other;",
             "",
             "class Inaccessible {}");
-    Source inaccessible2 =
-        CompilerTests.javaSource(
+    JavaFileObject inaccessible2 =
+        JavaFileObjects.forSourceLines(
             "other.Inaccessible2",
             "package other;",
             "",
             "class Inaccessible2 {}");
-    Source usesInaccessible =
-        CompilerTests.javaSource(
+    JavaFileObject usesInaccessible =
+        JavaFileObjects.forSourceLines(
             "other.UsesInaccessible",
             "package other;",
             "",
@@ -133,8 +154,8 @@ public class SetBindingRequestFulfillmentWithGuavaTest {
             "  @Inject UsesInaccessible(Set<Inaccessible> set1, Set<Inaccessible2> set2) {}",
             "}");
 
-    Source module =
-        CompilerTests.javaSource(
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "other.TestModule",
             "package other;",
             "",
@@ -154,8 +175,8 @@ public class SetBindingRequestFulfillmentWithGuavaTest {
             "    return Collections.emptySet();",
             "  }",
             "}");
-    Source componentFile =
-        CompilerTests.javaSource(
+    JavaFileObject componentFile =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -169,22 +190,42 @@ public class SetBindingRequestFulfillmentWithGuavaTest {
             "interface TestComponent {",
             "  UsesInaccessible usesInaccessible();",
             "}");
-
-    CompilerTests.daggerCompiler(
-            module, inaccessible, inaccessible2, usesInaccessible, componentFile)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/DaggerTestComponent"));
-            });
+    JavaFileObject generatedComponent =
+        JavaFileObjects.forSourceLines(
+            "test.DaggerTestComponent",
+            "package test;",
+            "",
+            "import com.google.common.collect.ImmutableSet;",
+            "import other.TestModule_EmptySetFactory;",
+            "import other.UsesInaccessible;",
+            "import other.UsesInaccessible_Factory;",
+            "",
+            GeneratedLines.generatedAnnotations(),
+            "final class DaggerTestComponent implements TestComponent {",
+            "  private Set setOfInaccessible2() {",
+            "    return ImmutableSet.copyOf(TestModule_EmptySetFactory.emptySet());",
+            "  }",
+            "",
+            "  @Override",
+            "  public UsesInaccessible usesInaccessible() {",
+            "    return UsesInaccessible_Factory.newInstance(",
+            "        (Set) ImmutableSet.of(),",
+            "        (Set) setOfInaccessible2());",
+            "  }",
+            "}");
+    Compilation compilation =
+        compilerWithOptions(compilerMode.javacopts())
+            .compile(module, inaccessible, inaccessible2, usesInaccessible, componentFile);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .generatedSourceFile("test.DaggerTestComponent")
+        .containsElementsIn(generatedComponent);
   }
 
   @Test
-  public void subcomponentOmitsInheritedBindings() throws Exception {
-    Source parent =
-        CompilerTests.javaSource(
+  public void subcomponentOmitsInheritedBindings() {
+    JavaFileObject parent =
+        JavaFileObjects.forSourceLines(
             "test.Parent",
             "package test;",
             "",
@@ -194,8 +235,8 @@ public class SetBindingRequestFulfillmentWithGuavaTest {
             "interface Parent {",
             "  Child child();",
             "}");
-    Source parentModule =
-        CompilerTests.javaSource(
+    JavaFileObject parentModule =
+        JavaFileObjects.forSourceLines(
             "test.ParentModule",
             "package test;",
             "",
@@ -210,8 +251,8 @@ public class SetBindingRequestFulfillmentWithGuavaTest {
             "    return \"parent object\";",
             "  }",
             "}");
-    Source child =
-        CompilerTests.javaSource(
+    JavaFileObject child =
+        JavaFileObjects.forSourceLines(
             "test.Child",
             "package test;",
             "",
@@ -222,58 +263,115 @@ public class SetBindingRequestFulfillmentWithGuavaTest {
             "interface Child {",
             "  Set<Object> objectSet();",
             "}");
-
-    CompilerTests.daggerCompiler(parent, parentModule, child)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/DaggerParent"));
-            });
+    JavaFileObject generatedComponent =
+        JavaFileObjects.forSourceLines(
+            "test.DaggerParent",
+            "package test;",
+            "",
+            "import com.google.common.collect.ImmutableSet;",
+            "",
+            GeneratedLines.generatedAnnotations(),
+            "final class DaggerParent implements Parent {",
+            "  private static final class ChildImpl implements Child {",
+            "    @Override",
+            "    public Set<Object> objectSet() {",
+            "      return ImmutableSet.<Object>of(",
+            "          ParentModule_ParentObjectFactory.parentObject());",
+            "    }",
+            "  }",
+            "}");
+    Compilation compilation =
+        compilerWithOptions(compilerMode.javacopts()).compile(parent, parentModule, child);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .generatedSourceFile("test.DaggerParent")
+        .containsElementsIn(generatedComponent);
   }
 
   @Test
-  public void productionComponents() throws Exception {
-    Source emptySetModuleFile =
-        CompilerTests.javaSource(
-            "test.EmptySetModule",
+  public void productionComponents() {
+    JavaFileObject emptySetModuleFile = JavaFileObjects.forSourceLines("test.EmptySetModule",
+        "package test;",
+        "",
+        "import dagger.Module;",
+        "import dagger.Provides;",
+        "import dagger.multibindings.ElementsIntoSet;",
+        "import java.util.Collections;",
+        "import java.util.Set;",
+        "",
+        "@Module",
+        "abstract class EmptySetModule {",
+        "  @Provides @ElementsIntoSet",
+        "  static Set<String> emptySet() { ",
+        "    return Collections.emptySet();",
+        "  }",
+        "}");
+    JavaFileObject componentFile = JavaFileObjects.forSourceLines("test.TestComponent",
+        "package test;",
+        "",
+        "import com.google.common.util.concurrent.ListenableFuture;",
+        "import dagger.producers.ProductionComponent;",
+        "import java.util.Set;",
+        "",
+        "@ProductionComponent(modules = EmptySetModule.class)",
+        "interface TestComponent {",
+        "  ListenableFuture<Set<String>> strings();",
+        "}");
+    JavaFileObject generatedComponent =
+        JavaFileObjects.forSourceLines(
+            "test.DaggerTestComponent",
             "package test;",
             "",
-            "import dagger.Module;",
-            "import dagger.Provides;",
-            "import dagger.multibindings.ElementsIntoSet;",
-            "import java.util.Collections;",
-            "import java.util.Set;",
+            GeneratedLines.generatedImports(
+                "import com.google.common.collect.ImmutableSet;",
+                "import com.google.common.util.concurrent.Futures;",
+                "import com.google.common.util.concurrent.ListenableFuture;",
+                "import dagger.producers.internal.CancellationListener;",
+                "import java.util.Set;"),
             "",
-            "@Module",
-            "abstract class EmptySetModule {",
-            "  @Provides @ElementsIntoSet",
-            "  static Set<String> emptySet() { ",
-            "    return Collections.emptySet();",
+            GeneratedLines.generatedAnnotations(),
+            "final class DaggerTestComponent implements TestComponent, ",
+            "    CancellationListener {",
+            "  private final DaggerTestComponent testComponent = this;",
+            "",
+            "  private DaggerTestComponent() {}",
+            "",
+            "  public static Builder builder() {",
+            "    return new Builder();",
+            "  }",
+            "",
+            "  public static TestComponent create() {",
+            "    return new Builder().build();",
+            "  }",
+            "",
+            "  private Set<String> setOfString() {",
+            "    return ImmutableSet.<String>copyOf(",
+            "        EmptySetModule_EmptySetFactory.emptySet());",
+            "  }",
+            "",
+            "  @Override",
+            "  public ListenableFuture<Set<String>> strings() {",
+            "    return Futures.immediateFuture(setOfString());",
+            "  }",
+            "",
+            "  @Override",
+            "  public void onProducerFutureCancelled(boolean mayInterruptIfRunning) {}",
+            "",
+            "  static final class Builder {",
+            "    private Builder() {}",
+            "",
+            "    public TestComponent build() {",
+            "      return new DaggerTestComponent();",
+            "    }",
             "  }",
             "}");
-    Source componentFile =
-        CompilerTests.javaSource(
-            "test.TestComponent",
-            "package test;",
-            "",
-            "import com.google.common.util.concurrent.ListenableFuture;",
-            "import dagger.producers.ProductionComponent;",
-            "import java.util.Set;",
-            "",
-            "@ProductionComponent(modules = EmptySetModule.class)",
-            "interface TestComponent {",
-            "  ListenableFuture<Set<String>> strings();",
-            "}");
 
-    CompilerTests.daggerCompiler(emptySetModuleFile, componentFile)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/DaggerTestComponent"));
-            });
+    Compilation compilation =
+        compilerWithOptions(compilerMode.javacopts())
+            .compile(emptySetModuleFile, componentFile);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .generatedSourceFile("test.DaggerTestComponent")
+        .hasSourceEquivalentTo(generatedComponent);
   }
 }

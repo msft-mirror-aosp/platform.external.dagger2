@@ -16,19 +16,22 @@
 
 package dagger.internal.codegen;
 
+import static com.google.testing.compile.CompilationSubject.assertThat;
+import static dagger.internal.codegen.Compilers.daggerCompiler;
 import static dagger.internal.codegen.DaggerModuleMethodSubject.Factory.assertThatMethodInUnannotatedClass;
 import static dagger.internal.codegen.DaggerModuleMethodSubject.Factory.assertThatModuleMethod;
 
-import androidx.room.compiler.processing.util.Source;
 import com.google.common.collect.ImmutableList;
+import com.google.testing.compile.Compilation;
+import com.google.testing.compile.JavaFileObjects;
 import dagger.Module;
 import dagger.producers.ProducerModule;
-import dagger.testing.compile.CompilerTests;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 import javax.inject.Inject;
 import javax.inject.Qualifier;
 import javax.inject.Singleton;
+import javax.tools.JavaFileObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -121,8 +124,8 @@ public class BindsOptionalOfMethodValidationTest {
    */
   @Test
   public void intoMapWithComponent() {
-    Source module =
-        CompilerTests.javaSource(
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -134,8 +137,8 @@ public class BindsOptionalOfMethodValidationTest {
             "interface TestModule {",
             "  @BindsOptionalOf @IntoMap Object object();",
             "}");
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -144,17 +147,12 @@ public class BindsOptionalOfMethodValidationTest {
             "@Component(modules = TestModule.class)",
             "interface TestComponent {}");
 
-    CompilerTests.daggerCompiler(module, component)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(2);
-              subject.hasErrorContaining("test.TestModule has errors")
-                  .onSource(component)
-                  .onLineContaining("@Component(modules = TestModule.class)");
-              subject.hasErrorContaining("cannot have multibinding annotations")
-                  .onSource(module)
-                  .onLineContaining("object()");
-            });
+    Compilation compilation = daggerCompiler().compile(module, component);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining("cannot have multibinding annotations")
+        .inFile(module)
+        .onLineContaining("object();");
   }
 
   /** An injectable value object. */

@@ -17,11 +17,12 @@
 package dagger.internal.codegen.writing;
 
 import androidx.room.compiler.processing.XFiler;
-import androidx.room.compiler.processing.XProcessingEnv;
 import androidx.room.compiler.processing.XTypeElement;
 import dagger.MapKey;
+import dagger.internal.codegen.langmodel.DaggerElements;
 import java.util.Set;
 import javax.inject.Inject;
+import javax.lang.model.SourceVersion;
 
 /**
  * Generates classes that create annotation instances for an unwrapped {@link MapKey} annotation
@@ -55,8 +56,8 @@ import javax.inject.Inject;
 public final class UnwrappedMapKeyGenerator extends AnnotationCreatorGenerator {
 
   @Inject
-  UnwrappedMapKeyGenerator(XFiler filer, XProcessingEnv processingEnv) {
-    super(filer, processingEnv);
+  UnwrappedMapKeyGenerator(XFiler filer, DaggerElements elements, SourceVersion sourceVersion) {
+    super(filer, elements, sourceVersion);
   }
 
   @Override

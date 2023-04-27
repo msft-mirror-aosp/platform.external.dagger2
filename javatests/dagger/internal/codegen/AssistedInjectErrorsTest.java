@@ -16,9 +16,13 @@
 
 package dagger.internal.codegen;
 
-import androidx.room.compiler.processing.util.Source;
+import static com.google.testing.compile.CompilationSubject.assertThat;
+import static dagger.internal.codegen.Compilers.compilerWithOptions;
+
 import com.google.common.collect.ImmutableCollection;
-import dagger.testing.compile.CompilerTests;
+import com.google.testing.compile.Compilation;
+import com.google.testing.compile.JavaFileObjects;
+import javax.tools.JavaFileObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -39,8 +43,8 @@ public class AssistedInjectErrorsTest {
 
   @Test
   public void testAssistedInjectWithDuplicateTypesFails() {
-    Source foo =
-        CompilerTests.javaSource(
+    JavaFileObject foo =
+        JavaFileObjects.forSourceLines(
             "test.Foo",
             "package test;",
             "",
@@ -52,23 +56,20 @@ public class AssistedInjectErrorsTest {
             "  Foo(@Assisted String str1, @Assisted String str2) {}",
             "}");
 
-    CompilerTests.daggerCompiler(foo)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      "@AssistedInject constructor has duplicate @Assisted type: @Assisted "
-                          + "java.lang.String")
-                  .onSource(foo)
-                  .onLine(8);
-            });
+    Compilation compilation = compilerWithOptions(compilerMode.javacopts()).compile(foo);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
+    assertThat(compilation)
+        .hadErrorContaining(
+            "@AssistedInject constructor has duplicate @Assisted type: @Assisted java.lang.String")
+        .inFile(foo)
+        .onLine(8);
   }
 
   @Test
   public void testAssistedInjectWithDuplicateTypesEmptyQualifierFails() {
-    Source foo =
-        CompilerTests.javaSource(
+    JavaFileObject foo =
+        JavaFileObjects.forSourceLines(
             "test.Foo",
             "package test;",
             "",
@@ -80,23 +81,20 @@ public class AssistedInjectErrorsTest {
             "  Foo(@Assisted(\"\") String str1, @Assisted String str2) {}",
             "}");
 
-    CompilerTests.daggerCompiler(foo)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      "@AssistedInject constructor has duplicate @Assisted type: @Assisted "
-                          + "java.lang.String")
-                  .onSource(foo)
-                  .onLine(8);
-            });
+    Compilation compilation = compilerWithOptions(compilerMode.javacopts()).compile(foo);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
+    assertThat(compilation)
+        .hadErrorContaining(
+            "@AssistedInject constructor has duplicate @Assisted type: @Assisted java.lang.String")
+        .inFile(foo)
+        .onLine(8);
   }
 
   @Test
   public void testAssistedInjectWithDuplicateQualifiedTypesFails() {
-    Source foo =
-        CompilerTests.javaSource(
+    JavaFileObject foo =
+        JavaFileObjects.forSourceLines(
             "test.Foo",
             "package test;",
             "",
@@ -108,23 +106,21 @@ public class AssistedInjectErrorsTest {
             "  Foo(@Assisted(\"MyQualfier\") String s1, @Assisted(\"MyQualfier\") String s2) {}",
             "}");
 
-    CompilerTests.daggerCompiler(foo)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      "@AssistedInject constructor has duplicate @Assisted type: "
-                          + "@Assisted(\"MyQualfier\") java.lang.String")
-                  .onSource(foo)
-                  .onLine(8);
-            });
+    Compilation compilation = compilerWithOptions(compilerMode.javacopts()).compile(foo);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
+    assertThat(compilation)
+        .hadErrorContaining(
+            "@AssistedInject constructor has duplicate @Assisted type: "
+                + "@Assisted(\"MyQualfier\") java.lang.String")
+        .inFile(foo)
+        .onLine(8);
   }
 
   @Test
   public void testAssistedInjectWithDuplicateGenericTypesFails() {
-    Source foo =
-        CompilerTests.javaSource(
+    JavaFileObject foo =
+        JavaFileObjects.forSourceLines(
             "test.Foo",
             "package test;",
             "",
@@ -137,23 +133,21 @@ public class AssistedInjectErrorsTest {
             "  Foo(@Assisted List<String> list1, @Assisted List<String> list2) {}",
             "}");
 
-    CompilerTests.daggerCompiler(foo)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      "@AssistedInject constructor has duplicate @Assisted type: "
-                          + "@Assisted java.util.List<java.lang.String>")
-                  .onSource(foo)
-                  .onLine(9);
-            });
+    Compilation compilation = compilerWithOptions(compilerMode.javacopts()).compile(foo);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
+    assertThat(compilation)
+        .hadErrorContaining(
+            "@AssistedInject constructor has duplicate @Assisted type: "
+                + "@Assisted java.util.List<java.lang.String>")
+        .inFile(foo)
+        .onLine(9);
   }
 
   @Test
   public void testAssistedInjectWithDuplicateParameterizedTypesFails() {
-    Source foo =
-        CompilerTests.javaSource(
+    JavaFileObject foo =
+        JavaFileObjects.forSourceLines(
             "test.Foo",
             "package test;",
             "",
@@ -165,22 +159,19 @@ public class AssistedInjectErrorsTest {
             "  Foo(@Assisted T t1, @Assisted T t2) {}",
             "}");
 
-    CompilerTests.daggerCompiler(foo)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      "@AssistedInject constructor has duplicate @Assisted type: @Assisted T")
-                  .onSource(foo)
-                  .onLine(8);
-            });
+    Compilation compilation = compilerWithOptions(compilerMode.javacopts()).compile(foo);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
+    assertThat(compilation)
+        .hadErrorContaining("@AssistedInject constructor has duplicate @Assisted type: @Assisted T")
+        .inFile(foo)
+        .onLine(8);
   }
 
   @Test
   public void testAssistedInjectWithUniqueParameterizedTypesPasses() {
-    Source foo =
-        CompilerTests.javaSource(
+    JavaFileObject foo =
+        JavaFileObjects.forSourceLines(
             "test.Foo",
             "package test;",
             "",
@@ -193,15 +184,14 @@ public class AssistedInjectErrorsTest {
             "  Foo(@Assisted T1 t1, @Assisted T2 t2) {}",
             "}");
 
-    CompilerTests.daggerCompiler(foo)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(subject -> subject.hasErrorCount(0));
+    Compilation compilation = compilerWithOptions(compilerMode.javacopts()).compile(foo);
+    assertThat(compilation).succeeded();
   }
 
   @Test
   public void testAssistedInjectWithUniqueGenericTypesPasses() {
-    Source foo =
-        CompilerTests.javaSource(
+    JavaFileObject foo =
+        JavaFileObjects.forSourceLines(
             "test.Foo",
             "package test;",
             "",
@@ -214,15 +204,14 @@ public class AssistedInjectErrorsTest {
             "  Foo(@Assisted List<String> list1, @Assisted List<Integer> list2) {}",
             "}");
 
-    CompilerTests.daggerCompiler(foo)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(subject -> subject.hasErrorCount(0));
+    Compilation compilation = compilerWithOptions(compilerMode.javacopts()).compile(foo);
+    assertThat(compilation).succeeded();
   }
 
   @Test
   public void testAssistedInjectWithUniqueQualifiedTypesPasses() {
-    Source foo =
-        CompilerTests.javaSource(
+    JavaFileObject foo =
+        JavaFileObjects.forSourceLines(
             "test.Foo",
             "package test;",
             "",
@@ -239,8 +228,7 @@ public class AssistedInjectErrorsTest {
             "      @Assisted String s3) {}",
             "}");
 
-    CompilerTests.daggerCompiler(foo)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(subject -> subject.hasErrorCount(0));
+    Compilation compilation = compilerWithOptions(compilerMode.javacopts()).compile(foo);
+    assertThat(compilation).succeeded();
   }
 }

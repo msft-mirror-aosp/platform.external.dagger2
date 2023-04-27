@@ -106,47 +106,47 @@ public final class MyComponentModule {
   @MyOtherAnnotation(MyTransitiveType.class)
   @Module
   interface MyAbstractModule {
-    // TODO(b/219587431): Support @MyTransitiveAnnotation (Requires generating metadata).
+    // @MyTransitiveAnnotation: Not yet supported
     @MyAnnotation(MyTransitiveType.VALUE)
     @MyOtherAnnotation(MyTransitiveType.class)
     @Binds
     @Singleton
     @MyQualifier
     ScopedQualifiedBindsType scopedQualifiedBindsType(
-        // TODO(b/219587431): Support @MyTransitiveAnnotation (Requires generating metadata).
+        // @MyTransitiveAnnotation: Not yet supported
         @MyQualifier
             @MyAnnotation(MyTransitiveType.VALUE)
             @MyOtherAnnotation(MyTransitiveType.class)
             ScopedQualifiedProvidesType scopedQualifiedProvidesType);
 
-    // TODO(b/219587431): Support @MyTransitiveAnnotation (Requires generating metadata).
+    // @MyTransitiveAnnotation: Not yet supported
     @MyAnnotation(MyTransitiveType.VALUE)
     @MyOtherAnnotation(MyTransitiveType.class)
     @Binds
     @Singleton
     ScopedUnqualifiedBindsType scopedUnqualifiedBindsType(
-        // TODO(b/219587431): Support @MyTransitiveAnnotation (Requires generating metadata).
+        // @MyTransitiveAnnotation: Not yet supported
         @MyAnnotation(MyTransitiveType.VALUE) @MyOtherAnnotation(MyTransitiveType.class)
             ScopedUnqualifiedProvidesType scopedUnqualifiedProvidesType);
 
-    // TODO(b/219587431): Support @MyTransitiveAnnotation (Requires generating metadata).
+    // @MyTransitiveAnnotation: Not yet supported
     @MyAnnotation(MyTransitiveType.VALUE)
     @MyOtherAnnotation(MyTransitiveType.class)
     @Binds
     @MyQualifier
     UnscopedQualifiedBindsType unscopedQualifiedBindsType(
-        // TODO(b/219587431): Support @MyTransitiveAnnotation (Requires generating metadata).
+        // @MyTransitiveAnnotation: Not yet supported
         @MyQualifier
             @MyAnnotation(MyTransitiveType.VALUE)
             @MyOtherAnnotation(MyTransitiveType.class)
             UnscopedQualifiedProvidesType unscopedQualifiedProvidesType);
 
-    // TODO(b/219587431): Support @MyTransitiveAnnotation (Requires generating metadata).
+    // @MyTransitiveAnnotation: Not yet supported
     @MyAnnotation(MyTransitiveType.VALUE)
     @MyOtherAnnotation(MyTransitiveType.class)
     @Binds
     UnscopedUnqualifiedBindsType unscopedUnqualifiedBindsType(
-        // TODO(b/219587431): Support @MyTransitiveAnnotation (Requires generating metadata).
+        // @MyTransitiveAnnotation: Not yet supported
         @MyAnnotation(MyTransitiveType.VALUE) @MyOtherAnnotation(MyTransitiveType.class)
             UnscopedUnqualifiedProvidesType unscopedUnqualifiedProvidesType);
   }

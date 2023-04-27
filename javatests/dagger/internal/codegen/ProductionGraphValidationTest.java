@@ -16,31 +16,22 @@
 
 package dagger.internal.codegen;
 
-import androidx.room.compiler.processing.util.Source;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import dagger.testing.compile.CompilerTests;
+import static com.google.testing.compile.CompilationSubject.assertThat;
+import static dagger.internal.codegen.Compilers.compilerWithOptions;
+import static dagger.internal.codegen.Compilers.daggerCompiler;
+
+import com.google.testing.compile.Compilation;
+import com.google.testing.compile.JavaFileObjects;
+import javax.tools.JavaFileObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
+import org.junit.runners.JUnit4;
 
 /** Producer-specific validation tests. */
-@RunWith(Parameterized.class)
+@RunWith(JUnit4.class)
 public class ProductionGraphValidationTest {
-  @Parameters(name = "{0}")
-  public static ImmutableList<Object[]> parameters() {
-    return CompilerMode.TEST_PARAMETERS;
-  }
-
-  private final CompilerMode compilerMode;
-
-  public ProductionGraphValidationTest(CompilerMode compilerMode) {
-    this.compilerMode = compilerMode;
-  }
-
-  private static final Source EXECUTOR_MODULE =
-      CompilerTests.javaSource(
+  private static final JavaFileObject EXECUTOR_MODULE =
+      JavaFileObjects.forSourceLines(
           "test.ExecutorModule",
           "package test;",
           "",
@@ -58,91 +49,70 @@ public class ProductionGraphValidationTest {
           "}");
 
   @Test public void componentWithUnprovidedInput() {
-    Source component =
-        CompilerTests.javaSource(
-            "test.MyComponent",
-            "package test;",
-            "",
-            "import com.google.common.util.concurrent.ListenableFuture;",
-            "import dagger.producers.ProductionComponent;",
-            "",
-            "@ProductionComponent(modules = {ExecutorModule.class, FooModule.class})",
-            "interface MyComponent {",
-            "  ListenableFuture<Foo> getFoo();",
-            "}");
-    Source module =
-        CompilerTests.javaSource(
-            "test.FooModule",
-            "package test;",
-            "",
-            "import dagger.producers.ProducerModule;",
-            "import dagger.producers.Produces;",
-            "",
-            "@ProducerModule",
-            "class FooModule {",
-            "  @Produces Foo foo(Bar bar) {",
-            "    return null;",
-            "  }",
-            "}");
-    Source foo =
-        CompilerTests.javaSource(
-            "test.Foo",
-            "package test;",
-            "",
-            "class Foo {}");
-    Source bar =
-        CompilerTests.javaSource(
-            "test.Bar",
-            "package test;",
-            "",
-            "class Bar {}");
-    CompilerTests.daggerCompiler(EXECUTOR_MODULE, module, component, foo, bar)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      "Bar cannot be provided without an @Inject constructor or an @Provides- or "
-                          + "@Produces-annotated method.")
-                  .onSource(component)
-                  .onLineContaining("interface MyComponent");
-            });
+    JavaFileObject component = JavaFileObjects.forSourceLines("test.MyComponent",
+        "package test;",
+        "",
+        "import com.google.common.util.concurrent.ListenableFuture;",
+        "import dagger.producers.ProductionComponent;",
+        "",
+        "@ProductionComponent(modules = {ExecutorModule.class, FooModule.class})",
+        "interface MyComponent {",
+        "  ListenableFuture<Foo> getFoo();",
+        "}");
+    JavaFileObject module = JavaFileObjects.forSourceLines("test.FooModule",
+        "package test;",
+        "",
+        "import dagger.producers.ProducerModule;",
+        "import dagger.producers.Produces;",
+        "",
+        "class Foo {}",
+        "class Bar {}",
+        "",
+        "@ProducerModule",
+        "class FooModule {",
+        "  @Produces Foo foo(Bar bar) {",
+        "    return null;",
+        "  }",
+        "}");
+    Compilation compilation = daggerCompiler().compile(EXECUTOR_MODULE, module, component);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            "Bar cannot be provided without an @Inject constructor or an @Provides- or "
+                + "@Produces-annotated method.")
+        .inFile(component)
+        .onLineContaining("interface MyComponent");
   }
 
   @Test public void componentProductionWithNoDependencyChain() {
-    Source component =
-        CompilerTests.javaSource(
-            "test.TestClass",
-            "package test;",
-            "",
-            "import com.google.common.util.concurrent.ListenableFuture;",
-            "import dagger.producers.ProductionComponent;",
-            "",
-            "final class TestClass {",
-            "  interface A {}",
-            "",
-            "  @ProductionComponent(modules = ExecutorModule.class)",
-            "  interface AComponent {",
-            "    ListenableFuture<A> getA();",
-            "  }",
-            "}");
+    JavaFileObject component = JavaFileObjects.forSourceLines("test.TestClass",
+        "package test;",
+        "",
+        "import com.google.common.util.concurrent.ListenableFuture;",
+        "import dagger.producers.ProductionComponent;",
+        "",
+        "final class TestClass {",
+        "  interface A {}",
+        "",
+        "  @ProductionComponent(modules = ExecutorModule.class)",
+        "  interface AComponent {",
+        "    ListenableFuture<A> getA();",
+        "  }",
+        "}");
 
-    CompilerTests.daggerCompiler(EXECUTOR_MODULE, component)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      "TestClass.A cannot be provided without an @Provides- or @Produces-annotated "
-                          + "method.")
-                  .onSource(component)
-                  .onLineContaining("interface AComponent");
-            });
+    Compilation compilation = daggerCompiler().compile(EXECUTOR_MODULE, component);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            "TestClass.A cannot be provided without an @Provides- or @Produces-annotated "
+                + "method.")
+        .inFile(component)
+        .onLineContaining("interface AComponent");
   }
 
   @Test public void provisionDependsOnProduction() {
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestClass",
             "package test;",
             "",
@@ -176,39 +146,26 @@ public class ProductionGraphValidationTest {
             "  }",
             "}");
 
-    CompilerTests.daggerCompiler(EXECUTOR_MODULE, component)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      "TestClass.A is a provision, which cannot depend on a production.")
-                  .onSource(component)
-                  .onLineContaining("interface AComponent");
-            });
+    Compilation compilation = daggerCompiler().compile(EXECUTOR_MODULE, component);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining("TestClass.A is a provision, which cannot depend on a production.")
+        .inFile(component)
+        .onLineContaining("interface AComponent");
 
-    CompilerTests.daggerCompiler(EXECUTOR_MODULE, component)
-        .withProcessingOptions(
-            ImmutableMap.<String, String>builder()
-                .putAll(compilerMode.processorOptions())
-                .put("dagger.fullBindingGraphValidation", "ERROR")
-                .buildOrThrow())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(2);
-              subject.hasErrorContaining(
-                      "TestClass.A is a provision, which cannot depend on a production.")
-                  .onSource(component)
-                  .onLineContaining("class AModule");
-              subject.hasErrorContaining("test.TestClass.AModule has errors")
-                  .onSource(component)
-                  .onLineContaining("@ProductionComponent");
-            });
+    compilation =
+        compilerWithOptions("-Adagger.fullBindingGraphValidation=ERROR")
+            .compile(EXECUTOR_MODULE, component);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining("TestClass.A is a provision, which cannot depend on a production.")
+        .inFile(component)
+        .onLineContaining("class AModule");
   }
 
   @Test public void provisionEntryPointDependsOnProduction() {
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestClass",
             "package test;",
             "",
@@ -233,23 +190,19 @@ public class ProductionGraphValidationTest {
             "  }",
             "}");
 
-    CompilerTests.daggerCompiler(EXECUTOR_MODULE, component)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      "TestClass.A is a provision entry-point, which cannot depend on a "
-                          + "production.")
-                  .onSource(component)
-                  .onLineContaining("interface AComponent");
-            });
+    Compilation compilation = daggerCompiler().compile(EXECUTOR_MODULE, component);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            "TestClass.A is a provision entry-point, which cannot depend on a production.")
+        .inFile(component)
+        .onLineContaining("interface AComponent");
   }
 
   @Test
   public void providingMultibindingWithProductions() {
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestClass",
             "package test;",
             "",
@@ -296,23 +249,18 @@ public class ProductionGraphValidationTest {
             "    ListenableFuture<B> b();",
             "  }",
             "}");
-
-    CompilerTests.daggerCompiler(EXECUTOR_MODULE, component)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      "TestClass.A is a provision, which cannot depend on a production")
-                  .onSource(component)
-                  .onLineContaining("interface AComponent");
-            });
+    Compilation compilation = daggerCompiler().compile(EXECUTOR_MODULE, component);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining("TestClass.A is a provision, which cannot depend on a production")
+        .inFile(component)
+        .onLineContaining("interface AComponent");
   }
 
   @Test
   public void monitoringDependsOnUnboundType() {
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestClass",
             "package test;",
             "",
@@ -351,22 +299,19 @@ public class ProductionGraphValidationTest {
             "  }",
             "}");
 
-    CompilerTests.daggerCompiler(EXECUTOR_MODULE, component)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      "TestClass.A cannot be provided without an @Provides-annotated method.")
-                  .onSource(component)
-                  .onLineContaining("interface StringComponent");
-            });
+    Compilation compilation = daggerCompiler().compile(EXECUTOR_MODULE, component);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            "TestClass.A cannot be provided without an @Provides-annotated method.")
+        .inFile(component)
+        .onLineContaining("interface StringComponent");
   }
 
   @Test
   public void monitoringDependsOnProduction() {
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestClass",
             "package test;",
             "",
@@ -408,24 +353,21 @@ public class ProductionGraphValidationTest {
             "  }",
             "}");
 
-    CompilerTests.daggerCompiler(EXECUTOR_MODULE, component)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      "Set<ProductionComponentMonitor.Factory>"
-                          + " TestClass.MonitoringModule#monitorFactory is a provision,"
-                          + " which cannot depend on a production.")
-                  .onSource(component)
-                  .onLineContaining("interface StringComponent");
-            });
+    Compilation compilation = daggerCompiler().compile(EXECUTOR_MODULE, component);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            "Set<ProductionComponentMonitor.Factory>"
+                + " TestClass.MonitoringModule#monitorFactory is a provision,"
+                + " which cannot depend on a production.")
+        .inFile(component)
+        .onLineContaining("interface StringComponent");
   }
 
   @Test
   public void cycleNotBrokenByMap() {
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -436,8 +378,8 @@ public class ProductionGraphValidationTest {
             "interface TestComponent {",
             "  ListenableFuture<String> string();",
             "}");
-    Source module =
-        CompilerTests.javaSource(
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -458,22 +400,18 @@ public class ProductionGraphValidationTest {
             "    return string;",
             "  }",
             "}");
-
-    CompilerTests.daggerCompiler(EXECUTOR_MODULE, component, module)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining("cycle")
-                  .onSource(component)
-                  .onLineContaining("interface TestComponent");
-            });
+    Compilation compilation = daggerCompiler().compile(EXECUTOR_MODULE, component, module);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining("cycle")
+        .inFile(component)
+        .onLineContaining("interface TestComponent");
   }
 
   @Test
   public void cycleNotBrokenByProducerMap() {
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -484,8 +422,8 @@ public class ProductionGraphValidationTest {
             "interface TestComponent {",
             "  ListenableFuture<String> string();",
             "}");
-    Source module =
-        CompilerTests.javaSource(
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -507,22 +445,18 @@ public class ProductionGraphValidationTest {
             "    return string;",
             "  }",
             "}");
-
-    CompilerTests.daggerCompiler(EXECUTOR_MODULE, component, module)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining("cycle")
-                  .onSource(component)
-                  .onLineContaining("interface TestComponent");
-            });
+    Compilation compilation = daggerCompiler().compile(EXECUTOR_MODULE, component, module);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining("cycle")
+        .inFile(component)
+        .onLineContaining("interface TestComponent");
   }
-
+  
   @Test
   public void componentWithBadModule() {
-    Source badModule =
-        CompilerTests.javaSource(
+    JavaFileObject badModule =
+        JavaFileObjects.forSourceLines(
             "test.BadModule",
             "package test;",
             "",
@@ -537,8 +471,8 @@ public class ProductionGraphValidationTest {
             "  @BindsOptionalOf",
             "  abstract Set<String> strings();",
             "}");
-    Source badComponent =
-        CompilerTests.javaSource(
+    JavaFileObject badComponent =
+        JavaFileObjects.forSourceLines(
             "test.BadComponent",
             "package test;",
             "",
@@ -551,21 +485,11 @@ public class ProductionGraphValidationTest {
             "  Set<String> strings();",
             "  Optional<Set<String>> optionalStrings();",
             "}");
-
-    CompilerTests.daggerCompiler(badModule, badComponent)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(2);
-              subject.hasErrorContaining(
-                      "strings is annotated with more than one of (dagger.Provides, "
-                          + "dagger.producers.Produces, dagger.Binds, "
-                          + "dagger.multibindings.Multibinds, dagger.BindsOptionalOf)")
-                  .onSource(badModule)
-                  .onLine(12);
-              subject.hasErrorContaining("test.BadModule has errors")
-                  .onSource(badComponent)
-                  .onLine(7);
-            });
+    Compilation compilation = daggerCompiler().compile(badModule, badComponent);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining("BadModule has errors")
+        .inFile(badComponent)
+        .onLine(7);
   }
 }

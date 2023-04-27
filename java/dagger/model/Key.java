@@ -28,6 +28,7 @@ import com.google.common.base.Equivalence.Wrapper;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
+import com.google.errorprone.annotations.CheckReturnValue;
 import com.squareup.javapoet.CodeBlock;
 import java.util.List;
 import java.util.Objects;
@@ -177,11 +178,11 @@ public abstract class Key {
   }
 
   /** A builder for {@link Key}s. */
+  @CanIgnoreReturnValue
   @AutoValue.Builder
   public abstract static class Builder {
     abstract Builder wrappedType(Equivalence.Wrapper<TypeMirror> wrappedType);
 
-    @CanIgnoreReturnValue
     public final Builder type(TypeMirror type) {
       return wrappedType(MoreTypes.equivalence().wrap(checkNotNull(type)));
     }
@@ -191,12 +192,10 @@ public abstract class Key {
 
     abstract Builder wrappedQualifier(Equivalence.Wrapper<AnnotationMirror> wrappedQualifier);
 
-    @CanIgnoreReturnValue
     public final Builder qualifier(AnnotationMirror qualifier) {
       return wrappedQualifier(AnnotationMirrors.equivalence().wrap(checkNotNull(qualifier)));
     }
 
-    @CanIgnoreReturnValue
     public final Builder qualifier(Optional<AnnotationMirror> qualifier) {
       return wrappedQualifier(checkNotNull(qualifier).map(AnnotationMirrors.equivalence()::wrap));
     }
@@ -207,6 +206,7 @@ public abstract class Key {
     public abstract Builder multibindingContributionIdentifier(
         MultibindingContributionIdentifier identifier);
 
+    @CheckReturnValue
     public abstract Key build();
   }
 

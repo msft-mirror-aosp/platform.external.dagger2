@@ -18,7 +18,7 @@ package dagger.internal.codegen.validation;
 
 import static dagger.internal.codegen.base.ElementFormatter.elementToString;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
-import static dagger.internal.codegen.xprocessing.XElements.transitivelyEncloses;
+import static dagger.internal.codegen.langmodel.DaggerElements.transitivelyEncloses;
 import static javax.tools.Diagnostic.Kind.ERROR;
 import static javax.tools.Diagnostic.Kind.NOTE;
 import static javax.tools.Diagnostic.Kind.WARNING;
@@ -37,7 +37,6 @@ import javax.tools.Diagnostic;
 import javax.tools.Diagnostic.Kind;
 
 /** A collection of issues to report for source code. */
-@CheckReturnValue
 public final class ValidationReport {
   private static final Traverser<ValidationReport> SUBREPORTS =
       Traverser.forTree(report -> report.subreports);
@@ -146,6 +145,7 @@ public final class ValidationReport {
   }
 
   /** A {@link ValidationReport} builder. */
+  @CanIgnoreReturnValue
   public static final class Builder {
     private final XElement subject;
     private final ImmutableSet.Builder<Item> items = ImmutableSet.builder();
@@ -156,28 +156,23 @@ public final class ValidationReport {
       this.subject = subject;
     }
 
-    @CanIgnoreReturnValue
     Builder addItems(Iterable<Item> newItems) {
       items.addAll(newItems);
       return this;
     }
 
-    @CanIgnoreReturnValue
     public Builder addError(String message) {
       return addError(message, subject);
     }
 
-    @CanIgnoreReturnValue
     public Builder addError(String message, XElement element) {
       return addItem(message, ERROR, element);
     }
 
-    @CanIgnoreReturnValue
     public Builder addError(String message, XElement element, XAnnotation annotation) {
       return addItem(message, ERROR, element, annotation);
     }
 
-    @CanIgnoreReturnValue
     public Builder addError(
         String message,
         XElement element,
@@ -186,22 +181,18 @@ public final class ValidationReport {
       return addItem(message, ERROR, element, annotation, annotationValue);
     }
 
-    @CanIgnoreReturnValue
     Builder addWarning(String message) {
       return addWarning(message, subject);
     }
 
-    @CanIgnoreReturnValue
     Builder addWarning(String message, XElement element) {
       return addItem(message, WARNING, element);
     }
 
-    @CanIgnoreReturnValue
     Builder addWarning(String message, XElement element, XAnnotation annotation) {
       return addItem(message, WARNING, element, annotation);
     }
 
-    @CanIgnoreReturnValue
     Builder addWarning(
         String message,
         XElement element,
@@ -210,22 +201,18 @@ public final class ValidationReport {
       return addItem(message, WARNING, element, annotation, annotationValue);
     }
 
-    @CanIgnoreReturnValue
     Builder addNote(String message) {
       return addNote(message, subject);
     }
 
-    @CanIgnoreReturnValue
     Builder addNote(String message, XElement element) {
       return addItem(message, NOTE, element);
     }
 
-    @CanIgnoreReturnValue
     Builder addNote(String message, XElement element, XAnnotation annotation) {
       return addItem(message, NOTE, element, annotation);
     }
 
-    @CanIgnoreReturnValue
     Builder addNote(
         String message,
         XElement element,
@@ -234,17 +221,14 @@ public final class ValidationReport {
       return addItem(message, NOTE, element, annotation, annotationValue);
     }
 
-    @CanIgnoreReturnValue
     Builder addItem(String message, Kind kind, XElement element) {
       return addItem(message, kind, element, Optional.empty(), Optional.empty());
     }
 
-    @CanIgnoreReturnValue
     Builder addItem(String message, Kind kind, XElement element, XAnnotation annotation) {
       return addItem(message, kind, element, Optional.of(annotation), Optional.empty());
     }
 
-    @CanIgnoreReturnValue
     Builder addItem(
         String message,
         Kind kind,
@@ -254,7 +238,6 @@ public final class ValidationReport {
       return addItem(message, kind, element, Optional.of(annotation), Optional.of(annotationValue));
     }
 
-    @CanIgnoreReturnValue
     private Builder addItem(
         String message,
         Kind kind,
@@ -279,12 +262,12 @@ public final class ValidationReport {
       this.markedDirty = true;
     }
 
-    @CanIgnoreReturnValue
     public Builder addSubreport(ValidationReport subreport) {
       subreports.add(subreport);
       return this;
     }
 
+    @CheckReturnValue
     public ValidationReport build() {
       return new ValidationReport(subject, items.build(), subreports.build(), markedDirty);
     }

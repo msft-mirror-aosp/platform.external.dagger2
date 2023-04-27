@@ -16,7 +16,9 @@
 
 package dagger.internal.codegen;
 
+import static com.google.testing.compile.CompilationSubject.assertThat;
 import static dagger.internal.codegen.CompilerMode.DEFAULT_MODE;
+import static dagger.internal.codegen.TestUtils.message;
 import static dagger.internal.codegen.base.ComponentCreatorAnnotation.SUBCOMPONENT_BUILDER;
 import static dagger.internal.codegen.base.ComponentCreatorAnnotation.SUBCOMPONENT_FACTORY;
 import static dagger.internal.codegen.base.ComponentCreatorKind.BUILDER;
@@ -25,11 +27,12 @@ import static dagger.internal.codegen.base.ComponentKind.SUBCOMPONENT;
 import static dagger.internal.codegen.binding.ErrorMessages.ComponentCreatorMessages.moreThanOneRefToSubcomponent;
 import static dagger.internal.codegen.binding.ErrorMessages.componentMessagesFor;
 
-import androidx.room.compiler.processing.util.Source;
 import com.google.common.collect.ImmutableList;
+import com.google.testing.compile.Compilation;
+import com.google.testing.compile.JavaFileObjects;
 import dagger.internal.codegen.base.ComponentCreatorAnnotation;
-import dagger.testing.compile.CompilerTests;
 import java.util.Collection;
+import javax.tools.JavaFileObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -49,8 +52,8 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
 
   @Test
   public void testRefSubcomponentAndSubCreatorFails() {
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.ParentComponent",
             "package test;",
             "",
@@ -62,7 +65,7 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
             "  ChildComponent child();",
             "  ChildComponent.Builder childComponentBuilder();",
             "}");
-    Source childComponentFile = preprocessedJavaSource("test.ChildComponent",
+    JavaFileObject childComponentFile = preprocessedJavaFile("test.ChildComponent",
         "package test;",
         "",
         "import dagger.Subcomponent;",
@@ -74,25 +77,20 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
         "    ChildComponent build();",
         "  }",
         "}");
-    CompilerTests.daggerCompiler(componentFile, childComponentFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      String.format(
-                          moreThanOneRefToSubcomponent(),
-                          "test.ChildComponent",
-                          process("["
-                              + "test.ParentComponent.child(), "
-                              + "test.ParentComponent.childComponentBuilder()"
-                              + "]")))
-                  .onSource(componentFile);
-            });
+    Compilation compilation = compile(componentFile, childComponentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            String.format(
+                moreThanOneRefToSubcomponent(),
+                "test.ChildComponent",
+                process("[child(), childComponentBuilder()]")))
+        .inFile(componentFile);
   }
 
   @Test
   public void testRefSubCreatorTwiceFails() {
-    Source componentFile = preprocessedJavaSource("test.ParentComponent",
+    JavaFileObject componentFile = preprocessedJavaFile("test.ParentComponent",
         "package test;",
         "",
         "import dagger.Component;",
@@ -103,7 +101,7 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
         "  ChildComponent.Builder builder1();",
         "  ChildComponent.Builder builder2();",
         "}");
-    Source childComponentFile = preprocessedJavaSource("test.ChildComponent",
+    JavaFileObject childComponentFile = preprocessedJavaFile("test.ChildComponent",
         "package test;",
         "",
         "import dagger.Subcomponent;",
@@ -115,25 +113,19 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
         "    ChildComponent build();",
         "  }",
         "}");
-    CompilerTests.daggerCompiler(componentFile, childComponentFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      String.format(
-                          moreThanOneRefToSubcomponent(),
-                          "test.ChildComponent",
-                          process("["
-                              + "test.ParentComponent.builder1(), "
-                              + "test.ParentComponent.builder2()"
-                              + "]")))
-                  .onSource(componentFile);
-            });
+    Compilation compilation = compile(componentFile, childComponentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            String.format(
+                moreThanOneRefToSubcomponent(),
+                "test.ChildComponent", process("[builder1(), builder2()]")))
+        .inFile(componentFile);
   }
 
   @Test
   public void testMoreThanOneCreatorFails() {
-    Source componentFile = preprocessedJavaSource("test.ParentComponent",
+    JavaFileObject componentFile = preprocessedJavaFile("test.ParentComponent",
         "package test;",
         "",
         "import dagger.Component;",
@@ -143,7 +135,7 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
         "interface ParentComponent {",
         "  ChildComponent.Builder1 build();",
         "}");
-    Source childComponentFile = preprocessedJavaSource("test.ChildComponent",
+    JavaFileObject childComponentFile = preprocessedJavaFile("test.ChildComponent",
         "package test;",
         "",
         "import dagger.Subcomponent;",
@@ -160,21 +152,19 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
         "    ChildComponent build();",
         "  }",
         "}");
-    CompilerTests.daggerCompiler(componentFile, childComponentFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      String.format(
-                          componentMessagesFor(SUBCOMPONENT).moreThanOne(),
-                          process("[test.ChildComponent.Builder1, test.ChildComponent.Builder2]")))
-                  .onSource(childComponentFile);
-            });
+    Compilation compilation = compile(componentFile, childComponentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            String.format(
+                componentMessagesFor(SUBCOMPONENT).moreThanOne(),
+                process("[test.ChildComponent.Builder1, test.ChildComponent.Builder2]")))
+        .inFile(childComponentFile);
   }
 
   @Test
   public void testMoreThanOneCreatorFails_differentTypes() {
-    Source componentFile = preprocessedJavaSource("test.ParentComponent",
+    JavaFileObject componentFile = preprocessedJavaFile("test.ParentComponent",
         "package test;",
         "",
         "import dagger.Component;",
@@ -184,8 +174,7 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
         "interface ParentComponent {",
         "  ChildComponent.Builder build();",
         "}");
-    Source childComponentFile =
-        CompilerTests.javaSource("test.ChildComponent",
+    JavaFileObject childComponentFile = JavaFileObjects.forSourceLines("test.ChildComponent",
         "package test;",
         "",
         "import dagger.Subcomponent;",
@@ -202,21 +191,19 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
         "    ChildComponent create();",
         "  }",
         "}");
-    CompilerTests.daggerCompiler(componentFile, childComponentFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      String.format(
-                          componentMessagesFor(SUBCOMPONENT).moreThanOne(),
-                          "[test.ChildComponent.Builder, test.ChildComponent.Factory]"))
-                  .onSource(childComponentFile);
-            });
+    Compilation compilation = compile(componentFile, childComponentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            String.format(
+                componentMessagesFor(SUBCOMPONENT).moreThanOne(),
+                "[test.ChildComponent.Builder, test.ChildComponent.Factory]"))
+        .inFile(childComponentFile);
   }
 
   @Test
   public void testCreatorGenericsFails() {
-    Source componentFile = preprocessedJavaSource("test.ParentComponent",
+    JavaFileObject componentFile = preprocessedJavaFile("test.ParentComponent",
         "package test;",
         "",
         "import dagger.Component;",
@@ -226,7 +213,7 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
         "interface ParentComponent {",
         "  ChildComponent.Builder build();",
         "}");
-    Source childComponentFile = preprocessedJavaSource("test.ChildComponent",
+    JavaFileObject childComponentFile = preprocessedJavaFile("test.ChildComponent",
         "package test;",
         "",
         "import dagger.Subcomponent;",
@@ -238,35 +225,29 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
         "     ChildComponent build();",
         "  }",
         "}");
-    CompilerTests.daggerCompiler(componentFile, childComponentFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(messages.generics()).onSource(childComponentFile);
-            });
+    Compilation compilation = compile(componentFile, childComponentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorContaining(messages.generics()).inFile(childComponentFile);
   }
 
   @Test
   public void testCreatorNotInComponentFails() {
-    Source builder = preprocessedJavaSource("test.Builder",
+    JavaFileObject builder = preprocessedJavaFile("test.Builder",
         "package test;",
         "",
         "import dagger.Subcomponent;",
         "",
         "@Subcomponent.Builder",
         "interface Builder {}");
-    CompilerTests.daggerCompiler(builder)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(messages.mustBeInComponent()).onSource(builder);
-            });
+    Compilation compilation = compile(builder);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorContaining(messages.mustBeInComponent()).inFile(builder);
   }
 
   @Test
   public void testCreatorMissingFactoryMethodFails() {
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.ParentComponent",
             "package test;",
             "",
@@ -277,7 +258,7 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
             "interface ParentComponent {",
             "  ChildComponent.Builder childComponentBuilder();",
             "}");
-    Source childComponentFile = preprocessedJavaSource("test.ChildComponent",
+    JavaFileObject childComponentFile = preprocessedJavaFile("test.ChildComponent",
         "package test;",
         "",
         "import dagger.Subcomponent;",
@@ -287,18 +268,16 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
         "  @Subcomponent.Builder",
         "  interface Builder {}",
         "}");
-    CompilerTests.daggerCompiler(componentFile, childComponentFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(messages.missingFactoryMethod())
-                  .onSource(childComponentFile);
-            });
+    Compilation compilation = compile(componentFile, childComponentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(messages.missingFactoryMethod())
+        .inFile(childComponentFile);
   }
 
   @Test
   public void testPrivateCreatorFails() {
-    Source childComponentFile = preprocessedJavaSource("test.ChildComponent",
+    JavaFileObject childComponentFile = preprocessedJavaFile("test.ChildComponent",
         "package test;",
         "",
         "import dagger.Subcomponent;",
@@ -308,17 +287,14 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
         "  @Subcomponent.Builder",
         "  private interface Builder {}",
         "}");
-    CompilerTests.daggerCompiler(childComponentFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(messages.isPrivate()).onSource(childComponentFile);
-            });
+    Compilation compilation = compile(childComponentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorContaining(messages.isPrivate()).inFile(childComponentFile);
   }
 
   @Test
   public void testNonStaticCreatorFails() {
-    Source childComponentFile = preprocessedJavaSource("test.ChildComponent",
+    JavaFileObject childComponentFile = preprocessedJavaFile("test.ChildComponent",
         "package test;",
         "",
         "import dagger.Subcomponent;",
@@ -328,17 +304,14 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
         "  @Subcomponent.Builder",
         "  abstract class Builder {}",
         "}");
-    CompilerTests.daggerCompiler(childComponentFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(messages.mustBeStatic()).onSource(childComponentFile);
-            });
+    Compilation compilation = compile(childComponentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorContaining(messages.mustBeStatic()).inFile(childComponentFile);
   }
 
   @Test
   public void testNonAbstractCreatorFails() {
-    Source childComponentFile = preprocessedJavaSource("test.ChildComponent",
+    JavaFileObject childComponentFile = preprocessedJavaFile("test.ChildComponent",
         "package test;",
         "",
         "import dagger.Subcomponent;",
@@ -348,18 +321,16 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
         "  @Subcomponent.Builder",
         "  static class Builder {}",
         "}");
-    CompilerTests.daggerCompiler(childComponentFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(messages.mustBeAbstract())
-                  .onSource(childComponentFile);
-            });
+    Compilation compilation = compile(childComponentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(messages.mustBeAbstract())
+        .inFile(childComponentFile);
   }
 
   @Test
   public void testCreatorOneConstructorWithArgsFails() {
-    Source childComponentFile = preprocessedJavaSource("test.ChildComponent",
+    JavaFileObject childComponentFile = preprocessedJavaFile("test.ChildComponent",
         "package test;",
         "",
         "import dagger.Subcomponent;",
@@ -369,21 +340,18 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
         "  @Subcomponent.Builder",
         "  static abstract class Builder {",
         "    Builder(String unused) {}",
-        "    abstract ChildComponent build();",
         "  }",
         "}");
-    CompilerTests.daggerCompiler(childComponentFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(messages.invalidConstructor())
-                  .onSource(childComponentFile);
-            });
+    Compilation compilation = compile(childComponentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(messages.invalidConstructor())
+        .inFile(childComponentFile);
   }
 
   @Test
   public void testCreatorMoreThanOneConstructorFails() {
-    Source childComponentFile = preprocessedJavaSource("test.ChildComponent",
+    JavaFileObject childComponentFile = preprocessedJavaFile("test.ChildComponent",
         "package test;",
         "",
         "import dagger.Subcomponent;",
@@ -394,21 +362,18 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
         "  static abstract class Builder {",
         "    Builder() {}",
         "    Builder(String unused) {}",
-        "    abstract ChildComponent build();",
         "  }",
         "}");
-    CompilerTests.daggerCompiler(childComponentFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(messages.invalidConstructor())
-                  .onSource(childComponentFile);
-            });
+    Compilation compilation = compile(childComponentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(messages.invalidConstructor())
+        .inFile(childComponentFile);
   }
 
   @Test
   public void testCreatorEnumFails() {
-    Source childComponentFile = preprocessedJavaSource("test.ChildComponent",
+    JavaFileObject childComponentFile = preprocessedJavaFile("test.ChildComponent",
         "package test;",
         "",
         "import dagger.Subcomponent;",
@@ -418,18 +383,16 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
         "  @Subcomponent.Builder",
         "  enum Builder {}",
         "}");
-    CompilerTests.daggerCompiler(childComponentFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(messages.mustBeClassOrInterface())
-                  .onSource(childComponentFile);
-            });
+    Compilation compilation = compile(childComponentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(messages.mustBeClassOrInterface())
+        .inFile(childComponentFile);
   }
 
   @Test
   public void testCreatorFactoryMethodReturnsWrongTypeFails() {
-    Source childComponentFile = preprocessedJavaSource("test.ChildComponent",
+    JavaFileObject childComponentFile = preprocessedJavaFile("test.ChildComponent",
         "package test;",
         "",
         "import dagger.Subcomponent;",
@@ -441,19 +404,17 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
         "    String build();",
         "  }",
         "}");
-    CompilerTests.daggerCompiler(childComponentFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(messages.factoryMethodMustReturnComponentType())
-                  .onSource(childComponentFile)
-                  .onLine(9);
-            });
+    Compilation compilation = compile(childComponentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(messages.factoryMethodMustReturnComponentType())
+        .inFile(childComponentFile)
+        .onLine(9);
   }
 
   @Test
   public void testInheritedCreatorFactoryMethodReturnsWrongTypeFails() {
-    Source childComponentFile = preprocessedJavaSource("test.ChildComponent",
+    JavaFileObject childComponentFile = preprocessedJavaFile("test.ChildComponent",
         "package test;",
         "",
         "import dagger.Subcomponent;",
@@ -467,23 +428,19 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
         "  @Subcomponent.Builder",
         "  interface Builder extends Parent {}",
         "}");
-
-    CompilerTests.daggerCompiler(childComponentFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      String.format(
-                          messages.inheritedFactoryMethodMustReturnComponentType(),
-                          process("String test.ChildComponent.Parent.build()")))
-                  .onSource(childComponentFile)
-                  .onLine(12);
-            });
+    Compilation compilation = compile(childComponentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            String.format(
+                messages.inheritedFactoryMethodMustReturnComponentType(), process("build")))
+        .inFile(childComponentFile)
+        .onLine(12);
   }
 
   @Test
   public void testTwoFactoryMethodsFails() {
-    Source childComponentFile = preprocessedJavaSource("test.ChildComponent",
+    JavaFileObject childComponentFile = preprocessedJavaFile("test.ChildComponent",
         "package test;",
         "",
         "import dagger.Subcomponent;",
@@ -496,23 +453,17 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
         "    ChildComponent build1();",
         "  }",
         "}");
-
-    CompilerTests.daggerCompiler(childComponentFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      String.format(
-                          messages.twoFactoryMethods(),
-                          process("test.ChildComponent test.ChildComponent.Builder.build()")))
-                  .onSource(childComponentFile)
-                  .onLine(10);
-            });
+    Compilation compilation = compile(childComponentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(String.format(messages.twoFactoryMethods(), process("build()")))
+        .inFile(childComponentFile)
+        .onLine(10);
   }
 
   @Test
   public void testInheritedTwoFactoryMethodsFails() {
-    Source childComponentFile = preprocessedJavaSource("test.ChildComponent",
+    JavaFileObject childComponentFile = preprocessedJavaFile("test.ChildComponent",
         "package test;",
         "",
         "import dagger.Subcomponent;",
@@ -527,25 +478,20 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
         "  @Subcomponent.Builder",
         "  interface Builder extends Parent {}",
         "}");
-
-    CompilerTests.daggerCompiler(childComponentFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      String.format(
-                          messages.inheritedTwoFactoryMethods(),
-                          process("test.ChildComponent test.ChildComponent.Parent.build()"),
-                          process("test.ChildComponent test.ChildComponent.Parent.build1()")))
-                  .onSource(childComponentFile)
-                  .onLine(13);
-            });
+    Compilation compilation = compile(childComponentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            String.format(
+                messages.inheritedTwoFactoryMethods(), process("build()"), process("build1()")))
+        .inFile(childComponentFile)
+        .onLine(13);
   }
 
   @Test
   public void testMultipleSettersPerTypeFails() {
-    Source moduleFile =
-        CompilerTests.javaSource(
+    JavaFileObject moduleFile =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -556,8 +502,8 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
             "final class TestModule {",
             "  @Provides String s() { return \"\"; }",
             "}");
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.ParentComponent",
             "package test;",
             "",
@@ -567,7 +513,7 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
             "interface ParentComponent {",
             "  ChildComponent.Builder childComponentBuilder();",
             "}");
-    Source childComponentFile =
+    JavaFileObject childComponentFile =
         javaFileBuilder("test.ChildComponent")
             .addLines(
                 "package test;",
@@ -595,31 +541,26 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
                 "  }")
             .addLines( //
                 "}")
-            .buildSource();
-
+            .build();
+    Compilation compilation = compile(moduleFile, componentFile, childComponentFile);
+    assertThat(compilation).failed();
     String elements =
         creatorKind.equals(BUILDER)
             ? "[void test.ChildComponent.Builder.set1(test.TestModule), "
                 + "void test.ChildComponent.Builder.set2(test.TestModule)]"
             : "[test.TestModule m1, test.TestModule m2]";
-    CompilerTests.daggerCompiler(moduleFile, componentFile, childComponentFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                  String.format(
-                      messages.multipleSettersForModuleOrDependencyType(),
-                      "test.TestModule",
-                      elements))
-                  .onSource(childComponentFile)
-                  .onLine(11);
-            });
+    assertThat(compilation)
+        .hadErrorContaining(
+            String.format(
+                messages.multipleSettersForModuleOrDependencyType(), "test.TestModule", elements))
+        .inFile(childComponentFile)
+        .onLine(11);
   }
 
   @Test
   public void testMultipleSettersPerTypeIncludingResolvedGenericsFails() {
-    Source moduleFile =
-        CompilerTests.javaSource(
+    JavaFileObject moduleFile =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -630,8 +571,8 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
             "final class TestModule {",
             "  @Provides String s() { return \"\"; }",
             "}");
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.ParentComponent",
             "package test;",
             "",
@@ -641,7 +582,7 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
             "interface ParentComponent {",
             "  ChildComponent.Builder childComponentBuilder();",
             "}");
-    Source childComponentFile =
+    JavaFileObject childComponentFile =
         javaFileBuilder("test.ChildComponent")
             .addLines(
                 "package test;",
@@ -674,31 +615,26 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
                 "  interface Factory extends Parent<ChildComponent, TestModule> {}")
             .addLines( //
                 "}")
-            .buildSource();
-
+            .build();
+    Compilation compilation = compile(moduleFile, componentFile, childComponentFile);
+    assertThat(compilation).failed();
     String elements =
         creatorKind.equals(BUILDER)
             ? "[void test.ChildComponent.Builder.set1(test.TestModule), "
                 + "void test.ChildComponent.Builder.set2(test.TestModule)]"
             : "[test.TestModule m1, test.TestModule t]";
-    CompilerTests.daggerCompiler(moduleFile, componentFile, childComponentFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                  String.format(
-                      messages.multipleSettersForModuleOrDependencyType(),
-                      "test.TestModule",
-                      elements))
-                  .onSource(childComponentFile)
-                  .onLine(15);
-            });
+    assertThat(compilation)
+        .hadErrorContaining(
+            String.format(
+                messages.multipleSettersForModuleOrDependencyType(), "test.TestModule", elements))
+        .inFile(childComponentFile)
+        .onLine(15);
   }
 
   @Test
   public void testMultipleSettersPerBoundInstanceTypeFails() {
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.ParentComponent",
             "package test;",
             "",
@@ -708,7 +644,7 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
             "interface ParentComponent {",
             "  ChildComponent.Builder childComponentBuilder();",
             "}");
-    Source childComponentFile =
+    JavaFileObject childComponentFile =
         javaFileBuilder("test.ChildComponent")
             .addLines(
                 "package test;",
@@ -737,30 +673,30 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
                 "  }")
             .addLines( //
                 "}")
-            .buildSource();
+            .build();
 
+    Compilation compilation = compile(componentFile, childComponentFile);
+    assertThat(compilation).failed();
     String firstBinding = creatorKind.equals(FACTORY)
         ? "ChildComponent.Factory.create(s1, …)"
         : "@BindsInstance void ChildComponent.Builder.set1(String)";
     String secondBinding = creatorKind.equals(FACTORY)
         ? "ChildComponent.Factory.create(…, s2)"
         : "@BindsInstance void ChildComponent.Builder.set2(String)";
-    CompilerTests.daggerCompiler(componentFile, childComponentFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining("String is bound multiple times:");
-              subject.hasErrorContaining("    " + firstBinding);
-              subject.hasErrorContaining("    " + secondBinding);
-              subject.hasErrorContaining("    in component: [ParentComponent → ChildComponent]")
-                  .onSource(componentFile)
-                  .onLineContaining("interface ParentComponent {");
-            });
+    assertThat(compilation)
+        .hadErrorContaining(
+            message(
+                "String is bound multiple times:",
+                "    " + firstBinding,
+                "    " + secondBinding,
+                "    in component: [ParentComponent → ChildComponent]"))
+        .inFile(componentFile)
+        .onLineContaining("interface ParentComponent {");
   }
 
   @Test
   public void testExtraSettersFails() {
-    Source componentFile = preprocessedJavaSource("test.ParentComponent",
+    JavaFileObject componentFile = preprocessedJavaFile("test.ParentComponent",
         "package test;",
         "",
         "import dagger.Component;",
@@ -770,7 +706,7 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
         "interface ParentComponent {",
         "  ChildComponent.Builder build();",
         "}");
-    Source childComponentFile =
+    JavaFileObject childComponentFile =
         javaFileBuilder("test.ChildComponent")
             .addLines(
                 "package test;",
@@ -795,78 +731,70 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
                 "    ChildComponent create(String s, Integer i);",
                 "  }")
             .addLines("}")
-            .buildSource();
-
+            .build();
+    Compilation compilation = compile(componentFile, childComponentFile);
+    assertThat(compilation).failed();
     String elements =
         creatorKind.equals(FACTORY)
             ? "[String s, Integer i]"
             : "[void test.ChildComponent.Builder.set1(String),"
                 + " void test.ChildComponent.Builder.set2(Integer)]";
-    CompilerTests.daggerCompiler(componentFile, childComponentFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(String.format(messages.extraSetters(), elements))
-                  .onSource(childComponentFile)
-                  .onLine(9);
-            });
+    assertThat(compilation)
+        .hadErrorContaining(
+            String.format(
+                messages.extraSetters(),
+                elements))
+        .inFile(childComponentFile)
+        .onLine(9);
   }
 
   @Test
   public void testMissingSettersFail() {
-    Source moduleFile =
-        CompilerTests.javaSource(
-            "test.TestModule",
-            "package test;",
-            "",
-            "import dagger.Module;",
-            "import dagger.Provides;",
-            "",
-            "@Module",
-            "final class TestModule {",
-            "  TestModule(String unused) {}",
-            "  @Provides String s() { return null; }",
-            "}");
-    Source module2File =
-        CompilerTests.javaSource(
-            "test.Test2Module",
-            "package test;",
-            "",
-            "import dagger.Module;",
-            "import dagger.Provides;",
-            "",
-            "@Module",
-            "final class Test2Module {",
-            "  @Provides Integer i() { return null; }",
-            "}");
-    Source module3File =
-        CompilerTests.javaSource(
-            "test.Test3Module",
-            "package test;",
-            "",
-            "import dagger.Module;",
-            "import dagger.Provides;",
-            "",
-            "@Module",
-            "final class Test3Module {",
-            "  Test3Module(String unused) {}",
-            "  @Provides Double d() { return null; }",
-            "}");
-    Source componentFile =
-        preprocessedJavaSource(
-            "test.ParentComponent",
-            "package test;",
-            "",
-            "import dagger.Component;",
-            "import javax.inject.Provider;",
-            "",
-            "@Component",
-            "interface ParentComponent {",
-            "  ChildComponent.Builder build();",
-            "}");
-    Source childComponentFile =
-        preprocessedJavaSource(
-            "test.ChildComponent",
+    JavaFileObject moduleFile = JavaFileObjects.forSourceLines("test.TestModule",
+        "package test;",
+        "",
+        "import dagger.Module;",
+        "import dagger.Provides;",
+        "",
+        "@Module",
+        "final class TestModule {",
+        "  TestModule(String unused) {}",
+        "  @Provides String s() { return null; }",
+        "}");
+    JavaFileObject module2File = JavaFileObjects.forSourceLines("test.Test2Module",
+        "package test;",
+        "",
+        "import dagger.Module;",
+        "import dagger.Provides;",
+        "",
+        "@Module",
+        "final class Test2Module {",
+        "  @Provides Integer i() { return null; }",
+        "}");
+    JavaFileObject module3File = JavaFileObjects.forSourceLines("test.Test3Module",
+        "package test;",
+        "",
+        "import dagger.Module;",
+        "import dagger.Provides;",
+        "",
+        "@Module",
+        "final class Test3Module {",
+        "  Test3Module(String unused) {}",
+        "  @Provides Double d() { return null; }",
+        "}");
+    JavaFileObject componentFile = preprocessedJavaFile("test.ParentComponent",
+        "package test;",
+        "",
+        "import dagger.Component;",
+        "import javax.inject.Provider;",
+        "",
+        "@Component",
+        "interface ParentComponent {",
+        "  ChildComponent.Builder build();",
+        "}");
+    JavaFileObject childComponentFile =
+        preprocessedJavaFile(
+            "test.TestComponent",
             "package test;",
             "",
             "import dagger.Subcomponent;",
@@ -881,28 +809,22 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
             "    ChildComponent build();",
             "  }",
             "}");
-
-    CompilerTests.daggerCompiler(
-            moduleFile, module2File, module3File, componentFile, childComponentFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      // Ignores Test2Module because we can construct it ourselves.
-                      // TODO(sameb): Ignore Test3Module because it's not used within transitive
-                      // dependencies.
-                      String.format(
-                          messages.missingSetters(),
-                          "[test.TestModule, test.Test3Module]"))
-                  .onSource(childComponentFile)
-                  .onLine(11);
-            });
+    Compilation compilation =
+        compile(moduleFile, module2File, module3File, componentFile, childComponentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            // Ignores Test2Module because we can construct it ourselves.
+            // TODO(sameb): Ignore Test3Module because it's not used within transitive dependencies.
+            String.format(messages.missingSetters(), "[test.TestModule, test.Test3Module]"))
+        .inFile(childComponentFile)
+        .onLine(11);
   }
 
   @Test
   public void covariantFactoryMethodReturnType() {
-    Source foo =
-        CompilerTests.javaSource(
+    JavaFileObject foo =
+        JavaFileObjects.forSourceLines(
             "test.Foo",
             "package test;",
             "",
@@ -911,8 +833,8 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
             "class Foo {",
             "  @Inject Foo() {}",
             "}");
-    Source supertype =
-        CompilerTests.javaSource(
+    JavaFileObject supertype =
+        JavaFileObjects.forSourceLines(
             "test.Supertype",
             "package test;",
             "",
@@ -920,8 +842,8 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
             "  Foo foo();",
             "}");
 
-    Source subcomponent =
-        preprocessedJavaSource(
+    JavaFileObject subcomponent =
+        preprocessedJavaFile(
             "test.HasSupertype",
             "package test;",
             "",
@@ -935,18 +857,14 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
             "  }",
             "}");
 
-    CompilerTests.daggerCompiler(foo, supertype, subcomponent)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.hasWarningCount(0);
-            });
+    Compilation compilation = compile(foo, supertype, subcomponent);
+    assertThat(compilation).succeededWithoutWarnings();
   }
 
   @Test
   public void covariantFactoryMethodReturnType_hasNewMethod() {
-    Source foo =
-        CompilerTests.javaSource(
+    JavaFileObject foo =
+        JavaFileObjects.forSourceLines(
             "test.Foo",
             "package test;",
             "",
@@ -955,8 +873,8 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
             "class Foo {",
             "  @Inject Foo() {}",
             "}");
-    Source bar =
-        CompilerTests.javaSource(
+    JavaFileObject bar =
+        JavaFileObjects.forSourceLines(
             "test.Bar",
             "package test;",
             "",
@@ -965,8 +883,8 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
             "class Bar {",
             "  @Inject Bar() {}",
             "}");
-    Source supertype =
-        CompilerTests.javaSource(
+    JavaFileObject supertype =
+        JavaFileObjects.forSourceLines(
             "test.Supertype",
             "package test;",
             "",
@@ -974,8 +892,8 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
             "  Foo foo();",
             "}");
 
-    Source subcomponent =
-        preprocessedJavaSource(
+    JavaFileObject subcomponent =
+        preprocessedJavaFile(
             "test.HasSupertype",
             "package test;",
             "",
@@ -991,26 +909,23 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
             "  }",
             "}");
 
-    CompilerTests.daggerCompiler(foo, bar, supertype, subcomponent)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.hasWarningCount(1);
-              subject.hasWarningContaining(
-                      process(
-                          "test.HasSupertype.Builder.build() returns test.Supertype, but "
-                              + "test.HasSupertype declares additional component method(s): bar(). "
-                              + "In order to provide type-safe access to these methods, override "
-                              + "build() to return test.HasSupertype"))
-                  .onSource(subcomponent)
-                  .onLine(11);
-            });
+    Compilation compilation = compile(foo, bar, supertype, subcomponent);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .hadWarningContaining(
+            process(
+                "test.HasSupertype.Builder.build() returns test.Supertype, but test.HasSupertype "
+                    + "declares additional component method(s): bar(). In order to provide "
+                    + "type-safe access to these methods, override build() to return "
+                    + "test.HasSupertype"))
+        .inFile(subcomponent)
+        .onLine(11);
   }
 
   @Test
   public void covariantFactoryMethodReturnType_hasNewMethod_buildMethodInherited() {
-    Source foo =
-        CompilerTests.javaSource(
+    JavaFileObject foo =
+        JavaFileObjects.forSourceLines(
             "test.Foo",
             "package test;",
             "",
@@ -1019,8 +934,8 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
             "class Foo {",
             "  @Inject Foo() {}",
             "}");
-    Source bar =
-        CompilerTests.javaSource(
+    JavaFileObject bar =
+        JavaFileObjects.forSourceLines(
             "test.Bar",
             "package test;",
             "",
@@ -1029,8 +944,8 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
             "class Bar {",
             "  @Inject Bar() {}",
             "}");
-    Source supertype =
-        CompilerTests.javaSource(
+    JavaFileObject supertype =
+        JavaFileObjects.forSourceLines(
             "test.Supertype",
             "package test;",
             "",
@@ -1038,8 +953,8 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
             "  Foo foo();",
             "}");
 
-    Source creatorSupertype =
-        preprocessedJavaSource(
+    JavaFileObject creatorSupertype =
+        preprocessedJavaFile(
             "test.CreatorSupertype",
             "package test;",
             "",
@@ -1047,8 +962,8 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
             "  Supertype build();",
             "}");
 
-    Source subcomponent =
-        preprocessedJavaSource(
+    JavaFileObject subcomponent =
+        preprocessedJavaFile(
             "test.HasSupertype",
             "package test;",
             "",
@@ -1062,17 +977,14 @@ public class SubcomponentCreatorValidationTest extends ComponentCreatorTestHelpe
             "  interface Builder extends CreatorSupertype {}",
             "}");
 
-    CompilerTests.daggerCompiler(foo, bar, supertype, creatorSupertype, subcomponent)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.hasWarningCount(1);
-              subject.hasWarningContaining(
-                  process(
-                      "[test.CreatorSupertype.build()] test.HasSupertype.Builder.build() returns "
-                          + "test.Supertype, but test.HasSupertype declares additional component "
-                          + "method(s): bar(). In order to provide type-safe access to these "
-                          + "methods, override build() to return test.HasSupertype"));
-            });
+    Compilation compilation = compile(foo, bar, supertype, creatorSupertype, subcomponent);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .hadWarningContaining(
+            process(
+                "[test.CreatorSupertype.build()] test.HasSupertype.Builder.build() returns "
+                    + "test.Supertype, but test.HasSupertype declares additional component "
+                    + "method(s): bar(). In order to provide type-safe access to these methods, "
+                    + "override build() to return test.HasSupertype"));
   }
 }

@@ -51,7 +51,7 @@ public final class AnyBindingMethodValidator implements ClearableCache {
   }
 
   /** Returns the binding method annotations considered by this validator. */
-  public ImmutableSet<ClassName> methodAnnotations() {
+  ImmutableSet<ClassName> methodAnnotations() {
     return validators.keySet();
   }
 
@@ -59,7 +59,7 @@ public final class AnyBindingMethodValidator implements ClearableCache {
    * Returns {@code true} if {@code method} is annotated with at least one of {@link
    * #methodAnnotations()}.
    */
-  public boolean isBindingMethod(XExecutableElement method) {
+  boolean isBindingMethod(XExecutableElement method) {
     return hasAnyAnnotation(method, methodAnnotations());
   }
 
@@ -76,7 +76,7 @@ public final class AnyBindingMethodValidator implements ClearableCache {
    * @throws IllegalArgumentException if {@code method} is not annotated by any {@linkplain
    *     #methodAnnotations() binding method annotation}
    */
-  public ValidationReport validate(XMethodElement method) {
+  ValidationReport validate(XMethodElement method) {
     return reentrantComputeIfAbsent(reports, method, this::validateUncached);
   }
 
@@ -84,7 +84,7 @@ public final class AnyBindingMethodValidator implements ClearableCache {
    * Returns {@code true} if {@code method} was already {@linkplain #validate(XMethodElement)
    * validated}.
    */
-  public boolean wasAlreadyValidated(XMethodElement method) {
+  boolean wasAlreadyValidated(XMethodElement method) {
     return reports.containsKey(method);
   }
 

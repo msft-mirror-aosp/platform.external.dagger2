@@ -59,10 +59,7 @@ abstract class ProcessedRootSentinelMetadata {
   static ProcessedRootSentinelIr toIr(ProcessedRootSentinelMetadata metadata) {
     return new ProcessedRootSentinelIr(
         ClassName.get(metadata.aggregatingElement()),
-        metadata.rootElements().stream()
-            .map(ClassName::get)
-            .map(ClassName::canonicalName)
-            .collect(Collectors.toList())
+        metadata.rootElements().stream().map(ClassName::get).collect(Collectors.toList())
     );
   }
 

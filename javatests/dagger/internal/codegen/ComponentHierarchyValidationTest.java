@@ -16,33 +16,25 @@
 
 package dagger.internal.codegen;
 
-import androidx.room.compiler.processing.util.Source;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import dagger.testing.compile.CompilerTests;
+import static com.google.testing.compile.CompilationSubject.assertThat;
+import static dagger.internal.codegen.Compilers.compilerWithOptions;
+import static dagger.internal.codegen.Compilers.daggerCompiler;
+import static dagger.internal.codegen.TestUtils.message;
+
+import com.google.testing.compile.Compilation;
+import com.google.testing.compile.JavaFileObjects;
+import javax.tools.JavaFileObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
+import org.junit.runners.JUnit4;
 
 /** Tests for {ComponentHierarchyValidator}. */
-@RunWith(Parameterized.class)
+@RunWith(JUnit4.class)
 public class ComponentHierarchyValidationTest {
-  @Parameters(name = "{0}")
-  public static ImmutableList<Object[]> parameters() {
-    return CompilerMode.TEST_PARAMETERS;
-  }
-
-  private final CompilerMode compilerMode;
-
-  public ComponentHierarchyValidationTest(CompilerMode compilerMode) {
-    this.compilerMode = compilerMode;
-  }
-
   @Test
   public void singletonSubcomponent() {
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.Parent",
             "package test;",
             "",
@@ -54,8 +46,8 @@ public class ComponentHierarchyValidationTest {
             "interface Parent {",
             "  Child child();",
             "}");
-    Source subcomponent =
-        CompilerTests.javaSource(
+    JavaFileObject subcomponent =
+        JavaFileObjects.forSourceLines(
             "test.Child",
             "package test;",
             "",
@@ -66,32 +58,21 @@ public class ComponentHierarchyValidationTest {
             "@Subcomponent",
             "interface Child {}");
 
-    CompilerTests.daggerCompiler(component, subcomponent)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                  String.join(
-                      "\n",
-                      "test.Child has conflicting scopes:",
-                      "    test.Parent also has @Singleton"));
-            });
+    Compilation compilation = daggerCompiler().compile(component, subcomponent);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorContaining("conflicting scopes");
+    assertThat(compilation).hadErrorContaining("test.Parent also has @Singleton");
 
-    // Check that compiling with disableInterComponentScopeValidation=none flag succeeds.
-    CompilerTests.daggerCompiler(component, subcomponent)
-        .withProcessingOptions(
-            ImmutableMap.<String, String>builder()
-                .putAll(compilerMode.processorOptions())
-                .put("dagger.disableInterComponentScopeValidation", "none")
-                .buildOrThrow())
-        .compile(subject -> subject.hasErrorCount(0));
+    Compilation withoutScopeValidation =
+        compilerWithOptions("-Adagger.disableInterComponentScopeValidation=none")
+            .compile(component, subcomponent);
+    assertThat(withoutScopeValidation).succeeded();
   }
 
   @Test
   public void productionComponents_productionScopeImplicitOnBoth() {
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.Parent",
             "package test;",
             "",
@@ -102,8 +83,8 @@ public class ComponentHierarchyValidationTest {
             "  Child child();",
             "  Object productionScopedObject();",
             "}");
-    Source parentModule =
-        CompilerTests.javaSource(
+    JavaFileObject parentModule =
+        JavaFileObjects.forSourceLines(
             "test.ParentModule",
             "package test;",
             "",
@@ -115,8 +96,8 @@ public class ComponentHierarchyValidationTest {
             "class ParentModule {",
             "  @Provides @ProductionScope Object parentScopedObject() { return new Object(); }",
             "}");
-    Source subcomponent =
-        CompilerTests.javaSource(
+    JavaFileObject subcomponent =
+        JavaFileObjects.forSourceLines(
             "test.Child",
             "package test;",
             "",
@@ -126,8 +107,8 @@ public class ComponentHierarchyValidationTest {
             "interface Child {",
             "  String productionScopedString();",
             "}");
-    Source childModule =
-        CompilerTests.javaSource(
+    JavaFileObject childModule =
+        JavaFileObjects.forSourceLines(
             "test.ChildModule",
             "package test;",
             "",
@@ -139,15 +120,15 @@ public class ComponentHierarchyValidationTest {
             "class ChildModule {",
             "  @Provides @ProductionScope String childScopedString() { return new String(); }",
             "}");
-    CompilerTests.daggerCompiler(component, subcomponent, parentModule, childModule)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(subject -> subject.hasErrorCount(0));
+    Compilation compilation =
+        daggerCompiler().compile(component, subcomponent, parentModule, childModule);
+    assertThat(compilation).succeeded();
   }
 
   @Test
   public void producerModuleRepeated() {
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.Parent",
             "package test;",
             "",
@@ -157,8 +138,8 @@ public class ComponentHierarchyValidationTest {
             "interface Parent {",
             "  Child child();",
             "}");
-    Source repeatedModule =
-        CompilerTests.javaSource(
+    JavaFileObject repeatedModule =
+        JavaFileObjects.forSourceLines(
             "test.RepeatedProducerModule",
             "package test;",
             "",
@@ -166,8 +147,8 @@ public class ComponentHierarchyValidationTest {
             "",
             "@ProducerModule",
             "interface RepeatedProducerModule {}");
-    Source subcomponent =
-        CompilerTests.javaSource(
+    JavaFileObject subcomponent =
+        JavaFileObjects.forSourceLines(
             "test.Child",
             "package test;",
             "",
@@ -175,25 +156,21 @@ public class ComponentHierarchyValidationTest {
             "",
             "@ProductionSubcomponent(modules = RepeatedProducerModule.class)",
             "interface Child {}");
-    CompilerTests.daggerCompiler(component, subcomponent, repeatedModule)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      String.join(
-                          "\n",
-                          "test.Child repeats @ProducerModules:",
-                          "test.Parent also installs: test.RepeatedProducerModule"))
-                  .onSource(component)
-                  .onLineContaining("interface Parent");
-            });
+    Compilation compilation = daggerCompiler().compile(component, subcomponent, repeatedModule);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            message(
+                "test.Child repeats @ProducerModules:",
+                "  test.Parent also installs: test.RepeatedProducerModule"))
+        .inFile(component)
+        .onLineContaining("interface Parent");
   }
 
   @Test
   public void factoryMethodForSubcomponentWithBuilder_isNotAllowed() {
-    Source module =
-        CompilerTests.javaSource(
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -204,8 +181,8 @@ public class ComponentHierarchyValidationTest {
             "class TestModule {",
             "}");
 
-    Source subcomponent =
-        CompilerTests.javaSource(
+    JavaFileObject subcomponent =
+        JavaFileObjects.forSourceLines(
             "test.Sub",
             "package test;",
             "",
@@ -219,9 +196,9 @@ public class ComponentHierarchyValidationTest {
             "  }",
             "}");
 
-    Source component =
-        CompilerTests.javaSource(
-            "test.C",
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
+            "test.Sub",
             "package test;",
             "",
             "import dagger.Component;",
@@ -231,21 +208,17 @@ public class ComponentHierarchyValidationTest {
             "  Sub newSub();",
             "}");
 
-    CompilerTests.daggerCompiler(module, component, subcomponent)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                  "Components may not have factory methods for subcomponents that define a "
-                      + "builder.");
-            });
+    Compilation compilation = daggerCompiler().compile(module, component, subcomponent);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            "Components may not have factory methods for subcomponents that define a builder.");
   }
 
   @Test
   public void repeatedModulesWithScopes() {
-    Source testScope =
-        CompilerTests.javaSource(
+    JavaFileObject testScope =
+        JavaFileObjects.forSourceLines(
             "test.TestScope",
             "package test;",
             "",
@@ -253,8 +226,8 @@ public class ComponentHierarchyValidationTest {
             "",
             "@Scope",
             "@interface TestScope {}");
-    Source moduleWithScopedProvides =
-        CompilerTests.javaSource(
+    JavaFileObject moduleWithScopedProvides =
+        JavaFileObjects.forSourceLines(
             "test.ModuleWithScopedProvides",
             "package test;",
             "",
@@ -267,8 +240,8 @@ public class ComponentHierarchyValidationTest {
             "  @TestScope",
             "  static Object o() { return new Object(); }",
             "}");
-    Source moduleWithScopedBinds =
-        CompilerTests.javaSource(
+    JavaFileObject moduleWithScopedBinds =
+        JavaFileObjects.forSourceLines(
             "test.ModuleWithScopedBinds",
             "package test;",
             "",
@@ -281,8 +254,8 @@ public class ComponentHierarchyValidationTest {
             "  @TestScope",
             "  Object o(String s);",
             "}");
-    Source parent =
-        CompilerTests.javaSource(
+    JavaFileObject parent =
+        JavaFileObjects.forSourceLines(
             "test.Parent",
             "package test;",
             "",
@@ -292,8 +265,8 @@ public class ComponentHierarchyValidationTest {
             "interface Parent {",
             "  Child child();",
             "}");
-    Source child =
-        CompilerTests.javaSource(
+    JavaFileObject child =
+        JavaFileObjects.forSourceLines(
             "test.Child",
             "package test;",
             "",
@@ -302,26 +275,23 @@ public class ComponentHierarchyValidationTest {
             "@Subcomponent(",
             "    modules = {ModuleWithScopedProvides.class, ModuleWithScopedBinds.class})",
             "interface Child {}");
-    CompilerTests.daggerCompiler(
-            testScope, moduleWithScopedProvides, moduleWithScopedBinds, parent, child)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                  String.join(
-                      "\n",
-                      "test.Child repeats modules with scoped bindings or declarations:",
-                      "- test.Parent also includes:",
-                      "    - test.ModuleWithScopedProvides with scopes: @test.TestScope",
-                      "    - test.ModuleWithScopedBinds with scopes: @test.TestScope"));
-            });
+    Compilation compilation =
+        daggerCompiler()
+            .compile(testScope, moduleWithScopedProvides, moduleWithScopedBinds, parent, child);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            message(
+                "test.Child repeats modules with scoped bindings or declarations:",
+                "  - test.Parent also includes:",
+                "    - test.ModuleWithScopedProvides with scopes: @test.TestScope",
+                "    - test.ModuleWithScopedBinds with scopes: @test.TestScope"));
   }
 
   @Test
   public void repeatedModulesWithReusableScope() {
-    Source moduleWithScopedProvides =
-        CompilerTests.javaSource(
+    JavaFileObject moduleWithScopedProvides =
+        JavaFileObjects.forSourceLines(
             "test.ModuleWithScopedProvides",
             "package test;",
             "",
@@ -335,8 +305,8 @@ public class ComponentHierarchyValidationTest {
             "  @Reusable",
             "  static Object o() { return new Object(); }",
             "}");
-    Source moduleWithScopedBinds =
-        CompilerTests.javaSource(
+    JavaFileObject moduleWithScopedBinds =
+        JavaFileObjects.forSourceLines(
             "test.ModuleWithScopedBinds",
             "package test;",
             "",
@@ -350,8 +320,8 @@ public class ComponentHierarchyValidationTest {
             "  @Reusable",
             "  Object o(String s);",
             "}");
-    Source parent =
-        CompilerTests.javaSource(
+    JavaFileObject parent =
+        JavaFileObjects.forSourceLines(
             "test.Parent",
             "package test;",
             "",
@@ -361,8 +331,8 @@ public class ComponentHierarchyValidationTest {
             "interface Parent {",
             "  Child child();",
             "}");
-    Source child =
-        CompilerTests.javaSource(
+    JavaFileObject child =
+        JavaFileObjects.forSourceLines(
             "test.Child",
             "package test;",
             "",
@@ -371,12 +341,9 @@ public class ComponentHierarchyValidationTest {
             "@Subcomponent(",
             "    modules = {ModuleWithScopedProvides.class, ModuleWithScopedBinds.class})",
             "interface Child {}");
-    CompilerTests.daggerCompiler(moduleWithScopedProvides, moduleWithScopedBinds, parent, child)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.hasWarningCount(0);
-            });
+    Compilation compilation =
+        daggerCompiler()
+            .compile(moduleWithScopedProvides, moduleWithScopedBinds, parent, child);
+    assertThat(compilation).succeededWithoutWarnings();
   }
 }

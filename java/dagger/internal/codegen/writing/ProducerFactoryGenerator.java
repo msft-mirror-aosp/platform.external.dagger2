@@ -16,6 +16,7 @@
 
 package dagger.internal.codegen.writing;
 
+import static androidx.room.compiler.processing.compat.XConverters.toJavac;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Verify.verifyNotNull;
 import static com.squareup.javapoet.ClassName.OBJECT;
@@ -39,7 +40,6 @@ import static dagger.internal.codegen.javapoet.TypeNames.listOf;
 import static dagger.internal.codegen.javapoet.TypeNames.listenableFutureOf;
 import static dagger.internal.codegen.javapoet.TypeNames.producedOf;
 import static dagger.internal.codegen.writing.GwtCompatibility.gwtIncompatibleAnnotation;
-import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static javax.lang.model.element.Modifier.FINAL;
@@ -50,7 +50,6 @@ import static javax.lang.model.element.Modifier.STATIC;
 
 import androidx.room.compiler.processing.XElement;
 import androidx.room.compiler.processing.XFiler;
-import androidx.room.compiler.processing.XProcessingEnv;
 import androidx.room.compiler.processing.XType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -74,6 +73,7 @@ import dagger.internal.codegen.compileroption.CompilerOptions;
 import dagger.internal.codegen.javapoet.AnnotationSpecs;
 import dagger.internal.codegen.javapoet.AnnotationSpecs.Suppression;
 import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.langmodel.DaggerElements;
 import dagger.producers.Producer;
 import dagger.producers.internal.AbstractProducesMethodProducer;
 import dagger.producers.internal.Producers;
@@ -85,24 +85,23 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.Optional;
 import javax.inject.Inject;
+import javax.lang.model.SourceVersion;
 
 /** Generates {@link Producer} implementations from {@link ProductionBinding} instances. */
 public final class ProducerFactoryGenerator extends SourceFileGenerator<ProductionBinding> {
   private final CompilerOptions compilerOptions;
   private final KeyFactory keyFactory;
-  private final SourceFiles sourceFiles;
 
   @Inject
   ProducerFactoryGenerator(
       XFiler filer,
-      XProcessingEnv processingEnv,
+      DaggerElements elements,
+      SourceVersion sourceVersion,
       CompilerOptions compilerOptions,
-      KeyFactory keyFactory,
-      SourceFiles sourceFiles) {
-    super(filer, processingEnv);
+      KeyFactory keyFactory) {
+    super(filer, elements, sourceVersion);
     this.compilerOptions = compilerOptions;
     this.keyFactory = keyFactory;
-    this.sourceFiles = sourceFiles;
   }
 
   @Override
@@ -195,7 +194,7 @@ public final class ProducerFactoryGenerator extends SourceFileGenerator<Producti
               ? CodeBlock.of("$T.createFutureProduced($L)", PRODUCERS, futureAccess)
               : futureAccess);
     }
-    FutureTransform futureTransform = createFutureTransform(fields, binding, asyncDependencies);
+    FutureTransform futureTransform = FutureTransform.create(fields, binding, asyncDependencies);
 
     collectDependenciesBuilder
         .returns(listenableFutureOf(futureTransform.applyArgType()))
@@ -297,32 +296,18 @@ public final class ProducerFactoryGenerator extends SourceFileGenerator<Producti
                 String.format(
                     "%s#%s",
                     binding.bindingTypeElement().get().getClassName(),
-                    getSimpleName(binding.bindingElement().get())))
+                    toJavac(binding.bindingElement().get()).getSimpleName()))
             : CodeBlock.of("$T.class", generatedTypeName);
     return CodeBlock.of("$T.create($L)", PRODUCER_TOKEN, producerTokenArgs);
   }
 
   /** Returns a name of the variable representing this dependency's future. */
   private static String dependencyFutureName(DependencyRequest dependency) {
-    return getSimpleName(dependency.requestElement().get().xprocessing()) + "Future";
+    return dependency.requestElement().get().java().getSimpleName() + "Future";
   }
 
-  private FutureTransform createFutureTransform(
-        ImmutableMap<DependencyRequest, FieldSpec> fields,
-        ProductionBinding binding,
-        ImmutableList<DependencyRequest> asyncDependencies) {
-      if (asyncDependencies.isEmpty()) {
-        return new NoArgFutureTransform(fields, binding);
-      } else if (asyncDependencies.size() == 1) {
-        return new SingleArgFutureTransform(
-            fields, binding, Iterables.getOnlyElement(asyncDependencies));
-      } else {
-        return new MultiArgFutureTransform(fields, binding, asyncDependencies);
-      }
-    }
-
   /** Represents the transformation of an input future by a producer method. */
-  abstract class FutureTransform {
+  abstract static class FutureTransform {
     protected final ImmutableMap<DependencyRequest, FieldSpec> fields;
     protected final ProductionBinding binding;
 
@@ -349,12 +334,26 @@ public final class ProducerFactoryGenerator extends SourceFileGenerator<Producti
     }
 
     CodeBlock frameworkTypeUsageStatement(DependencyRequest dependency) {
-      return sourceFiles.frameworkTypeUsageStatement(
+      return SourceFiles.frameworkTypeUsageStatement(
           CodeBlock.of("$N", fields.get(dependency)), dependency.kind());
+    }
+
+    static FutureTransform create(
+        ImmutableMap<DependencyRequest, FieldSpec> fields,
+        ProductionBinding binding,
+        ImmutableList<DependencyRequest> asyncDependencies) {
+      if (asyncDependencies.isEmpty()) {
+        return new NoArgFutureTransform(fields, binding);
+      } else if (asyncDependencies.size() == 1) {
+        return new SingleArgFutureTransform(
+            fields, binding, Iterables.getOnlyElement(asyncDependencies));
+      } else {
+        return new MultiArgFutureTransform(fields, binding, asyncDependencies);
+      }
     }
   }
 
-  final class NoArgFutureTransform extends FutureTransform {
+  static final class NoArgFutureTransform extends FutureTransform {
     NoArgFutureTransform(
         ImmutableMap<DependencyRequest, FieldSpec> fields, ProductionBinding binding) {
       super(fields, binding);
@@ -383,7 +382,7 @@ public final class ProducerFactoryGenerator extends SourceFileGenerator<Producti
     }
   }
 
-  final class SingleArgFutureTransform extends FutureTransform {
+  static final class SingleArgFutureTransform extends FutureTransform {
     private final DependencyRequest asyncDependency;
 
     SingleArgFutureTransform(
@@ -406,7 +405,7 @@ public final class ProducerFactoryGenerator extends SourceFileGenerator<Producti
 
     @Override
     String applyArgName() {
-      String argName = getSimpleName(asyncDependency.requestElement().get().xprocessing());
+      String argName = asyncDependency.requestElement().get().java().getSimpleName().toString();
       if (argName.equals("module")) {
         return "moduleArg";
       }
@@ -429,7 +428,7 @@ public final class ProducerFactoryGenerator extends SourceFileGenerator<Producti
     }
   }
 
-  final class MultiArgFutureTransform extends FutureTransform {
+  static final class MultiArgFutureTransform extends FutureTransform {
     private final ImmutableList<DependencyRequest> asyncDependencies;
 
     MultiArgFutureTransform(
@@ -496,7 +495,7 @@ public final class ProducerFactoryGenerator extends SourceFileGenerator<Producti
   }
 
   private static TypeName asyncDependencyType(DependencyRequest dependency) {
-    TypeName keyName = dependency.key().type().xprocessing().getTypeName();
+    TypeName keyName = TypeName.get(dependency.key().type().java());
     switch (dependency.kind()) {
       case INSTANCE:
         return keyName;
@@ -525,7 +524,7 @@ public final class ProducerFactoryGenerator extends SourceFileGenerator<Producti
             binding.requiresModuleInstance()
                 ? "module"
                 : CodeBlock.of("$T", binding.bindingTypeElement().get().getClassName()),
-            getSimpleName(binding.bindingElement().get()),
+            toJavac(binding.bindingElement().get()).getSimpleName(),
             makeParametersCodeBlock(parameterCodeBlocks));
 
     final CodeBlock returnCodeBlock;

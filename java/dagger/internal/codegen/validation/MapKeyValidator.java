@@ -18,22 +18,22 @@ package dagger.internal.codegen.validation;
 
 import androidx.room.compiler.processing.XAnnotationKt;
 import androidx.room.compiler.processing.XMethodElement;
-import androidx.room.compiler.processing.XProcessingEnv;
 import androidx.room.compiler.processing.XTypeElement;
 import androidx.room.compiler.processing.XTypeKt;
 import dagger.MapKey;
 import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.langmodel.DaggerElements;
 import java.util.List;
 import javax.inject.Inject;
 
 /** A validator for {@link MapKey} annotations. */
 // TODO(dpb,gak): Should unwrapped MapKeys be required to have their single member be named "value"?
 public final class MapKeyValidator {
-  private final XProcessingEnv processingEnv;
+  private final DaggerElements elements;
 
   @Inject
-  MapKeyValidator(XProcessingEnv processingEnv) {
-    this.processingEnv = processingEnv;
+  MapKeyValidator(DaggerElements elements) {
+    this.elements = elements;
   }
 
   public ValidationReport validate(XTypeElement element) {
@@ -61,6 +61,6 @@ public final class MapKeyValidator {
   }
 
   private boolean autoAnnotationIsMissing() {
-    return processingEnv.findTypeElement("com.google.auto.value.AutoAnnotation") == null;
+    return elements.getTypeElement("com.google.auto.value.AutoAnnotation") == null;
   }
 }

@@ -18,30 +18,18 @@
 load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_jvm_library")
 load("//:build_defs.bzl", "DOCLINT_HTML_AND_SYNTAX")
 load("//:test_defs.bzl", "GenJavaTests")
+load("//java/dagger/testing/compile:macros.bzl", "compiler_test")
 
 package(default_visibility = ["//:src"])
 
-# These sources are purposely compiled without the Dagger compiler for certain tests.
 kt_jvm_library(
-    name = "kt_lib_no_dagger_compiler",
+    name = "kotlin_sources",
     srcs = [
         "KotlinInjectedQualifier.kt",
         "KotlinObjectWithMemberInjection.kt",
     ],
     deps = [
         "//java/dagger:core",
-    ],
-)
-
-# These sources are purposely compiled without the Dagger compiler for certain tests.
-java_library(
-    name = "java_lib_no_dagger_compiler",
-    srcs = [
-        "ComponentProcessorTestClasses.java",
-        "InvalidInjectConstructor.java",
-    ],
-    deps = [
-        "//third_party/java/jsr330_inject",
     ],
 )
 
@@ -56,12 +44,19 @@ java_library(
     deps = [
         "//java/dagger/internal/codegen:package_info",
         "//java/dagger/internal/codegen:processor",
-        "//java/dagger/internal/codegen/xprocessing:xprocessing-testing",
-        "//java/dagger/testing/compile",
         "//third_party/java/compile_testing",
         "//third_party/java/guava/base",
         "//third_party/java/guava/collect",
         "@com_google_auto_value_auto_value//jar",
+    ],
+)
+
+java_library(
+    name = "InvalidInjectConstructor",
+    srcs = ["InvalidInjectConstructor.java"],
+    # Note: We purposely leave off the dagger processor here.
+    deps = [
+        "//third_party/java/jsr330_inject",
     ],
 )
 
@@ -70,20 +65,20 @@ GenJavaTests(
     srcs = glob(
         ["*.java"],
         exclude = [
-            "ComponentProcessorTestClasses.java",
             "CompilerMode.java",
             "Compilers.java",
-            "InvalidInjectConstructor.java",
             "JavaFileBuilder.java",
+            "ComponentValidationKtTest.java",
+            "InvalidInjectConstructor.java",
         ],
     ),
     functional = False,
     javacopts = DOCLINT_HTML_AND_SYNTAX,
     plugins = ["//java/dagger/internal/codegen/bootstrap"],
     deps = [
+        ":InvalidInjectConstructor",
         ":compilers",
-        ":java_lib_no_dagger_compiler",
-        ":kt_lib_no_dagger_compiler",
+        ":kotlin_sources",
         "//java/dagger:core",
         "//java/dagger/internal/codegen:package_info",
         "//java/dagger/internal/codegen:processor",
@@ -91,7 +86,6 @@ GenJavaTests(
         "//java/dagger/internal/codegen/binding",
         "//java/dagger/internal/codegen/bindinggraphvalidation",
         "//java/dagger/internal/codegen/compileroption",
-        "//java/dagger/internal/codegen/extension",
         "//java/dagger/internal/codegen/javac",
         "//java/dagger/internal/codegen/javapoet",
         "//java/dagger/internal/codegen/kotlin",
@@ -99,13 +93,9 @@ GenJavaTests(
         "//java/dagger/internal/codegen/validation",
         "//java/dagger/internal/codegen/writing",
         "//java/dagger/internal/codegen/xprocessing",
-        "//java/dagger/internal/codegen/xprocessing:xprocessing-testing",
         "//java/dagger/model/testing",
         "//java/dagger/producers",
         "//java/dagger/spi",
-        "//java/dagger/spi/model/testing",
-        "//java/dagger/testing/compile",
-        "//java/dagger/testing/golden",
         "//third_party/java/auto:common",
         "//third_party/java/auto:value",
         "//third_party/java/compile_testing",
@@ -113,11 +103,37 @@ GenJavaTests(
         "//third_party/java/guava/collect",
         "//third_party/java/guava/util/concurrent",
         "//third_party/java/javapoet",
-        "//third_party/java/jsr250_annotations",  # Include @Generated in generated files.
         "//third_party/java/jsr330_inject",
         "//third_party/java/junit",
         "//third_party/java/mockito",
         "//third_party/java/truth",
         "@com_google_auto_value_auto_value//jar",
+    ],
+)
+
+compiler_test(
+    name = "ComponentValidationKtTest",
+    srcs = ["ComponentValidationKtTest.java"],
+    compiler_deps = [
+        "//java/dagger:core",
+        "//java/dagger/internal/codegen:package_info",
+        "//java/dagger/internal/codegen:processor",
+        "//java/dagger/internal/codegen/base",
+        "//java/dagger/internal/codegen/binding",
+        "//java/dagger/internal/codegen/bindinggraphvalidation",
+        "//java/dagger/internal/codegen/compileroption",
+        "//java/dagger/internal/codegen/javapoet",
+        "//java/dagger/internal/codegen/langmodel",
+        "//java/dagger/internal/codegen/validation",
+        "//java/dagger/internal/codegen/writing",
+        "//java/dagger/model/testing",
+        "//java/dagger/producers",
+        "//java/dagger/spi",
+    ],
+    deps = [
+        "//third_party/java/guava/collect",
+        "//third_party/java/junit",
+        "//third_party/java/truth",
+        "@maven//:com_github_tschuchortdev_kotlin_compile_testing",
     ],
 )

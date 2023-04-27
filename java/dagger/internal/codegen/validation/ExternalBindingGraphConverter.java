@@ -121,8 +121,7 @@ public final class ExternalBindingGraphConverter {
 
   private static MultibindingContributionIdentifier fromSpiModel(
       dagger.spi.model.Key.MultibindingContributionIdentifier identifier) {
-    return new MultibindingContributionIdentifier(
-        identifier.bindingMethod(), identifier.contributingModule());
+    return new MultibindingContributionIdentifier(identifier.bindingElement(), identifier.module());
   }
 
   private static Key fromSpiModel(dagger.spi.model.Key key) {

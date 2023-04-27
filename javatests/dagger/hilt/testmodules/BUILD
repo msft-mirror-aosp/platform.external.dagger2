@@ -15,10 +15,21 @@
 # Description:
 #  Builds and run tests related to AggregatedDepsProcessor.
 
+load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_android_library")
+
 package(default_visibility = ["//:src"])
 
-# The test modules are left out because they don't build due to
-# https://github.com/bazelbuild/bazel/issues/16087
+kt_android_library(
+    name = "testmodules",
+    testonly = True,
+    srcs = glob(["*.kt"]),
+    deps = [
+        "//:dagger_with_compiler",
+        "//java/dagger/hilt:install_in",
+        "//java/dagger/hilt/components",
+        "//third_party/java/jsr330_inject",
+    ],
+)
 
 filegroup(
     name = "srcs_filegroup",

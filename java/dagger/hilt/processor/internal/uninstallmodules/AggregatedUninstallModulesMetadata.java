@@ -74,10 +74,9 @@ public abstract class AggregatedUninstallModulesMetadata {
   public static AggregatedUninstallModulesIr toIr(AggregatedUninstallModulesMetadata metadata) {
     return new AggregatedUninstallModulesIr(
         ClassName.get(metadata.aggregatingElement()),
-        ClassName.get(metadata.testElement()).canonicalName(),
+        ClassName.get(metadata.testElement()),
         metadata.uninstallModuleElements().stream()
             .map(ClassName::get)
-            .map(ClassName::canonicalName)
             .collect(Collectors.toList()));
   }
 

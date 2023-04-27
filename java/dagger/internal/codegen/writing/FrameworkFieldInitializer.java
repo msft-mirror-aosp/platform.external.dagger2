@@ -22,7 +22,7 @@ import static dagger.internal.codegen.javapoet.AnnotationSpecs.Suppression.RAWTY
 import static dagger.internal.codegen.writing.ComponentImplementation.FieldSpecKind.FRAMEWORK_FIELD;
 import static javax.lang.model.element.Modifier.PRIVATE;
 
-import androidx.room.compiler.processing.XType;
+import com.google.auto.common.MoreTypes;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.FieldSpec;
@@ -34,6 +34,7 @@ import dagger.internal.codegen.binding.ContributionBinding;
 import dagger.internal.codegen.binding.FrameworkField;
 import dagger.internal.codegen.javapoet.AnnotationSpecs;
 import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.writing.ComponentImplementation.CompilerMode;
 import dagger.internal.codegen.writing.ComponentImplementation.ShardImplementation;
 import dagger.spi.model.BindingKind;
 import java.util.Optional;
@@ -64,6 +65,7 @@ class FrameworkFieldInitializer implements FrameworkInstanceSupplier {
   private final ShardImplementation shardImplementation;
   private final ContributionBinding binding;
   private final FrameworkInstanceCreationExpression frameworkInstanceCreationExpression;
+  private final CompilerMode compilerMode;
   private FieldSpec fieldSpec;
   private InitializationState fieldInitializationState = InitializationState.UNINITIALIZED;
 
@@ -72,6 +74,7 @@ class FrameworkFieldInitializer implements FrameworkInstanceSupplier {
       ContributionBinding binding,
       FrameworkInstanceCreationExpression frameworkInstanceCreationExpression) {
     this.binding = checkNotNull(binding);
+    this.compilerMode = componentImplementation.compilerMode();
     this.shardImplementation = checkNotNull(componentImplementation).shardImplementation(binding);
     this.frameworkInstanceCreationExpression = checkNotNull(frameworkInstanceCreationExpression);
   }
@@ -110,13 +113,12 @@ class FrameworkFieldInitializer implements FrameworkInstanceSupplier {
       case INITIALIZING:
         fieldSpec = getOrCreateField();
         // We were recursively invoked, so create a delegate factory instead to break the loop.
-
-        // TODO(erichang): For the most part SwitchingProvider takes no dependencies so even if they
-        // are recursively invoked, we don't need to delegate it since there is no dependency cycle.
-        // However, there is a case with a scoped @Binds where we reference the impl binding when
-        // passing it into DoubleCheck. For this case, we do need to delegate it. There might be
-        // a way to only do delegates in this situation, but we'd need to keep track of what other
-        // bindings use this.
+        // However, because SwitchingProvider takes no dependencies, even if they are recursively
+        // invoked, we don't need to delegate it since there is no dependency cycle.
+        if (FrameworkInstanceKind.from(binding, compilerMode)
+            .equals(FrameworkInstanceKind.SWITCHING_PROVIDER)) {
+          break;
+        }
 
         fieldInitializationState = InitializationState.DELEGATED;
         shardImplementation.addInitialization(
@@ -137,7 +139,7 @@ class FrameworkFieldInitializer implements FrameworkInstanceSupplier {
     if (fieldSpec != null) {
       return fieldSpec;
     }
-    boolean useRawType = !shardImplementation.isTypeAccessible(binding.key().type().xprocessing());
+    boolean useRawType = !shardImplementation.isTypeAccessible(binding.key().type().java());
     FrameworkField contributionBindingField =
         FrameworkField.forBinding(
             binding, frameworkInstanceCreationExpression.alternativeFrameworkClass());
@@ -149,8 +151,8 @@ class FrameworkFieldInitializer implements FrameworkInstanceSupplier {
       // An assisted injection factory doesn't extend Provider, so we reference the generated
       // factory type directly (i.e. Foo_Factory<T> instead of Provider<Foo<T>>).
       TypeName[] typeParameters =
-          binding.key().type().xprocessing().getTypeArguments().stream()
-              .map(XType::getTypeName)
+          MoreTypes.asDeclared(binding.key().type().java()).getTypeArguments().stream()
+              .map(TypeName::get)
               .toArray(TypeName[]::new);
       fieldType =
           typeParameters.length == 0

@@ -20,8 +20,8 @@ import static androidx.test.core.app.ApplicationProvider.getApplicationContext;
 import static com.google.common.truth.Truth.assertThat;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-import dagger.hilt.android.testing.testinstallin.TestInstallInModules.SingletonBarModule;
-import dagger.hilt.android.testing.testinstallin.TestInstallInModules.SingletonFooModule;
+import dagger.hilt.android.testing.testinstallin.TestInstallInModules.GlobalBarModule;
+import dagger.hilt.android.testing.testinstallin.TestInstallInModules.GlobalFooModule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.annotation.Config;
@@ -33,12 +33,12 @@ public final class TestInstallInAppTest {
 
   @Test
   public void testFoo() {
-    assertThat(getMyApplication().foo.moduleClass).isEqualTo(SingletonFooModule.class);
+    assertThat(getMyApplication().foo.moduleClass).isEqualTo(GlobalFooModule.class);
   }
 
   @Test
   public void testBar() {
-    assertThat(getMyApplication().bar.moduleClass).isEqualTo(SingletonBarModule.class);
+    assertThat(getMyApplication().bar.moduleClass).isEqualTo(GlobalBarModule.class);
   }
 
   private static TestInstallInApp getMyApplication() {
