@@ -16,15 +16,19 @@
 
 package dagger.internal.codegen.binding;
 
+import static androidx.room.compiler.processing.compat.XConverters.toJavac;
+import static androidx.room.compiler.processing.compat.XConverters.toXProcessing;
+import static com.google.auto.common.MoreTypes.isType;
+import static com.google.auto.common.MoreTypes.isTypeOf;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static dagger.internal.codegen.base.RequestKinds.getRequestKind;
 import static dagger.internal.codegen.base.Util.reentrantComputeIfAbsent;
 import static dagger.internal.codegen.binding.AssistedInjectionAnnotations.isAssistedFactoryType;
+import static dagger.internal.codegen.binding.ComponentDescriptor.isComponentContributionMethod;
 import static dagger.internal.codegen.binding.SourceFiles.generatedMonitoringModuleName;
-import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
+import static dagger.internal.codegen.xprocessing.XElements.asMethod;
 import static dagger.internal.codegen.xprocessing.XTypes.isDeclared;
-import static dagger.internal.codegen.xprocessing.XTypes.isTypeOf;
 import static dagger.spi.model.BindingKind.ASSISTED_INJECTION;
 import static dagger.spi.model.BindingKind.DELEGATE;
 import static dagger.spi.model.BindingKind.INJECTION;
@@ -32,6 +36,7 @@ import static dagger.spi.model.BindingKind.OPTIONAL;
 import static dagger.spi.model.BindingKind.SUBCOMPONENT_CREATOR;
 import static dagger.spi.model.RequestKind.MEMBERS_INJECTION;
 import static java.util.function.Predicate.isEqual;
+import static javax.lang.model.util.ElementFilter.methodsIn;
 
 import androidx.room.compiler.processing.XProcessingEnv;
 import androidx.room.compiler.processing.XTypeElement;
@@ -42,6 +47,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimaps;
+import dagger.MembersInjector;
 import dagger.Reusable;
 import dagger.internal.codegen.base.ClearableCache;
 import dagger.internal.codegen.base.ContributionType;
@@ -51,7 +57,7 @@ import dagger.internal.codegen.base.MapType;
 import dagger.internal.codegen.base.OptionalType;
 import dagger.internal.codegen.compileroption.CompilerOptions;
 import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.internal.codegen.xprocessing.XTypeElements;
+import dagger.internal.codegen.langmodel.DaggerElements;
 import dagger.producers.internal.ProductionExecutorModule;
 import dagger.spi.model.DependencyRequest;
 import dagger.spi.model.Key;
@@ -62,18 +68,22 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
 
 /** A factory for {@link BindingGraph} objects. */
 @Singleton
 public final class BindingGraphFactory implements ClearableCache {
 
   private final XProcessingEnv processingEnv;
+  private final DaggerElements elements;
   private final InjectBindingRegistry injectBindingRegistry;
   private final KeyFactory keyFactory;
   private final BindingFactory bindingFactory;
@@ -85,6 +95,7 @@ public final class BindingGraphFactory implements ClearableCache {
   @Inject
   BindingGraphFactory(
       XProcessingEnv processingEnv,
+      DaggerElements elements,
       InjectBindingRegistry injectBindingRegistry,
       KeyFactory keyFactory,
       BindingFactory bindingFactory,
@@ -92,6 +103,7 @@ public final class BindingGraphFactory implements ClearableCache {
       BindingGraphConverter bindingGraphConverter,
       CompilerOptions compilerOptions) {
     this.processingEnv = processingEnv;
+    this.elements = elements;
     this.injectBindingRegistry = injectBindingRegistry;
     this.keyFactory = keyFactory;
     this.bindingFactory = bindingFactory;
@@ -130,27 +142,29 @@ public final class BindingGraphFactory implements ClearableCache {
     // Collect Component dependencies.
     for (ComponentRequirement dependency : componentDescriptor.dependencies()) {
       explicitBindingsBuilder.add(bindingFactory.componentDependencyBinding(dependency));
+      List<ExecutableElement> dependencyMethods =
+          methodsIn(elements.getAllMembers(toJavac(dependency.typeElement())));
 
       // Within a component dependency, we want to allow the same method to appear multiple
       // times assuming it is the exact same method. We do this by tracking a set of bindings
       // we've already added with the binding element removed since that is the only thing
       // allowed to differ.
       HashMultimap<String, ContributionBinding> dedupeBindings = HashMultimap.create();
-      XTypeElements.getAllMethods(dependency.typeElement()).stream()
-          // MembersInjection methods aren't "provided" explicitly, so ignore them.
-          .filter(ComponentDescriptor::isComponentContributionMethod)
-          .forEach(
-              method -> {
-                ContributionBinding binding =
-                    bindingFactory.componentDependencyMethodBinding(componentDescriptor, method);
-                if (dedupeBindings.put(
-                    getSimpleName(method),
-                    // Remove the binding element since we know that will be different, but
-                    // everything else we want to be the same to consider it a duplicate.
-                    binding.toBuilder().clearBindingElement().build())) {
-                  explicitBindingsBuilder.add(binding);
-                }
-              });
+      for (ExecutableElement method : dependencyMethods) {
+        // MembersInjection methods aren't "provided" explicitly, so ignore them.
+        if (isComponentContributionMethod(method)) {
+          ContributionBinding binding =
+              bindingFactory.componentDependencyMethodBinding(
+                  componentDescriptor, asMethod(toXProcessing(method, processingEnv)));
+          if (dedupeBindings.put(
+              method.getSimpleName().toString(),
+              // Remove the binding element since we know that will be different, but everything
+              // else we want to be the same to consider it a duplicate.
+              binding.toBuilder().clearBindingElement().build())) {
+            explicitBindingsBuilder.add(binding);
+          }
+        }
+      }
     }
 
     // Collect bindings on the creator.
@@ -216,7 +230,7 @@ public final class BindingGraphFactory implements ClearableCache {
       // identifier so that the multibinding itself is resolved.
       modules(componentDescriptor, parentResolver).stream()
           .flatMap(module -> module.allBindingKeys().stream())
-          .map(Key::withoutMultibindingContributionIdentifier)
+          .map(key -> key.toBuilder().multibindingContributionIdentifier(Optional.empty()).build())
           .forEach(requestResolver::resolve);
     }
 
@@ -404,14 +418,16 @@ public final class BindingGraphFactory implements ClearableCache {
       }
 
       // Add members injector binding
-      if (isTypeOf(requestKey.type().xprocessing(), TypeNames.MEMBERS_INJECTOR)) {
+      if (isType(requestKey.type().java())
+          && isTypeOf(MembersInjector.class, requestKey.type().java())) {
         injectBindingRegistry
             .getOrFindMembersInjectorProvisionBinding(requestKey)
             .ifPresent(bindings::add);
       }
 
       // Add Assisted Factory binding
-      if (isDeclared(requestKey.type().xprocessing())
+      if (isType(requestKey.type().java())
+          && isDeclared(requestKey.type().xprocessing())
           && isAssistedFactoryType(requestKey.type().xprocessing().getTypeElement())) {
         bindings.add(
             bindingFactory.assistedFactoryBinding(
@@ -576,14 +592,14 @@ public final class BindingGraphFactory implements ClearableCache {
      * multibinding contributions in the parent, and returns the parent-resolved {@link
      * ResolvedBindings#owningComponent(ContributionBinding)}.
      */
-    private XTypeElement getOwningComponent(Key requestKey, ContributionBinding binding) {
+    private TypeElement getOwningComponent(Key requestKey, ContributionBinding binding) {
       if (isResolvedInParent(requestKey, binding)
           && !new LocalDependencyChecker().dependsOnLocalBindings(binding)) {
         ResolvedBindings parentResolvedBindings =
             parentResolver.get().resolvedContributionBindings.get(requestKey);
         return parentResolvedBindings.owningComponent(binding);
       } else {
-        return componentDescriptor.typeElement();
+        return toJavac(componentDescriptor.typeElement());
       }
     }
 
@@ -965,7 +981,13 @@ public final class BindingGraphFactory implements ClearableCache {
     ImmutableSetMultimap.Builder<Key, T> builder = ImmutableSetMultimap.builder();
     for (T declaration : declarations) {
       if (declaration.key().multibindingContributionIdentifier().isPresent()) {
-        builder.put(declaration.key().withoutMultibindingContributionIdentifier(), declaration);
+        builder.put(
+            declaration
+                .key()
+                .toBuilder()
+                .multibindingContributionIdentifier(Optional.empty())
+                .build(),
+            declaration);
       }
     }
     return builder.build();

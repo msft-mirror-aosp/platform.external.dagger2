@@ -16,7 +16,7 @@
 
 package dagger.internal.codegen.writing;
 
-import static dagger.internal.codegen.xprocessing.XElements.asMethod;
+import static androidx.room.compiler.processing.compat.XConverters.toJavac;
 
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
@@ -61,7 +61,9 @@ final class ComponentProvisionRequestRepresentation extends RequestRepresentatio
             : getComponentRequirementExpression(requestingClass);
     CodeBlock invocation =
         CodeBlock.of(
-            "$L.$L()", componentDependency, asMethod(binding.bindingElement().get()).getJvmName());
+            "$L.$L()",
+            componentDependency,
+            toJavac(binding.bindingElement().get()).getSimpleName());
     return Expression.create(
         binding.contributedPrimitiveType().orElse(binding.key().type().xprocessing()),
         maybeCheckForNull(binding, compilerOptions, invocation));

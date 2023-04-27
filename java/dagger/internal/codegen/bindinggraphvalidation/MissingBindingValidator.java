@@ -31,7 +31,6 @@ import com.google.common.collect.ImmutableSet;
 import dagger.internal.codegen.binding.DependencyRequestFormatter;
 import dagger.internal.codegen.binding.InjectBindingRegistry;
 import dagger.internal.codegen.validation.DiagnosticMessageGenerator;
-import dagger.internal.codegen.validation.ValidationBindingGraphPlugin;
 import dagger.spi.model.Binding;
 import dagger.spi.model.BindingGraph;
 import dagger.spi.model.BindingGraph.ComponentNode;
@@ -39,6 +38,7 @@ import dagger.spi.model.BindingGraph.DependencyEdge;
 import dagger.spi.model.BindingGraph.Edge;
 import dagger.spi.model.BindingGraph.MissingBinding;
 import dagger.spi.model.BindingGraph.Node;
+import dagger.spi.model.BindingGraphPlugin;
 import dagger.spi.model.ComponentPath;
 import dagger.spi.model.DiagnosticReporter;
 import dagger.spi.model.Key;
@@ -47,7 +47,7 @@ import java.util.stream.Collectors;
 import javax.inject.Inject;
 
 /** Reports errors for missing bindings. */
-final class MissingBindingValidator extends ValidationBindingGraphPlugin {
+final class MissingBindingValidator implements BindingGraphPlugin {
 
   private final InjectBindingRegistry injectBindingRegistry;
   private final DependencyRequestFormatter dependencyRequestFormatter;
@@ -75,51 +75,29 @@ final class MissingBindingValidator extends ValidationBindingGraphPlugin {
     if (graph.isFullBindingGraph() || graph.rootComponentNode().isSubcomponent()) {
       return;
     }
-    // A missing binding might exist in a different component as unused binding, thus getting
-    // stripped. Therefore, full graph needs to be traversed to capture the stripped bindings.
-    if (!graph.missingBindings().isEmpty()) {
-      requestVisitFullGraph(graph);
-    }
-  }
-
-  @Override
-  public void revisitFullGraph(
-      BindingGraph prunedGraph, BindingGraph fullGraph, DiagnosticReporter diagnosticReporter) {
-    prunedGraph
+    graph
         .missingBindings()
-        .forEach(
-            missingBinding ->
-                reportMissingBinding(missingBinding, prunedGraph, fullGraph, diagnosticReporter));
+        .forEach(missingBinding -> reportMissingBinding(missingBinding, graph, diagnosticReporter));
   }
 
   private void reportMissingBinding(
-      MissingBinding missingBinding,
-      BindingGraph prunedGraph,
-      BindingGraph fullGraph,
-      DiagnosticReporter diagnosticReporter) {
+      MissingBinding missingBinding, BindingGraph graph, DiagnosticReporter diagnosticReporter) {
     List<ComponentPath> alternativeComponents =
-        fullGraph.bindings(missingBinding.key()).stream()
+        graph.bindings(missingBinding.key()).stream()
             .map(Binding::componentPath)
             .distinct()
             .collect(Collectors.toList());
     // Print component name for each binding along the dependency path if the missing binding
     // exists in a different component than expected
     if (alternativeComponents.isEmpty()) {
-      // TODO(b/266993189): the passed in diagnostic reporter is constructed with full graph, so it
-      // doesn't print out full dependency path for a binding when invoking reportBinding on it.
-      // Therefore, we manually constructed the binding dependency path and passed into
-      // reportComponent.
-      diagnosticReporter.reportComponent(
-          ERROR,
-          fullGraph.componentNode(missingBinding.componentPath()).get(),
-          missingBindingErrorMessage(missingBinding, fullGraph)
-              + diagnosticMessageGeneratorFactory.create(prunedGraph).getMessage(missingBinding));
+      diagnosticReporter.reportBinding(
+          ERROR, missingBinding, missingBindingErrorMessage(missingBinding, graph));
     } else {
       diagnosticReporter.reportComponent(
           ERROR,
-          fullGraph.componentNode(missingBinding.componentPath()).get(),
-          missingBindingErrorMessage(missingBinding, fullGraph)
-              + wrongComponentErrorMessage(missingBinding, alternativeComponents, prunedGraph));
+          graph.componentNode(missingBinding.componentPath()).get(),
+          missingBindingErrorMessage(missingBinding, graph)
+              + wrongComponentErrorMessage(missingBinding, alternativeComponents, graph));
     }
   }
 

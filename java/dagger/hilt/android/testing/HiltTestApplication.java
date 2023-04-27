@@ -16,6 +16,7 @@
 
 package dagger.hilt.android.testing;
 
+import android.content.Context;
 import androidx.multidex.MultiDexApplication;
 import dagger.hilt.android.internal.testing.TestApplicationComponentManager;
 import dagger.hilt.android.internal.testing.TestApplicationComponentManagerHolder;
@@ -27,26 +28,24 @@ import dagger.hilt.internal.GeneratedComponentManager;
 public final class HiltTestApplication extends MultiDexApplication
     implements GeneratedComponentManager<Object>, TestApplicationComponentManagerHolder {
 
-  // This field is initialized lazily to avoid pulling the generated component into the main dex. We
-  // could possibly avoid this by class loading TestComponentDataSupplier lazily rather than in the
-  // TestApplicationComponentManager constructor.
-  private volatile TestApplicationComponentManager componentManager;
-  private final Object componentManagerLock = new Object();
+  // This field is initialized in attachBaseContext to avoid pulling the generated component into
+  // the main dex. We could possibly avoid this by class loading TestComponentDataSupplier lazily
+  // rather than in the TestApplicationComponentManager constructor.
+  private TestApplicationComponentManager componentManager;
+
+  @Override
+  protected final void attachBaseContext(Context base) {
+    super.attachBaseContext(base);
+    componentManager = new TestApplicationComponentManager(this);
+  }
 
   @Override
   public final GeneratedComponentManager<Object> componentManager() {
-    if (componentManager == null) {
-      synchronized (componentManagerLock) {
-        if (componentManager == null) {
-          componentManager = new TestApplicationComponentManager(this);
-        }
-      }
-    }
     return componentManager;
   }
 
   @Override
   public final Object generatedComponent() {
-    return componentManager().generatedComponent();
+    return componentManager.generatedComponent();
   }
 }

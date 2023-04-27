@@ -18,7 +18,6 @@ package dagger.internal.codegen.binding;
 
 import static androidx.room.compiler.processing.compat.XConverters.toJavac;
 import static dagger.internal.codegen.extension.Optionals.emptiesLast;
-import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
 import static java.util.Comparator.comparing;
 
 import androidx.room.compiler.processing.XElement;
@@ -54,7 +53,7 @@ public abstract class BindingDeclaration {
           .thenComparing(
               (BindingDeclaration declaration) -> declaration.bindingElement(),
               emptiesLast(
-                  comparing((XElement element) -> getSimpleName(element))
+                  comparing((XElement element) -> toJavac(element).getSimpleName().toString())
                       .thenComparing((XElement element) -> toJavac(element).asType().toString())));
 
   /** The {@link Key} of this declaration. */

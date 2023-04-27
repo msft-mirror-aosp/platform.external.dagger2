@@ -16,16 +16,17 @@
 
 package dagger.internal.codegen.kotlin;
 
-import static dagger.internal.codegen.xprocessing.XElements.closestEnclosingTypeElement;
+import static com.google.auto.common.MoreElements.isAnnotationPresent;
+import static dagger.internal.codegen.langmodel.DaggerElements.closestEnclosingTypeElement;
 
-import androidx.room.compiler.processing.XElement;
-import androidx.room.compiler.processing.XTypeElement;
 import dagger.internal.codegen.base.ClearableCache;
-import dagger.internal.codegen.javapoet.TypeNames;
 import java.util.HashMap;
 import java.util.Map;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.TypeElement;
+import kotlin.Metadata;
 
 /**
  * Factory creating Kotlin metadata data objects.
@@ -35,7 +36,7 @@ import javax.inject.Singleton;
  */
 @Singleton
 public final class KotlinMetadataFactory implements ClearableCache {
-  private final Map<XTypeElement, KotlinMetadata> metadataCache = new HashMap<>();
+  private final Map<TypeElement, KotlinMetadata> metadataCache = new HashMap<>();
 
   @Inject
   KotlinMetadataFactory() {}
@@ -45,11 +46,11 @@ public final class KotlinMetadataFactory implements ClearableCache {
    *
    * @throws IllegalStateException if the element has no metadata or is not enclosed in a type
    *     element with metadata. To check if an element has metadata use {@link
-   *     KotlinMetadataUtil#hasMetadata(XElement)}
+   *     KotlinMetadataUtil#hasMetadata(Element)}
    */
-  public KotlinMetadata create(XElement element) {
-    XTypeElement enclosingElement = closestEnclosingTypeElement(element);
-    if (!enclosingElement.hasAnnotation(TypeNames.KOTLIN_METADATA)) {
+  public KotlinMetadata create(Element element) {
+    TypeElement enclosingElement = closestEnclosingTypeElement(element);
+    if (!isAnnotationPresent(enclosingElement, Metadata.class)) {
       throw new IllegalStateException("Missing @Metadata for: " + enclosingElement);
     }
     return metadataCache.computeIfAbsent(enclosingElement, KotlinMetadata::from);

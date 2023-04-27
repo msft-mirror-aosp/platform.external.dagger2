@@ -17,8 +17,11 @@
 package dagger.internal.codegen;
 
 import static com.google.common.truth.TruthJUnit.assume;
+import static com.google.testing.compile.CompilationSubject.assertThat;
 import static dagger.internal.codegen.CompilerMode.DEFAULT_MODE;
 import static dagger.internal.codegen.CompilerMode.FAST_INIT_MODE;
+import static dagger.internal.codegen.Compilers.compilerWithOptions;
+import static dagger.internal.codegen.Compilers.daggerCompiler;
 import static dagger.internal.codegen.ComponentCreatorTest.CompilerType.JAVAC;
 import static dagger.internal.codegen.base.ComponentCreatorAnnotation.COMPONENT_BUILDER;
 import static dagger.internal.codegen.base.ComponentCreatorAnnotation.COMPONENT_FACTORY;
@@ -27,14 +30,12 @@ import static dagger.internal.codegen.base.ComponentCreatorKind.FACTORY;
 import static dagger.internal.codegen.base.ComponentKind.COMPONENT;
 import static dagger.internal.codegen.binding.ErrorMessages.componentMessagesFor;
 
-import androidx.room.compiler.processing.util.Source;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
+import com.google.testing.compile.Compilation;
+import com.google.testing.compile.JavaFileObjects;
 import dagger.internal.codegen.base.ComponentCreatorAnnotation;
-import dagger.testing.compile.CompilerTests;
-import dagger.testing.golden.GoldenFileRule;
 import java.util.Collection;
-import org.junit.Rule;
+import javax.tools.JavaFileObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -48,7 +49,7 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
   }
 
   private final CompilerType compilerType;
-  private final ImmutableMap<String, String> compilerOptions;
+  private final CompilerMode compilerMode;
 
   @Parameters(name = "compilerMode={0}, creatorKind={1}")
   public static Collection<Object[]> parameters() {
@@ -59,25 +60,20 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
       new Object[]{FAST_INIT_MODE, COMPONENT_FACTORY, JAVAC});
   }
 
-  @Rule public GoldenFileRule goldenFileRule = new GoldenFileRule();
-
   public ComponentCreatorTest(
       CompilerMode compilerMode,
       ComponentCreatorAnnotation componentCreatorAnnotation,
       CompilerType compilerType) {
     super(compilerMode, componentCreatorAnnotation);
+    this.compilerMode = compilerMode;
     this.compilerType = compilerType;
-    this.compilerOptions =
-        ImmutableMap.<String, String>builder()
-            .putAll(compilerMode.processorOptions())
-            .build();
   }
 
   @Test
-  public void testEmptyCreator() throws Exception {
+  public void testEmptyCreator() {
     assume().that(compilerType).isEqualTo(JAVAC);
-    Source injectableTypeFile =
-        CompilerTests.javaSource(
+    JavaFileObject injectableTypeFile =
+        JavaFileObjects.forSourceLines(
             "test.SomeInjectableType",
             "package test;",
             "",
@@ -86,8 +82,8 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "final class SomeInjectableType {",
             "  @Inject SomeInjectableType() {}",
             "}");
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.SimpleComponent",
             "package test;",
             "",
@@ -103,21 +99,32 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "     SimpleComponent build();",
             "  }",
             "}");
-
-    CompilerTests.daggerCompiler(injectableTypeFile, componentFile)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerSimpleComponent"));
-            });
+    JavaFileObject generatedComponent =
+        preprocessedJavaFile(
+            "test.DaggerSimpleComponent",
+            "package test;",
+            "",
+            GeneratedLines.generatedAnnotations(),
+            "final class DaggerSimpleComponent implements SimpleComponent {",
+            "  private static final class Builder implements SimpleComponent.Builder {",
+            "    @Override",
+            "    public SimpleComponent build() {",
+            "      return new DaggerSimpleComponent();",
+            "    }",
+            "  }",
+            "}");
+    Compilation compilation = compile(injectableTypeFile, componentFile);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .generatedSourceFile("test.DaggerSimpleComponent")
+        .containsElementsIn(generatedComponent);
   }
 
   @Test
-  public void testCanInstantiateModulesUserCannotSet() throws Exception {
+  public void testCanInstantiateModulesUserCannotSet() {
     assume().that(compilerType).isEqualTo(JAVAC);
-    Source module =
-        CompilerTests.javaSource(
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -129,8 +136,8 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "  @Provides String string() { return null; }",
             "}");
 
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.TestComponent",
             "package test;",
             "",
@@ -145,20 +152,54 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "    TestComponent build();",
             "  }",
             "}");
-
-    CompilerTests.daggerCompiler(module, componentFile)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
-            });
+    JavaFileObject generatedComponent =
+        preprocessedJavaFile(
+            "test.DaggerTestComponent",
+            "package test;",
+            "",
+            GeneratedLines.generatedImports(),
+            "",
+            GeneratedLines.generatedAnnotations(),
+            "final class DaggerTestComponent implements TestComponent {",
+            "  private final TestModule testModule;",
+            "",
+            "  private final DaggerTestComponent testComponent = this;",
+            "",
+            "  private DaggerTestComponent(TestModule testModuleParam) {",
+            "    this.testModule = testModuleParam;",
+            "  }",
+            "",
+            "  public static TestComponent.Builder builder() {",
+            "    return new Builder();",
+            "  }",
+            "",
+            "  public static TestComponent create() {",
+            "    return new Builder().build();",
+            "  }",
+            "",
+            "  @Override",
+            "  public String string() {",
+            "    return TestModule_StringFactory.string(testModule);",
+            "  }",
+            "",
+            "  private static final class Builder implements TestComponent.Builder {",
+            "    @Override",
+            "    public TestComponent build() {",
+            "      return new DaggerTestComponent(new TestModule());",
+            "    }",
+            "  }",
+            "}");
+    Compilation compilation = compile(module, componentFile);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .generatedSourceFile("test.DaggerTestComponent")
+        .hasSourceEquivalentTo(generatedComponent);
   }
 
   @Test
   public void testMoreThanOneCreatorOfSameTypeFails() {
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.SimpleComponent",
             "package test;",
             "",
@@ -177,24 +218,20 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "     SimpleComponent build();",
             "  }",
             "}");
-
-    CompilerTests.daggerCompiler(componentFile)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      String.format(
-                          componentMessagesFor(COMPONENT).moreThanOne(),
-                          process("[test.SimpleComponent.Builder, test.SimpleComponent.Builder2]")))
-                  .onSource(componentFile);
-            });
+    Compilation compilation = compile(componentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            String.format(
+                componentMessagesFor(COMPONENT).moreThanOne(),
+                process("[test.SimpleComponent.Builder, test.SimpleComponent.Builder2]")))
+        .inFile(componentFile);
   }
 
   @Test
   public void testBothBuilderAndFactoryFails() {
-    Source componentFile =
-        CompilerTests.javaSource(
+    JavaFileObject componentFile =
+        JavaFileObjects.forSourceLines(
             "test.SimpleComponent",
             "package test;",
             "",
@@ -213,23 +250,20 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "     SimpleComponent create();",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(componentFile)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      String.format(
-                          componentMessagesFor(COMPONENT).moreThanOne(),
-                          "[test.SimpleComponent.Builder, test.SimpleComponent.Factory]"))
-                  .onSource(componentFile);
-            });
+    Compilation compilation = compile(componentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            String.format(
+                componentMessagesFor(COMPONENT).moreThanOne(),
+                "[test.SimpleComponent.Builder, test.SimpleComponent.Factory]"))
+        .inFile(componentFile);
   }
 
   @Test
   public void testGenericCreatorTypeFails() {
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.SimpleComponent",
             "package test;",
             "",
@@ -243,19 +277,15 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "     SimpleComponent build();",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(componentFile)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(messages.generics()).onSource(componentFile);
-            });
+    Compilation compilation = compile(componentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorContaining(messages.generics()).inFile(componentFile);
   }
 
   @Test
   public void testCreatorNotInComponentFails() {
-    Source builder =
-        preprocessedJavaSource(
+    JavaFileObject builder =
+        preprocessedJavaFile(
             "test.Builder",
             "package test;",
             "",
@@ -263,19 +293,15 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "",
             "@Component.Builder",
             "interface Builder {}");
-    CompilerTests.daggerCompiler(builder)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(messages.mustBeInComponent()).onSource(builder);
-            });
+    Compilation compilation = compile(builder);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorContaining(messages.mustBeInComponent()).inFile(builder);
   }
 
   @Test
   public void testCreatorMissingFactoryMethodFails() {
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.SimpleComponent",
             "package test;",
             "",
@@ -287,20 +313,17 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "  @Component.Builder",
             "  interface Builder {}",
             "}");
-    CompilerTests.daggerCompiler(componentFile)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(messages.missingFactoryMethod())
-                  .onSource(componentFile);
-            });
+    Compilation compilation = compile(componentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(messages.missingFactoryMethod())
+        .inFile(componentFile);
   }
 
   @Test
-  public void testCreatorWithBindsInstanceNoStaticCreateGenerated() throws Exception {
+  public void testCreatorWithBindsInstanceNoStaticCreateGenerated() {
     assume().that(compilerType).isEqualTo(JAVAC);
-    Source componentFile =
+    JavaFileObject componentFile =
         javaFileBuilder("test.SimpleComponent")
             .addLines(
                 "package test;",
@@ -327,22 +350,82 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
                 "    SimpleComponent create(@BindsInstance Object object);",
                 "  }")
             .addLines("}")
-            .buildSource();
+            .build();
 
-    CompilerTests.daggerCompiler(componentFile)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.hasWarningCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerSimpleComponent"));
-            });
+    JavaFileObject generatedComponent =
+        javaFileBuilder("test.DaggerSimpleComponent")
+            .addLines(
+                "package test;",
+                "",
+                GeneratedLines.generatedImports("import dagger.internal.Preconditions;"),
+                "",
+                GeneratedLines.generatedAnnotations(),
+                "final class DaggerSimpleComponent implements SimpleComponent {",
+                "  private final Object object;",
+                "",
+                "  private final DaggerSimpleComponent simpleComponent = this;",
+                "",
+                "  private DaggerSimpleComponent(Object objectParam) {",
+                "    this.object = objectParam;",
+                "  }",
+                "")
+            .addLinesIf(
+                BUILDER,
+                "  public static SimpleComponent.Builder builder() {",
+                "    return new Builder();",
+                "  }")
+            .addLinesIf(
+                FACTORY,
+                "  public static SimpleComponent.Factory factory() {",
+                "    return new Factory();",
+                "  }")
+            .addLines(
+                "", //
+                "  @Override",
+                "  public Object object() {",
+                "    return object;",
+                "  }",
+                "")
+            .addLinesIf(
+                BUILDER,
+                "  private static final class Builder implements SimpleComponent.Builder {",
+                "    private Object object;",
+                "",
+                "    @Override",
+                "    public Builder object(Object object) {",
+                "      this.object = Preconditions.checkNotNull(object);",
+                "      return this;",
+                "    }",
+                "",
+                "    @Override",
+                "    public SimpleComponent build() {",
+                "      Preconditions.checkBuilderRequirement(object, Object.class);",
+                "      return new DaggerSimpleComponent(object);",
+                "    }",
+                "  }")
+            .addLinesIf(
+                FACTORY,
+                "  private static final class Factory implements SimpleComponent.Factory {",
+                "    @Override",
+                "    public SimpleComponent create(Object object) {",
+                "      Preconditions.checkNotNull(object);",
+                "      return new DaggerSimpleComponent(object);",
+                "    }",
+                "  }")
+            .addLines("}")
+            .build();
+
+    Compilation compilation = compile(componentFile);
+    assertThat(compilation).succeededWithoutWarnings();
+    assertThat(compilation)
+        .generatedSourceFile("test.DaggerSimpleComponent")
+        .hasSourceEquivalentTo(generatedComponent);
   }
 
   @Test
-  public void testCreatorWithPrimitiveBindsInstance() throws Exception {
+  public void testCreatorWithPrimitiveBindsInstance() {
     assume().that(compilerType).isEqualTo(JAVAC);
-    Source componentFile =
+    JavaFileObject componentFile =
         javaFileBuilder("test.SimpleComponent")
             .addLines(
                 "package test;",
@@ -370,22 +453,69 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
                 "  }")
             .addLines(
                 "}")
-            .buildSource();
+            .build();
 
-    CompilerTests.daggerCompiler(componentFile)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.hasWarningCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerSimpleComponent"));
-            });
+    JavaFileObject generatedComponent =
+        javaFileBuilder("test.DaggerSimpleComponent")
+            .addLines(
+                "package test;",
+                "",
+                GeneratedLines.generatedImports("import dagger.internal.Preconditions;"),
+                "",
+                GeneratedLines.generatedAnnotations(),
+                "final class DaggerSimpleComponent implements SimpleComponent {",
+                "  private final Integer i;",
+                "",
+                "  private DaggerSimpleComponent(Integer iParam) {",
+                "    this.i = iParam;",
+                "  }",
+                "",
+                "  @Override",
+                "  public int anInt() {",
+                "    return i;",
+                "  }",
+                "")
+            .addLinesIf(
+                BUILDER,
+                "  private static final class Builder implements SimpleComponent.Builder {",
+                "    private Integer i;",
+                "",
+                "    @Override",
+                "    public Builder i(int i) {",
+                "      this.i = Preconditions.checkNotNull(i);",
+                "      return this;",
+                "    }",
+                "",
+                "    @Override",
+                "    public SimpleComponent build() {",
+                "      Preconditions.checkBuilderRequirement(i, Integer.class);",
+                "      return new DaggerSimpleComponent(i);",
+                "    }",
+                "  }")
+            .addLinesIf(
+                FACTORY,
+                "  private static final class Factory implements SimpleComponent.Factory {",
+                "    @Override",
+                "    public SimpleComponent create(int i) {",
+                "      Preconditions.checkNotNull(i);",
+                "      return new DaggerSimpleComponent(i);",
+                "    }",
+                "  }")
+            .addLines(
+                "}")
+            .build();
+
+    Compilation compilation = compile(componentFile);
+    assertThat(compilation).succeededWithoutWarnings();
+    assertThat(compilation)
+        .generatedSourceFile("test.DaggerSimpleComponent")
+        .containsElementsIn(generatedComponent);
   }
 
   @Test
   public void testPrivateCreatorFails() {
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.SimpleComponent",
             "package test;",
             "",
@@ -397,19 +527,15 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "  @Component.Builder",
             "  private interface Builder {}",
             "}");
-    CompilerTests.daggerCompiler(componentFile)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(messages.isPrivate()).onSource(componentFile);
-            });
+    Compilation compilation = compile(componentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorContaining(messages.isPrivate()).inFile(componentFile);
   }
 
   @Test
   public void testNonStaticCreatorFails() {
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.SimpleComponent",
             "package test;",
             "",
@@ -421,19 +547,15 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "  @Component.Builder",
             "  abstract class Builder {}",
             "}");
-    CompilerTests.daggerCompiler(componentFile)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(messages.mustBeStatic()).onSource(componentFile);
-            });
+    Compilation compilation = compile(componentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorContaining(messages.mustBeStatic()).inFile(componentFile);
   }
 
   @Test
   public void testNonAbstractCreatorFails() {
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.SimpleComponent",
             "package test;",
             "",
@@ -445,19 +567,15 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "  @Component.Builder",
             "  static class Builder {}",
             "}");
-    CompilerTests.daggerCompiler(componentFile)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(messages.mustBeAbstract()).onSource(componentFile);
-            });
+    Compilation compilation = compile(componentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorContaining(messages.mustBeAbstract()).inFile(componentFile);
   }
 
   @Test
   public void testCreatorOneConstructorWithArgsFails() {
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.SimpleComponent",
             "package test;",
             "",
@@ -471,20 +589,17 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "    Builder(String unused) {}",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(componentFile)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(2);
-              subject.hasErrorContaining(messages.invalidConstructor())
-                  .onSource(componentFile);
-            });
+    Compilation compilation = compile(componentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(messages.invalidConstructor())
+        .inFile(componentFile);
   }
 
   @Test
   public void testCreatorMoreThanOneConstructorFails() {
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.SimpleComponent",
             "package test;",
             "",
@@ -499,20 +614,17 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "    Builder(String unused) {}",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(componentFile)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(2);
-              subject.hasErrorContaining(messages.invalidConstructor())
-                  .onSource(componentFile);
-            });
+    Compilation compilation = compile(componentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(messages.invalidConstructor())
+        .inFile(componentFile);
   }
 
   @Test
   public void testCreatorEnumFails() {
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.SimpleComponent",
             "package test;",
             "",
@@ -524,20 +636,17 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "  @Component.Builder",
             "  enum Builder {}",
             "}");
-    CompilerTests.daggerCompiler(componentFile)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(messages.mustBeClassOrInterface())
-                  .onSource(componentFile);
-            });
+    Compilation compilation = compile(componentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(messages.mustBeClassOrInterface())
+        .inFile(componentFile);
   }
 
   @Test
   public void testCreatorFactoryMethodReturnsWrongTypeFails() {
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.SimpleComponent",
             "package test;",
             "",
@@ -551,20 +660,17 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "    String build();",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(componentFile)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(messages.factoryMethodMustReturnComponentType())
-                  .onSource(componentFile)
-                  .onLineContaining(process("String build();"));
-            });
+    Compilation compilation = compile(componentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(messages.factoryMethodMustReturnComponentType())
+        .inFile(componentFile)
+        .onLineContaining(process("String build();"));
   }
 
   @Test
   public void testCreatorSetterForNonBindsInstancePrimitiveFails() {
-    Source component =
+    JavaFileObject component =
         javaFileBuilder("test.TestComponent")
             .addLines(
                 "package test;",
@@ -590,22 +696,20 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
                 "  }")
             .addLines( //
                 "}")
-            .buildSource();
-    CompilerTests.daggerCompiler(component)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(messages.nonBindsInstanceParametersMayNotBePrimitives())
-                  .onSource(component)
-                  .onLineContaining("(long l)");
-            });
+            .build();
+    Compilation compilation = compile(component);
+    assertThat(compilation).failed();
+
+    assertThat(compilation)
+        .hadErrorContaining(messages.nonBindsInstanceParametersMayNotBePrimitives())
+        .inFile(component)
+        .onLineContaining("(long l)");
   }
 
   @Test
   public void testInheritedBuilderBuildReturnsWrongTypeFails() {
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.SimpleComponent",
             "package test;",
             "",
@@ -621,24 +725,20 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "  @Component.Builder",
             "  interface Builder extends Parent {}",
             "}");
-    CompilerTests.daggerCompiler(componentFile)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                    String.format(
-                        messages.inheritedFactoryMethodMustReturnComponentType(),
-                        process("String test.SimpleComponent.Parent.build()")))
-                  .onSource(componentFile)
-                  .onLineContaining(process("interface Builder"));
-            });
+    Compilation compilation = compile(componentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            String.format(
+                messages.inheritedFactoryMethodMustReturnComponentType(), process("build")))
+        .inFile(componentFile)
+        .onLineContaining(process("interface Builder"));
   }
 
   @Test
   public void testTwoFactoryMethodsFails() {
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.SimpleComponent",
             "package test;",
             "",
@@ -653,24 +753,18 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "    SimpleComponent newSimpleComponent();",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(componentFile)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      String.format(
-                          messages.twoFactoryMethods(),
-                          process("test.SimpleComponent test.SimpleComponent.Builder.build()")))
-                  .onSource(componentFile)
-                  .onLineContaining("SimpleComponent newSimpleComponent();");
-            });
+    Compilation compilation = compile(componentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(String.format(messages.twoFactoryMethods(), process("build")))
+        .inFile(componentFile)
+        .onLineContaining("SimpleComponent newSimpleComponent();");
   }
 
   @Test
   public void testInheritedTwoFactoryMethodsFails() {
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.SimpleComponent",
             "package test;",
             "",
@@ -687,26 +781,21 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "  @Component.Builder",
             "  interface Builder extends Parent {}",
             "}");
-    CompilerTests.daggerCompiler(componentFile)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      String.format(
-                          messages.inheritedTwoFactoryMethods(),
-                          process("test.SimpleComponent test.SimpleComponent.Parent.build()"),
-                          "test.SimpleComponent test.SimpleComponent.Parent.newSimpleComponent()"))
-                  .onSource(componentFile)
-                  .onLineContaining(process("interface Builder"));
-            });
+    Compilation compilation = compile(componentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            String.format(
+                messages.inheritedTwoFactoryMethods(), process("build()"), "newSimpleComponent()"))
+        .inFile(componentFile)
+        .onLineContaining(process("interface Builder"));
   }
 
   @Test
   public void testMultipleSettersPerTypeFails() {
     assume().that(compilerType).isEqualTo(JAVAC);
-    Source moduleFile =
-        CompilerTests.javaSource(
+    JavaFileObject moduleFile =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -717,7 +806,7 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "final class TestModule {",
             "  @Provides String s() { return \"\"; }",
             "}");
-    Source componentFile =
+    JavaFileObject componentFile =
         javaFileBuilder("test.SimpleComponent")
             .addLines(
                 "package test;",
@@ -745,32 +834,27 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
                 "  }")
             .addLines( //
                 "}")
-            .buildSource();
-    CompilerTests.daggerCompiler(moduleFile, componentFile)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              String elements =
-                  creatorKind.equals(BUILDER)
-                      ? "[void test.SimpleComponent.Builder.set1(test.TestModule), "
-                          + "void test.SimpleComponent.Builder.set2(test.TestModule)]"
-                      : "[test.TestModule m1, test.TestModule m2]";
-              subject.hasErrorContaining(
-                      String.format(
-                          messages.multipleSettersForModuleOrDependencyType(),
-                          "test.TestModule",
-                          elements))
-                  .onSource(componentFile)
-                  .onLineContaining(process("interface Builder"));
-            });
+            .build();
+    Compilation compilation = compile(moduleFile, componentFile);
+    assertThat(compilation).failed();
+    String elements =
+        creatorKind.equals(BUILDER)
+            ? "[void test.SimpleComponent.Builder.set1(test.TestModule), "
+                + "void test.SimpleComponent.Builder.set2(test.TestModule)]"
+            : "[test.TestModule m1, test.TestModule m2]";
+    assertThat(compilation)
+        .hadErrorContaining(
+            String.format(
+                messages.multipleSettersForModuleOrDependencyType(), "test.TestModule", elements))
+        .inFile(componentFile)
+        .onLineContaining(process("interface Builder"));
   }
 
   @Test
   public void testMultipleSettersPerTypeIncludingResolvedGenericsFails() {
     assume().that(compilerType).isEqualTo(JAVAC);
-    Source moduleFile =
-        CompilerTests.javaSource(
+    JavaFileObject moduleFile =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -781,7 +865,7 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "final class TestModule {",
             "  @Provides String s() { return \"\"; }",
             "}");
-    Source componentFile =
+    JavaFileObject componentFile =
         javaFileBuilder("test.SimpleComponent")
             .addLines(
                 "package test;",
@@ -814,31 +898,26 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
                 "  interface Factory extends Parent<SimpleComponent, TestModule> {}")
             .addLines( //
                 "}")
-            .buildSource();
-    CompilerTests.daggerCompiler(moduleFile, componentFile)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              String elements =
-                  creatorKind.equals(BUILDER)
-                      ? "[void test.SimpleComponent.Builder.set1(test.TestModule), "
-                          + "void test.SimpleComponent.Builder.set2(test.TestModule)]"
-                      : "[test.TestModule m1, test.TestModule t]";
-              subject.hasErrorContaining(
-                      String.format(
-                          messages.multipleSettersForModuleOrDependencyType(),
-                          "test.TestModule",
-                          elements))
-                  .onSource(componentFile)
-                  .onLineContaining(process("interface Builder"));
-            });
+            .build();
+    Compilation compilation = compile(moduleFile, componentFile);
+    assertThat(compilation).failed();
+    String elements =
+        creatorKind.equals(BUILDER)
+            ? "[void test.SimpleComponent.Builder.set1(test.TestModule), "
+                + "void test.SimpleComponent.Builder.set2(test.TestModule)]"
+            : "[test.TestModule m1, test.TestModule t]";
+    assertThat(compilation)
+        .hadErrorContaining(
+            String.format(
+                messages.multipleSettersForModuleOrDependencyType(), "test.TestModule", elements))
+        .inFile(componentFile)
+        .onLineContaining(process("interface Builder"));
   }
 
   @Test
   public void testExtraSettersFails() {
     assume().that(compilerType).isEqualTo(JAVAC);
-    Source componentFile =
+    JavaFileObject componentFile =
         javaFileBuilder("test.SimpleComponent")
             .addLines(
                 "package test;",
@@ -863,9 +942,9 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
                 "    SimpleComponent create(AbstractModule abstractModule, String s);",
                 "  }")
             .addLines("}")
-            .buildSource();
-    Source abstractModule =
-        CompilerTests.javaSource(
+            .build();
+    JavaFileObject abstractModule =
+        JavaFileObjects.forSourceLines(
             "test.AbstractModule",
             "package test;",
             "",
@@ -873,27 +952,23 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "",
             "@Module",
             "abstract class AbstractModule {}");
-    CompilerTests.daggerCompiler(componentFile, abstractModule)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              String elements =
-                  creatorKind.equals(BUILDER)
-                      ? "[void test.SimpleComponent.Builder.abstractModule(test.AbstractModule), "
-                          + "void test.SimpleComponent.Builder.other(String)]"
-                      : "[test.AbstractModule abstractModule, String s]";
-              subject.hasErrorContaining(String.format(messages.extraSetters(), elements))
-                  .onSource(componentFile)
-                  .onLineContaining(process("interface Builder"));
-            });
+    Compilation compilation = compile(componentFile, abstractModule);
+    assertThat(compilation).failed();
+    String elements =
+        creatorKind.equals(BUILDER)
+            ? "[void test.SimpleComponent.Builder.abstractModule(test.AbstractModule), "
+                + "void test.SimpleComponent.Builder.other(String)]"
+            : "[test.AbstractModule abstractModule, String s]";
+    assertThat(compilation)
+        .hadErrorContaining(String.format(messages.extraSetters(), elements))
+        .inFile(componentFile)
+        .onLineContaining(process("interface Builder"));
   }
 
   @Test
   public void testMissingSettersFail() {
-    assume().that(compilerType).isEqualTo(JAVAC);
-    Source moduleFile =
-        CompilerTests.javaSource(
+    JavaFileObject moduleFile =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -905,8 +980,8 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "  TestModule(String unused) {}",
             "  @Provides String s() { return null; }",
             "}");
-    Source module2File =
-        CompilerTests.javaSource(
+    JavaFileObject module2File =
+        JavaFileObjects.forSourceLines(
             "test.Test2Module",
             "package test;",
             "",
@@ -917,8 +992,8 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "final class Test2Module {",
             "  @Provides Integer i() { return null; }",
             "}");
-    Source module3File =
-        CompilerTests.javaSource(
+    JavaFileObject module3File =
+        JavaFileObjects.forSourceLines(
             "test.Test3Module",
             "package test;",
             "",
@@ -930,17 +1005,15 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "  Test3Module(String unused) {}",
             "  @Provides Double d() { return null; }",
             "}");
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.TestComponent",
             "package test;",
             "",
             "import dagger.Component;",
             "",
-            "@Component(",
-            "    modules = {TestModule.class, Test2Module.class, Test3Module.class},",
-            "    dependencies = OtherComponent.class",
-            ")",
+            "@Component(modules = {TestModule.class, Test2Module.class, Test3Module.class},",
+            "           dependencies = OtherComponent.class)",
             "interface TestComponent {",
             "  String string();",
             "  Integer integer();",
@@ -950,8 +1023,8 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "    TestComponent create();",
             "  }",
             "}");
-    Source otherComponent =
-        CompilerTests.javaSource(
+    JavaFileObject otherComponent =
+        JavaFileObjects.forSourceLines(
             "test.OtherComponent",
             "package test;",
             "",
@@ -959,29 +1032,26 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "",
             "@Component",
             "interface OtherComponent {}");
-    CompilerTests.daggerCompiler(
-            moduleFile, module2File, module3File, componentFile, otherComponent)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      // Ignores Test2Module because we can construct it ourselves.
-                      // TODO(sameb): Ignore Test3Module because it's not used within transitive
-                      // dependencies.
-                      String.format(
-                          messages.missingSetters(),
-                          "[test.TestModule, test.Test3Module, test.OtherComponent]"))
-                  .onSource(componentFile)
-                  .onLineContaining(process("interface Builder"));
-            });
+    Compilation compilation =
+        daggerCompiler()
+            .compile(moduleFile, module2File, module3File, componentFile, otherComponent);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            // Ignores Test2Module because we can construct it ourselves.
+            // TODO(sameb): Ignore Test3Module because it's not used within transitive dependencies.
+            String.format(
+                messages.missingSetters(),
+                "[test.TestModule, test.Test3Module, test.OtherComponent]"))
+        .inFile(componentFile)
+        .onLineContaining(process("interface Builder"));
   }
 
   @Test
   public void covariantFactoryMethodReturnType() {
     assume().that(compilerType).isEqualTo(JAVAC);
-    Source foo =
-        CompilerTests.javaSource(
+    JavaFileObject foo =
+        JavaFileObjects.forSourceLines(
             "test.Foo",
             "package test;",
             "",
@@ -990,8 +1060,8 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "class Foo {",
             "  @Inject Foo() {}",
             "}");
-    Source supertype =
-        CompilerTests.javaSource(
+    JavaFileObject supertype =
+        JavaFileObjects.forSourceLines(
             "test.Supertype",
             "package test;",
             "",
@@ -999,8 +1069,8 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "  Foo foo();",
             "}");
 
-    Source component =
-        preprocessedJavaSource(
+    JavaFileObject component =
+        preprocessedJavaFile(
             "test.HasSupertype",
             "package test;",
             "",
@@ -1014,20 +1084,15 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "  }",
             "}");
 
-    CompilerTests.daggerCompiler(foo, supertype, component)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.hasWarningCount(0);
-            });
+    Compilation compilation = compile(foo, supertype, component);
+    assertThat(compilation).succeededWithoutWarnings();
   }
 
   @Test
   public void covariantFactoryMethodReturnType_hasNewMethod() {
     assume().that(compilerType).isEqualTo(JAVAC);
-    Source foo =
-        CompilerTests.javaSource(
+    JavaFileObject foo =
+        JavaFileObjects.forSourceLines(
             "test.Foo",
             "package test;",
             "",
@@ -1036,8 +1101,8 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "class Foo {",
             "  @Inject Foo() {}",
             "}");
-    Source bar =
-        CompilerTests.javaSource(
+    JavaFileObject bar =
+        JavaFileObjects.forSourceLines(
             "test.Bar",
             "package test;",
             "",
@@ -1046,8 +1111,8 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "class Bar {",
             "  @Inject Bar() {}",
             "}");
-    Source supertype =
-        CompilerTests.javaSource(
+    JavaFileObject supertype =
+        JavaFileObjects.forSourceLines(
             "test.Supertype",
             "package test;",
             "",
@@ -1055,8 +1120,8 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "  Foo foo();",
             "}");
 
-    Source component =
-        preprocessedJavaSource(
+    JavaFileObject component =
+        preprocessedJavaFile(
             "test.HasSupertype",
             "package test;",
             "",
@@ -1072,27 +1137,24 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "  }",
             "}");
 
-    CompilerTests.daggerCompiler(foo, bar, supertype, component)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.hasWarningContaining(
-                      process(
-                          "test.HasSupertype.Builder.build() returns test.Supertype, but "
-                              + "test.HasSupertype declares additional component method(s): bar(). "
-                              + "In order to provide type-safe access to these methods, override "
-                              + "build() to return test.HasSupertype"))
-                  .onSource(component)
-                  .onLine(11);
-            });
+    Compilation compilation = compile(foo, bar, supertype, component);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .hadWarningContaining(
+            process(
+                "test.HasSupertype.Builder.build() returns test.Supertype, but test.HasSupertype "
+                    + "declares additional component method(s): bar(). In order to provide "
+                    + "type-safe access to these methods, override build() to return "
+                    + "test.HasSupertype"))
+        .inFile(component)
+        .onLine(11);
   }
 
   @Test
   public void covariantFactoryMethodReturnType_hasNewMethod_factoryMethodInherited() {
     assume().that(compilerType).isEqualTo(JAVAC);
-    Source foo =
-        CompilerTests.javaSource(
+    JavaFileObject foo =
+        JavaFileObjects.forSourceLines(
             "test.Foo",
             "package test;",
             "",
@@ -1101,8 +1163,8 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "class Foo {",
             "  @Inject Foo() {}",
             "}");
-    Source bar =
-        CompilerTests.javaSource(
+    JavaFileObject bar =
+        JavaFileObjects.forSourceLines(
             "test.Bar",
             "package test;",
             "",
@@ -1111,8 +1173,8 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "class Bar {",
             "  @Inject Bar() {}",
             "}");
-    Source supertype =
-        CompilerTests.javaSource(
+    JavaFileObject supertype =
+        JavaFileObjects.forSourceLines(
             "test.Supertype",
             "package test;",
             "",
@@ -1120,8 +1182,8 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "  Foo foo();",
             "}");
 
-    Source creatorSupertype =
-        preprocessedJavaSource(
+    JavaFileObject creatorSupertype =
+        preprocessedJavaFile(
             "test.CreatorSupertype",
             "package test;",
             "",
@@ -1129,8 +1191,8 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "  Supertype build();",
             "}");
 
-    Source component =
-        preprocessedJavaSource(
+    JavaFileObject component =
+        preprocessedJavaFile(
             "test.HasSupertype",
             "package test;",
             "",
@@ -1144,24 +1206,21 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "  interface Builder extends CreatorSupertype {}",
             "}");
 
-    CompilerTests.daggerCompiler(foo, bar, supertype, creatorSupertype, component)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.hasWarningContaining(
-                  process(
-                      "test.HasSupertype.Builder.build() returns test.Supertype, but "
-                          + "test.HasSupertype declares additional component method(s): bar(). "
-                          + "In order to provide type-safe access to these methods, override "
-                          + "build() to return test.HasSupertype"));
-            });
+    Compilation compilation = compile(foo, bar, supertype, creatorSupertype, component);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .hadWarningContaining(
+            process(
+                "test.HasSupertype.Builder.build() returns test.Supertype, but test.HasSupertype "
+                    + "declares additional component method(s): bar(). In order to provide "
+                    + "type-safe access to these methods, override build() to return "
+                    + "test.HasSupertype"));
   }
 
   @Test
   public void testGenericsOnFactoryMethodFails() {
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.SimpleComponent",
             "package test;",
             "",
@@ -1175,21 +1234,18 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "    <T> SimpleComponent build();",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(componentFile)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(messages.methodsMayNotHaveTypeParameters())
-                  .onSource(componentFile)
-                  .onLineContaining(process("<T> SimpleComponent build();"));
-            });
+    Compilation compilation = compile(componentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(messages.methodsMayNotHaveTypeParameters())
+        .inFile(componentFile)
+        .onLineContaining(process("<T> SimpleComponent build();"));
   }
 
   @Test
   public void testGenericsOnInheritedFactoryMethodFails() {
-    Source componentFile =
-        preprocessedJavaSource(
+    JavaFileObject componentFile =
+        preprocessedJavaFile(
             "test.SimpleComponent",
             "package test;",
             "",
@@ -1205,17 +1261,22 @@ public class ComponentCreatorTest extends ComponentCreatorTestHelper {
             "  @Component.Builder",
             "  interface Builder extends Parent {}",
             "}");
-    CompilerTests.daggerCompiler(componentFile)
-        .withProcessingOptions(compilerOptions)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      String.format(
-                          messages.inheritedMethodsMayNotHaveTypeParameters(),
-                          process("test.SimpleComponent test.SimpleComponent.Parent.build()")))
-                  .onSource(componentFile)
-                  .onLineContaining(process("interface Builder"));
-            });
+    Compilation compilation = compile(componentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            String.format(
+                messages.inheritedMethodsMayNotHaveTypeParameters(), process("<T>build()")))
+        .inFile(componentFile)
+        .onLineContaining(process("interface Builder"));
+  }
+
+  /** Compiles the given files with the set compiler mode's javacopts. */
+  @Override
+  Compilation compile(JavaFileObject... files) {
+    ImmutableList.Builder<String> options =
+        ImmutableList.<String>builder().addAll(compilerMode.javacopts());
+
+    return compilerWithOptions(options.build()).compile(files);
   }
 }

@@ -26,6 +26,7 @@ import dagger.internal.codegen.binding.BindingGraph;
 import dagger.internal.codegen.binding.BindingRequest;
 import dagger.internal.codegen.binding.ProvisionBinding;
 import dagger.internal.codegen.compileroption.CompilerOptions;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.internal.codegen.writing.ComponentImplementation.CompilerMode;
 import dagger.spi.model.RequestKind;
 
@@ -50,7 +51,8 @@ final class ProvisionBindingRepresentation implements BindingRepresentation {
       SwitchingProviderInstanceSupplier.Factory switchingProviderInstanceSupplierFactory,
       ProviderInstanceSupplier.Factory providerInstanceSupplierFactory,
       StaticFactoryInstanceSupplier.Factory staticFactoryInstanceSupplierFactory,
-      CompilerOptions compilerOptions) {
+      CompilerOptions compilerOptions,
+      DaggerTypes types) {
     this.binding = binding;
     this.graph = graph;
     this.compilerMode = componentImplementation.compilerMode();

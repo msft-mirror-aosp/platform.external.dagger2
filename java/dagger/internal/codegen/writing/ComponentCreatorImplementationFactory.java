@@ -26,7 +26,6 @@ import static dagger.internal.codegen.binding.SourceFiles.simpleVariableName;
 import static dagger.internal.codegen.javapoet.CodeBlocks.toParametersCodeBlock;
 import static dagger.internal.codegen.javapoet.TypeSpecs.addSupertype;
 import static dagger.internal.codegen.langmodel.Accessibility.isElementAccessibleFrom;
-import static dagger.internal.codegen.xprocessing.MethodSpecs.overriding;
 import static javax.lang.model.element.Modifier.FINAL;
 import static javax.lang.model.element.Modifier.PRIVATE;
 import static javax.lang.model.element.Modifier.PUBLIC;
@@ -50,8 +49,8 @@ import dagger.internal.codegen.binding.ComponentCreatorDescriptor;
 import dagger.internal.codegen.binding.ComponentDescriptor;
 import dagger.internal.codegen.binding.ComponentRequirement;
 import dagger.internal.codegen.binding.ComponentRequirement.NullPolicy;
-import dagger.internal.codegen.compileroption.CompilerOptions;
 import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.xprocessing.MethodSpecs;
 import dagger.internal.codegen.xprocessing.XElements;
 import java.util.Optional;
 import java.util.Set;
@@ -62,14 +61,15 @@ import javax.lang.model.element.Modifier;
 /** Factory for creating {@link ComponentCreatorImplementation} instances. */
 final class ComponentCreatorImplementationFactory {
 
-  private final CompilerOptions compilerOptions;
   private final ComponentImplementation componentImplementation;
+  private final ModuleProxies moduleProxies;
 
   @Inject
   ComponentCreatorImplementationFactory(
-      CompilerOptions compilerOptions, ComponentImplementation componentImplementation) {
-    this.compilerOptions = compilerOptions;
+      ComponentImplementation componentImplementation,
+      ModuleProxies moduleProxies) {
     this.componentImplementation = componentImplementation;
+    this.moduleProxies = moduleProxies;
   }
 
   /** Returns a new creator implementation for the given component, if necessary. */
@@ -260,10 +260,9 @@ final class ComponentCreatorImplementationFactory {
 
     private MethodSpec maybeReturnThis(MethodSpec.Builder method) {
       MethodSpec built = method.build();
-      if (built.returnType.equals(TypeName.VOID)) {
-        return built;
-      }
-      return method.addStatement("return this").build();
+      return built.returnType.equals(TypeName.VOID)
+          ? built
+          : method.addStatement("return this").build();
     }
 
     private void addFactoryMethod() {
@@ -354,7 +353,7 @@ final class ComponentCreatorImplementationFactory {
 
     private CodeBlock newModuleInstance(ComponentRequirement requirement) {
       checkArgument(requirement.kind().isModule()); // this should be guaranteed to be true here
-      return ModuleProxies.newModuleInstance(
+      return moduleProxies.newModuleInstance(
           requirement.typeElement(), componentImplementation.getCreatorName());
     }
   }
@@ -406,7 +405,7 @@ final class ComponentCreatorImplementationFactory {
 
     @Override
     protected MethodSpec.Builder factoryMethodBuilder() {
-      return overriding(creatorDescriptor.factoryMethod(), creatorType());
+      return MethodSpecs.overriding(creatorDescriptor.factoryMethod(), creatorType());
     }
 
     private RequirementStatus requirementStatus(ComponentRequirement requirement) {
@@ -438,7 +437,7 @@ final class ComponentCreatorImplementationFactory {
     @Override
     protected MethodSpec.Builder setterMethodBuilder(ComponentRequirement requirement) {
       XMethodElement supertypeMethod = creatorDescriptor.setterMethods().get(requirement);
-      MethodSpec.Builder method = overriding(supertypeMethod, creatorType());
+      MethodSpec.Builder method = MethodSpecs.overriding(supertypeMethod, creatorType());
       if (!isVoid(supertypeMethod.getReturnType())) {
         // Take advantage of covariant returns so that we don't have to worry about type variables
         method.returns(componentImplementation.getCreatorName());

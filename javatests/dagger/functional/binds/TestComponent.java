@@ -17,6 +17,7 @@
 package dagger.functional.binds;
 
 import dagger.Component;
+import dagger.functional.SomeQualifier;
 import dagger.functional.binds.subpackage.ExposedModule;
 import java.util.Map;
 import java.util.Set;

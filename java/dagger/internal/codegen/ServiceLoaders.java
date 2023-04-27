@@ -16,9 +16,6 @@
 
 package dagger.internal.codegen;
 
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
-
-import androidx.room.compiler.processing.XProcessingEnv;
 import com.google.common.collect.ImmutableSet;
 import java.util.ServiceLoader;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -28,27 +25,13 @@ final class ServiceLoaders {
 
   private ServiceLoaders() {}
 
-  /**
-   * Returns the loaded services for the given class.
-   *
-   * <p>Note: This should only be called in Javac. This method will throw if called in KSP.
-   */
-  static <T> ImmutableSet<T> loadServices(XProcessingEnv processingEnv, Class<T> clazz) {
-    return ImmutableSet.copyOf(ServiceLoader.load(clazz, classLoaderFor(processingEnv, clazz)));
+  static <T> ImmutableSet<T> load(ProcessingEnvironment processingEnvironment, Class<T> clazz) {
+    return ImmutableSet.copyOf(
+        ServiceLoader.load(clazz, classloaderFor(processingEnvironment, clazz)));
   }
 
-  private static ClassLoader classLoaderFor(XProcessingEnv processingEnv, Class<?> clazz) {
-    switch (processingEnv.getBackend()) {
-      case JAVAC:
-        return javaClassLoader(toJavac(processingEnv), clazz);
-      case KSP:
-        return clazz.getClassLoader();
-    }
-    throw new AssertionError("Unexpected backend: " + processingEnv.getBackend());
-  }
-
-  private static ClassLoader javaClassLoader(
-      ProcessingEnvironment javacProcessingEnv, Class<?> clazz) {
+  private static ClassLoader classloaderFor(
+      ProcessingEnvironment processingEnvironment, Class<?> clazz) {
     return clazz.getClassLoader();
   }
 }

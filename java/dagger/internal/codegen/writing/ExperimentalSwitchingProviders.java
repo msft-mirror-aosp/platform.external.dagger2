@@ -16,6 +16,7 @@
 
 package dagger.internal.codegen.writing;
 
+import static androidx.room.compiler.processing.compat.XConverters.toJavac;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.getLast;
 import static com.google.common.collect.Iterables.getOnlyElement;
@@ -38,8 +39,10 @@ import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 import com.squareup.javapoet.TypeVariableName;
+import dagger.internal.codegen.base.UniqueNameSet;
 import dagger.internal.codegen.binding.ProvisionBinding;
 import dagger.internal.codegen.javapoet.CodeBlocks;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.internal.codegen.writing.ComponentImplementation.ShardImplementation;
 import dagger.internal.codegen.writing.FrameworkFieldInitializer.FrameworkInstanceCreationExpression;
 import dagger.spi.model.Key;
@@ -47,7 +50,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
-import javax.inject.Provider;
+import javax.inject.Inject;
+import javax.lang.model.type.TypeMirror;
 
 /**
  * Keeps track of all provider expression requests for a component.
@@ -55,6 +59,7 @@ import javax.inject.Provider;
  * <p>The provider expression request will be satisfied by a single generated {@code Provider} class
  * that can provide instances for all types by switching on an id.
  */
+@PerComponentImplementation
 final class ExperimentalSwitchingProviders {
   /**
    * Each switch size is fixed at 100 cases each and put in its own method. This is to limit the
@@ -76,15 +81,21 @@ final class ExperimentalSwitchingProviders {
   private final Map<Key, SwitchingProviderBuilder> switchingProviderBuilders =
       new LinkedHashMap<>();
 
-  private final ShardImplementation shardImplementation;
-  private final Provider<ComponentRequestRepresentations> componentRequestRepresentationsProvider;
+  private final ShardImplementation componentShard;
+  private final DaggerTypes types;
+  private final UniqueNameSet switchingProviderNames = new UniqueNameSet();
+  private final ComponentRequestRepresentations componentRequestRepresentations;
+  private final ComponentImplementation componentImplementation;
 
+  @Inject
   ExperimentalSwitchingProviders(
-      ShardImplementation shardImplementation,
-      Provider<ComponentRequestRepresentations> componentRequestRepresentationsProvider) {
-    this.shardImplementation = checkNotNull(shardImplementation);
-    this.componentRequestRepresentationsProvider =
-        checkNotNull(componentRequestRepresentationsProvider);
+      ComponentImplementation componentImplementation,
+      ComponentRequestRepresentations componentRequestRepresentations,
+      DaggerTypes types) {
+    this.componentShard = checkNotNull(componentImplementation).getComponentShard();
+    this.componentRequestRepresentations = componentRequestRepresentations;
+    this.componentImplementation = componentImplementation;
+    this.types = checkNotNull(types);
   }
 
   /** Returns the framework instance creation expression for an inner switching provider class. */
@@ -102,12 +113,12 @@ final class ExperimentalSwitchingProviders {
 
   private SwitchingProviderBuilder getSwitchingProviderBuilder() {
     if (switchingProviderBuilders.size() % MAX_CASES_PER_CLASS == 0) {
-      String name = shardImplementation.getUniqueClassName("SwitchingProvider");
+      String name = switchingProviderNames.getUniqueName("SwitchingProvider");
       // TODO(wanyingd): move Switching Providers and injection methods to Shard classes to avoid
       // exceeding component class constant pool limit.
       SwitchingProviderBuilder switchingProviderBuilder =
-          new SwitchingProviderBuilder(shardImplementation.name().nestedClass(name));
-      shardImplementation.addTypeSupplier(switchingProviderBuilder::build);
+          new SwitchingProviderBuilder(componentShard.name().nestedClass(name));
+      componentShard.addTypeSupplier(switchingProviderBuilder::build);
       return switchingProviderBuilder;
     }
     return getLast(switchingProviderBuilders.values());
@@ -135,6 +146,8 @@ final class ExperimentalSwitchingProviders {
             switchId, createSwitchCaseCodeBlock(key, unscopedInstanceRequestRepresentation));
       }
 
+      ShardImplementation shardImplementation =
+          componentImplementation.shardImplementation(binding);
       CodeBlock switchingProviderDependencies;
       switch (binding.kind()) {
           // TODO(wanyingd): there might be a better way to get component requirement information
@@ -158,20 +171,22 @@ final class ExperimentalSwitchingProviders {
           // Arguments built in the order of module reference, provision dependencies and members
           // injection dependencies
           switchingProviderDependencies =
-              componentRequestRepresentationsProvider.get().getCreateMethodArgumentsCodeBlock(
+              componentRequestRepresentations.getCreateMethodArgumentsCodeBlock(
                   binding, shardImplementation.name());
           break;
         default:
           throw new IllegalArgumentException("Unexpected binding kind: " + binding.kind());
       }
 
+      TypeMirror castedType =
+          shardImplementation.accessibleType(toJavac(binding.contributedType()));
       return CodeBlock.of(
           "new $T<$L>($L)",
           switchingProviderType,
           // Add the type parameter explicitly when the binding is scoped because Java can't resolve
           // the type when wrapped. For example, the following will error:
           //   fooProvider = DoubleCheck.provider(new SwitchingProvider<>(1));
-          CodeBlock.of("$T", shardImplementation.accessibleTypeName(binding.contributedType())),
+          CodeBlock.of("$T", castedType),
           switchingProviderDependencies.isEmpty()
               ? CodeBlock.of("$L", switchIds.get(key))
               : CodeBlock.of("$L, $L", switchIds.get(key), switchingProviderDependencies));
@@ -186,7 +201,7 @@ final class ExperimentalSwitchingProviders {
       CodeBlock instanceCodeBlock =
           unscopedInstanceRequestRepresentation
               .getDependencyExpression(switchingProviderType)
-              .box()
+              .box(types)
               .codeBlock();
 
       return CodeBlock.builder()

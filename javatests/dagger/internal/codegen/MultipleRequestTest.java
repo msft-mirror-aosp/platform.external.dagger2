@@ -16,115 +16,111 @@
 
 package dagger.internal.codegen;
 
-import dagger.testing.compile.CompilerTests;
+import static com.google.testing.compile.CompilationSubject.assertThat;
+import static dagger.internal.codegen.Compilers.daggerCompiler;
+
+import com.google.testing.compile.Compilation;
+import com.google.testing.compile.JavaFileObjects;
+import javax.tools.JavaFileObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class MultipleRequestTest {
+  private static final JavaFileObject DEP_FILE = JavaFileObjects.forSourceLines("test.Dep",
+      "package test;",
+      "",
+      "import javax.inject.Inject;",
+      "",
+      "class Dep {",
+      "  @Inject Dep() {}",
+      "}");
+
   @Test public void multipleRequests_constructor() {
-    CompilerTests.daggerCompiler(
-            CompilerTests.javaSource(
-                "test.Dep",
-                "package test;",
-                "",
-                "import javax.inject.Inject;",
-                "",
-                "class Dep {",
-                "  @Inject Dep() {}",
-                "}"),
-            CompilerTests.javaSource(
-                "test.ConstructorInjectsMultiple",
-                "package test;",
-                "",
-                "import javax.inject.Inject;",
-                "",
-                "class ConstructorInjectsMultiple {",
-                "  @Inject ConstructorInjectsMultiple(Dep d1, Dep d2) {}",
-                "}"),
-            CompilerTests.javaSource(
-                "test.SimpleComponent",
-                "package test;",
-                "",
-                "import dagger.Component;",
-                "",
-                "@Component",
-                "interface SimpleComponent {",
-                "  ConstructorInjectsMultiple get();",
-                "}"))
-        .compile(subject -> subject.hasErrorCount(0));
+    Compilation compilation =
+        daggerCompiler()
+            .compile(
+                DEP_FILE,
+                JavaFileObjects.forSourceLines(
+                    "test.ConstructorInjectsMultiple",
+                    "package test;",
+                    "",
+                    "import javax.inject.Inject;",
+                    "",
+                    "class ConstructorInjectsMultiple {",
+                    "  @Inject ConstructorInjectsMultiple(Dep d1, Dep d2) {}",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "test.SimpleComponent",
+                    "package test;",
+                    "",
+                    "import dagger.Component;",
+                    "",
+                    "@Component",
+                    "interface SimpleComponent {",
+                    "  ConstructorInjectsMultiple get();",
+                    "}"));
+    assertThat(compilation).succeeded();
   }
 
   @Test public void multipleRequests_field() {
-    CompilerTests.daggerCompiler(
-            CompilerTests.javaSource(
-                "test.Dep",
-                "package test;",
-                "",
-                "import javax.inject.Inject;",
-                "",
-                "class Dep {",
-                "  @Inject Dep() {}",
-                "}"),
-            CompilerTests.javaSource(
-                "test.FieldInjectsMultiple",
-                "package test;",
-                "",
-                "import javax.inject.Inject;",
-                "",
-                "class FieldInjectsMultiple {",
-                "  @Inject Dep d1;",
-                "  @Inject Dep d2;",
-                "  @Inject FieldInjectsMultiple() {}",
-                "}"),
-            CompilerTests.javaSource(
-                "test.SimpleComponent",
-                "package test;",
-                "",
-                "import dagger.Component;",
-                "",
-                "@Component",
-                "interface SimpleComponent {",
-                "  FieldInjectsMultiple get();",
-                "}"))
-        .compile(subject -> subject.hasErrorCount(0));
+    Compilation compilation =
+        daggerCompiler()
+            .compile(
+                DEP_FILE,
+                JavaFileObjects.forSourceLines(
+                    "test.FieldInjectsMultiple",
+                    "package test;",
+                    "",
+                    "import javax.inject.Inject;",
+                    "",
+                    "class FieldInjectsMultiple {",
+                    "  @Inject Dep d1;",
+                    "  @Inject Dep d2;",
+                    "  @Inject FieldInjectsMultiple() {}",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "test.SimpleComponent",
+                    "package test;",
+                    "",
+                    "import dagger.Component;",
+                    "",
+                    "@Component",
+                    "interface SimpleComponent {",
+                    "  FieldInjectsMultiple get();",
+                    "}"));
+    assertThat(compilation).succeeded();
   }
 
   @Test public void multipleRequests_providesMethod() {
-    CompilerTests.daggerCompiler(
-            CompilerTests.javaSource(
-                "test.Dep",
-                "package test;",
-                "",
-                "import javax.inject.Inject;",
-                "",
-                "class Dep {",
-                "  @Inject Dep() {}",
-                "}"),
-            CompilerTests.javaSource(
-                "test.SimpleModule",
-                "package test;",
-                "",
-                "import dagger.Module;",
-                "import dagger.Provides;",
-                "",
-                "@Module",
-                "class SimpleModule {",
-                "  @Provides Object provide(Dep d1, Dep d2) {",
-                "    return null;",
-                "  }",
-                "}"),
-            CompilerTests.javaSource(
-                "test.SimpleComponent",
-                "package test;",
-                "",
-                "import dagger.Component;",
-                "",
-                "@Component(modules = SimpleModule.class)",
-                "interface SimpleComponent {",
-                "  Object get();",
-                "}"))
-        .compile(subject -> subject.hasErrorCount(0));
+    Compilation compilation =
+        daggerCompiler()
+            .compile(
+                DEP_FILE,
+                JavaFileObjects.forSourceLines(
+                    "test.FieldInjectsMultiple",
+                    "package test;",
+                    "",
+                    "import dagger.Module;",
+                    "import dagger.Provides;",
+                    "",
+                    "@Module",
+                    "class SimpleModule {",
+                    "  @Provides Object provide(Dep d1, Dep d2) {",
+                    "    return null;",
+                    "  }",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "test.SimpleComponent",
+                    "package test;",
+                    "",
+                    "import dagger.Component;",
+                    "",
+                    "@Component(modules = SimpleModule.class)",
+                    "interface SimpleComponent {",
+                    "  Object get();",
+                    "}"));
+    assertThat(compilation).succeeded();
   }
 }

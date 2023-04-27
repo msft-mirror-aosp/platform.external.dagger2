@@ -49,9 +49,8 @@ import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
-import dagger.hilt.processor.internal.kotlin.KotlinMetadataUtil;
-import dagger.hilt.processor.internal.kotlin.KotlinMetadataUtils;
 import dagger.internal.codegen.extension.DaggerStreams;
+import dagger.internal.codegen.kotlin.KotlinMetadataUtil;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.util.LinkedHashSet;
@@ -603,6 +602,11 @@ public final class Processors {
     return getAnnotationMirror(element, ClassName.get(annotationClass));
   }
 
+  /** @see #getAnnotationMirror(Element, ClassName) */
+  public static AnnotationMirror getAnnotationMirror(Element element, String annotationClassName) {
+    return getAnnotationMirror(element, ClassName.bestGuess(annotationClassName));
+  }
+
   /**
    * Returns the annotation mirror from the given element that corresponds to the given class.
    *
@@ -755,31 +759,7 @@ public final class Processors {
 
   /** Returns MapKey annotated annotations found on an element. */
   public static ImmutableList<AnnotationMirror> getMapKeyAnnotations(Element element) {
-    ImmutableSet<? extends AnnotationMirror> mapKeys =
-        AnnotationMirrors.getAnnotatedAnnotations(element, ClassNames.MAP_KEY.canonicalName());
-    // Normally, we wouldn't need to handle Kotlin metadata because map keys are typically used
-    // only on methods. However, with @BindValueIntoMap, this can be used on fields so we need
-    // to check annotations on the property as well, just like with qualifiers.
-    KotlinMetadataUtil metadataUtil = KotlinMetadataUtils.getMetadataUtil();
-    if (element.getKind() == ElementKind.FIELD
-        // static fields are generally not supported, no need to get map keys from Kotlin metadata
-        && !element.getModifiers().contains(STATIC)
-        && metadataUtil.hasMetadata(element)) {
-      VariableElement fieldElement = asVariable(element);
-      return Stream.concat(
-              mapKeys.stream(),
-              metadataUtil.isMissingSyntheticPropertyForAnnotations(fieldElement)
-                  ? Stream.empty()
-                  : metadataUtil
-                      .getSyntheticPropertyAnnotations(fieldElement, ClassNames.MAP_KEY)
-                      .stream())
-          .map(AnnotationMirrors.equivalence()::wrap)
-          .distinct()
-          .map(Wrapper::get)
-          .collect(DaggerStreams.toImmutableList());
-    } else {
-      return ImmutableList.copyOf(mapKeys);
-    }
+    return getAnnotationsAnnotatedWith(element, ClassName.get("dagger", "MapKey"));
   }
 
   /** Returns Qualifier annotated annotations found on an element. */

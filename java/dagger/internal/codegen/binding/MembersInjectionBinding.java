@@ -16,15 +16,10 @@
 
 package dagger.internal.codegen.binding;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-import static dagger.internal.codegen.xprocessing.XElements.closestEnclosingTypeElement;
-import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
-import static dagger.internal.codegen.xprocessing.XElements.isPrivate;
+import static androidx.room.compiler.processing.compat.XConverters.toJavac;
 import static java.util.stream.Collectors.toList;
 
 import androidx.room.compiler.processing.XElement;
-import androidx.room.compiler.processing.XFieldElement;
-import androidx.room.compiler.processing.XMethodElement;
 import androidx.room.compiler.processing.XTypeElement;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
@@ -34,6 +29,10 @@ import dagger.spi.model.BindingKind;
 import dagger.spi.model.DependencyRequest;
 import dagger.spi.model.Key;
 import java.util.Optional;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Modifier;
+import javax.lang.model.element.VariableElement;
 
 /** Represents the full members injection of a particular type. */
 @AutoValue
@@ -86,8 +85,12 @@ public abstract class MembersInjectionBinding extends Binding {
    */
   public boolean hasLocalInjectionSites() {
     return injectionSites().stream()
-        .map(InjectionSite::enclosingTypeElement)
-        .anyMatch(membersInjectedType()::equals);
+        .anyMatch(
+            injectionSite ->
+                injectionSite
+                    .element()
+                    .getEnclosingElement()
+                    .equals(toJavac(membersInjectedType())));
   }
 
   @Override
@@ -114,9 +117,7 @@ public abstract class MembersInjectionBinding extends Binding {
 
     public abstract Kind kind();
 
-    public abstract XElement element();
-
-    public abstract XTypeElement enclosingTypeElement();
+    public abstract Element element();
 
     public abstract ImmutableSet<DependencyRequest> dependencies();
 
@@ -127,28 +128,26 @@ public abstract class MembersInjectionBinding extends Binding {
      */
     @Memoized
     public int indexAmongAtInjectMembersWithSameSimpleName() {
-      return enclosingTypeElement().getEnclosedElements().stream()
+      return element()
+          .getEnclosingElement()
+          .getEnclosedElements()
+          .stream()
           .filter(InjectionAnnotations::hasInjectAnnotation)
-          .filter(element -> !isPrivate(element))
-          .filter(element -> getSimpleName(element).equals(getSimpleName(this.element())))
+          .filter(element -> !element.getModifiers().contains(Modifier.PRIVATE))
+          .filter(element -> element.getSimpleName().equals(this.element().getSimpleName()))
           .collect(toList())
           .indexOf(element());
     }
 
-    public static InjectionSite field(XFieldElement field, DependencyRequest dependency) {
-      return create(Kind.FIELD, field, ImmutableSet.of(dependency));
+    public static InjectionSite field(VariableElement element, DependencyRequest dependency) {
+      return new AutoValue_MembersInjectionBinding_InjectionSite(
+          Kind.FIELD, element, ImmutableSet.of(dependency));
     }
 
     public static InjectionSite method(
-        XMethodElement method, Iterable<DependencyRequest> dependencies) {
-      return create(Kind.METHOD, method, ImmutableSet.copyOf(dependencies));
-    }
-
-    private static InjectionSite create(
-        Kind kind, XElement element, ImmutableSet<DependencyRequest> dependencies) {
-      XTypeElement enclosingTypeElement = checkNotNull(closestEnclosingTypeElement(element));
+        ExecutableElement element, Iterable<DependencyRequest> dependencies) {
       return new AutoValue_MembersInjectionBinding_InjectionSite(
-          kind, element, enclosingTypeElement, dependencies);
+          Kind.METHOD, element, ImmutableSet.copyOf(dependencies));
     }
   }
 }

@@ -16,36 +16,27 @@
 
 package dagger.internal.codegen;
 
-import androidx.room.compiler.processing.util.Source;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import dagger.testing.compile.CompilerTests;
+import static com.google.testing.compile.CompilationSubject.assertThat;
+import static dagger.internal.codegen.Compilers.compilerWithOptions;
+import static dagger.internal.codegen.Compilers.daggerCompiler;
+
+import com.google.testing.compile.Compilation;
+import com.google.testing.compile.JavaFileObjects;
+import javax.tools.JavaFileObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
+import org.junit.runners.JUnit4;
 
 /**
  * Tests to make sure that delegate bindings where the impl depends on a binding in a subcomponent
  * properly fail. These are regression tests for b/147020838.
  */
-@RunWith(Parameterized.class)
+@RunWith(JUnit4.class)
 public class BindsDependsOnSubcomponentValidationTest {
-  @Parameters(name = "{0}")
-  public static ImmutableList<Object[]> parameters() {
-    return CompilerMode.TEST_PARAMETERS;
-  }
-
-  private final CompilerMode compilerMode;
-
-  public BindsDependsOnSubcomponentValidationTest(CompilerMode compilerMode) {
-    this.compilerMode = compilerMode;
-  }
-
   @Test
   public void testBinds() {
-    Source parentComponent =
-        CompilerTests.javaSource(
+    JavaFileObject parentComponent =
+        JavaFileObjects.forSourceLines(
             "test.ParentComponent",
             "package test;",
             "",
@@ -55,8 +46,8 @@ public class BindsDependsOnSubcomponentValidationTest {
             "interface ParentComponent {",
             "  ChildComponent getChild();",
             "}");
-    Source parentModule =
-        CompilerTests.javaSource(
+    JavaFileObject parentModule =
+        JavaFileObjects.forSourceLines(
             "test.ParentModule",
             "package test;",
             "",
@@ -67,8 +58,8 @@ public class BindsDependsOnSubcomponentValidationTest {
             "interface ParentModule {",
             "  @Binds Foo bindFoo(FooImpl impl);",
             "}");
-    Source childComponent =
-        CompilerTests.javaSource(
+    JavaFileObject childComponent =
+        JavaFileObjects.forSourceLines(
             "test.ChildComponent",
             "package test;",
             "",
@@ -78,8 +69,8 @@ public class BindsDependsOnSubcomponentValidationTest {
             "interface ChildComponent {",
             "  Foo getFoo();",
             "}");
-    Source childModule =
-        CompilerTests.javaSource(
+    JavaFileObject childModule =
+        JavaFileObjects.forSourceLines(
             "test.ChildModule",
             "package test;",
             "",
@@ -92,14 +83,10 @@ public class BindsDependsOnSubcomponentValidationTest {
             "    return 0L;",
             "  }",
             "}");
-    Source iface =
-        CompilerTests.javaSource(
-            "test.Foo",
-            "package test;",
-            "",
-            "interface Foo {}");
-    Source impl =
-        CompilerTests.javaSource(
+    JavaFileObject iface =
+        JavaFileObjects.forSourceLines("test.Foo", "package test;", "", "interface Foo {", "}");
+    JavaFileObject impl =
+        JavaFileObjects.forSourceLines(
             "test.FooImpl",
             "package test;",
             "",
@@ -108,22 +95,21 @@ public class BindsDependsOnSubcomponentValidationTest {
             "class FooImpl implements Foo {",
             "  @Inject FooImpl(Long l) {}",
             "}");
-    CompilerTests.daggerCompiler(
-            parentComponent, parentModule, childComponent, childModule, iface, impl)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining("Long cannot be provided without an @Inject constructor")
-                  .onSource(parentComponent)
-                  .onLineContaining("interface ParentComponent");
-            });
+    Compilation compilation =
+        daggerCompiler()
+            .compile(parentComponent, parentModule, childComponent, childModule, iface, impl);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
+    assertThat(compilation)
+        .hadErrorContaining("Long cannot be provided without an @Inject constructor")
+        .inFile(parentComponent)
+        .onLineContaining("interface ParentComponent");
   }
 
   @Test
   public void testSetBindings() {
-    Source parentComponent =
-        CompilerTests.javaSource(
+    JavaFileObject parentComponent =
+        JavaFileObjects.forSourceLines(
             "test.ParentComponent",
             "package test;",
             "",
@@ -133,8 +119,8 @@ public class BindsDependsOnSubcomponentValidationTest {
             "interface ParentComponent {",
             "  ChildComponent getChild();",
             "}");
-    Source parentModule =
-        CompilerTests.javaSource(
+    JavaFileObject parentModule =
+        JavaFileObjects.forSourceLines(
             "test.ParentModule",
             "package test;",
             "",
@@ -146,8 +132,8 @@ public class BindsDependsOnSubcomponentValidationTest {
             "interface ParentModule {",
             "  @Binds @IntoSet Foo bindFoo(FooImpl impl);",
             "}");
-    Source childComponent =
-        CompilerTests.javaSource(
+    JavaFileObject childComponent =
+        JavaFileObjects.forSourceLines(
             "test.ChildComponent",
             "package test;",
             "",
@@ -158,8 +144,8 @@ public class BindsDependsOnSubcomponentValidationTest {
             "interface ChildComponent {",
             "  Set<Foo> getFooSet();",
             "}");
-    Source childModule =
-        CompilerTests.javaSource(
+    JavaFileObject childModule =
+        JavaFileObjects.forSourceLines(
             "test.ChildModule",
             "package test;",
             "",
@@ -172,14 +158,10 @@ public class BindsDependsOnSubcomponentValidationTest {
             "    return 0L;",
             "  }",
             "}");
-    Source iface =
-        CompilerTests.javaSource(
-            "test.Foo",
-            "package test;",
-            "",
-            "interface Foo {}");
-    Source impl =
-        CompilerTests.javaSource(
+    JavaFileObject iface =
+        JavaFileObjects.forSourceLines("test.Foo", "package test;", "", "interface Foo {", "}");
+    JavaFileObject impl =
+        JavaFileObjects.forSourceLines(
             "test.FooImpl",
             "package test;",
             "",
@@ -188,22 +170,21 @@ public class BindsDependsOnSubcomponentValidationTest {
             "class FooImpl implements Foo {",
             "  @Inject FooImpl(Long l) {}",
             "}");
-    CompilerTests.daggerCompiler(
-            parentComponent, parentModule, childComponent, childModule, iface, impl)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining("Long cannot be provided without an @Inject constructor")
-                  .onSource(parentComponent)
-                  .onLineContaining("interface ParentComponent");
-            });
+    Compilation compilation =
+        daggerCompiler()
+            .compile(parentComponent, parentModule, childComponent, childModule, iface, impl);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
+    assertThat(compilation)
+        .hadErrorContaining("Long cannot be provided without an @Inject constructor")
+        .inFile(parentComponent)
+        .onLineContaining("interface ParentComponent");
   }
 
   @Test
   public void testSetValueBindings() {
-    Source parentComponent =
-        CompilerTests.javaSource(
+    JavaFileObject parentComponent =
+        JavaFileObjects.forSourceLines(
             "test.ParentComponent",
             "package test;",
             "",
@@ -213,8 +194,8 @@ public class BindsDependsOnSubcomponentValidationTest {
             "interface ParentComponent {",
             "  ChildComponent getChild();",
             "}");
-    Source parentModule =
-        CompilerTests.javaSource(
+    JavaFileObject parentModule =
+        JavaFileObjects.forSourceLines(
             "test.ParentModule",
             "package test;",
             "",
@@ -231,8 +212,8 @@ public class BindsDependsOnSubcomponentValidationTest {
             "    return Collections.singleton(impl);",
             "  }",
             "}");
-    Source childComponent =
-        CompilerTests.javaSource(
+    JavaFileObject childComponent =
+        JavaFileObjects.forSourceLines(
             "test.ChildComponent",
             "package test;",
             "",
@@ -243,8 +224,8 @@ public class BindsDependsOnSubcomponentValidationTest {
             "interface ChildComponent {",
             "  Set<Foo> getFooSet();",
             "}");
-    Source childModule =
-        CompilerTests.javaSource(
+    JavaFileObject childModule =
+        JavaFileObjects.forSourceLines(
             "test.ChildModule",
             "package test;",
             "",
@@ -257,14 +238,10 @@ public class BindsDependsOnSubcomponentValidationTest {
             "    return 0L;",
             "  }",
             "}");
-    Source iface =
-        CompilerTests.javaSource(
-            "test.Foo",
-            "package test;",
-            "",
-            "interface Foo {}");
-    Source impl =
-        CompilerTests.javaSource(
+    JavaFileObject iface =
+        JavaFileObjects.forSourceLines("test.Foo", "package test;", "", "interface Foo {", "}");
+    JavaFileObject impl =
+        JavaFileObjects.forSourceLines(
             "test.FooImpl",
             "package test;",
             "",
@@ -273,22 +250,21 @@ public class BindsDependsOnSubcomponentValidationTest {
             "class FooImpl implements Foo {",
             "  @Inject FooImpl(Long l) {}",
             "}");
-    CompilerTests.daggerCompiler(
-            parentComponent, parentModule, childComponent, childModule, iface, impl)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining("Long cannot be provided without an @Inject constructor")
-                  .onSource(parentComponent)
-                  .onLineContaining("interface ParentComponent");
-            });
+    Compilation compilation =
+        daggerCompiler()
+            .compile(parentComponent, parentModule, childComponent, childModule, iface, impl);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
+    assertThat(compilation)
+        .hadErrorContaining("Long cannot be provided without an @Inject constructor")
+        .inFile(parentComponent)
+        .onLineContaining("interface ParentComponent");
   }
 
   @Test
   public void testMapBindings() {
-    Source parentComponent =
-        CompilerTests.javaSource(
+    JavaFileObject parentComponent =
+        JavaFileObjects.forSourceLines(
             "test.ParentComponent",
             "package test;",
             "",
@@ -298,8 +274,8 @@ public class BindsDependsOnSubcomponentValidationTest {
             "interface ParentComponent {",
             "  ChildComponent getChild();",
             "}");
-    Source parentModule =
-        CompilerTests.javaSource(
+    JavaFileObject parentModule =
+        JavaFileObjects.forSourceLines(
             "test.ParentModule",
             "package test;",
             "",
@@ -312,8 +288,8 @@ public class BindsDependsOnSubcomponentValidationTest {
             "interface ParentModule {",
             "  @Binds @IntoMap @StringKey(\"foo\") Foo bindFoo(FooImpl impl);",
             "}");
-    Source childComponent =
-        CompilerTests.javaSource(
+    JavaFileObject childComponent =
+        JavaFileObjects.forSourceLines(
             "test.ChildComponent",
             "package test;",
             "",
@@ -324,8 +300,8 @@ public class BindsDependsOnSubcomponentValidationTest {
             "interface ChildComponent {",
             "  Map<String, Foo> getFooSet();",
             "}");
-    Source childModule =
-        CompilerTests.javaSource(
+    JavaFileObject childModule =
+        JavaFileObjects.forSourceLines(
             "test.ChildModule",
             "package test;",
             "",
@@ -338,14 +314,10 @@ public class BindsDependsOnSubcomponentValidationTest {
             "    return 0L;",
             "  }",
             "}");
-    Source iface =
-        CompilerTests.javaSource(
-            "test.Foo",
-            "package test;",
-            "",
-            "interface Foo {}");
-    Source impl =
-        CompilerTests.javaSource(
+    JavaFileObject iface =
+        JavaFileObjects.forSourceLines("test.Foo", "package test;", "", "interface Foo {", "}");
+    JavaFileObject impl =
+        JavaFileObjects.forSourceLines(
             "test.FooImpl",
             "package test;",
             "",
@@ -354,20 +326,15 @@ public class BindsDependsOnSubcomponentValidationTest {
             "class FooImpl implements Foo {",
             "  @Inject FooImpl(Long l) {}",
             "}");
-    CompilerTests.daggerCompiler(
-            parentComponent, parentModule, childComponent, childModule, iface, impl)
-        .withProcessingOptions(
-            ImmutableMap.<String, String>builder()
-                .putAll(compilerMode.processorOptions())
-                // TODO(erichang): make this flag the default and remove this
-                .put("dagger.strictMultibindingValidation", "enabled")
-                .build())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining("Long cannot be provided without an @Inject constructor")
-                  .onSource(parentComponent)
-                  .onLineContaining("interface ParentComponent");
-            });
+    Compilation compilation =
+        // TODO(erichang): make this flag the default and remove this
+        compilerWithOptions("-Adagger.strictMultibindingValidation=enabled")
+            .compile(parentComponent, parentModule, childComponent, childModule, iface, impl);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(1);
+    assertThat(compilation)
+        .hadErrorContaining("Long cannot be provided without an @Inject constructor")
+        .inFile(parentComponent)
+        .onLineContaining("interface ParentComponent");
   }
 }

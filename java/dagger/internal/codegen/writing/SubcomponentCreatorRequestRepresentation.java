@@ -48,7 +48,7 @@ final class SubcomponentCreatorRequestRepresentation extends RequestRepresentati
   @Override
   Expression getDependencyExpression(ClassName requestingClass) {
     return Expression.create(
-        binding.key().type().xprocessing(),
+        binding.key().type().java(),
         "new $T($L)",
         shardImplementation.getSubcomponentCreatorSimpleName(binding.key()),
         isExperimentalMergedMode

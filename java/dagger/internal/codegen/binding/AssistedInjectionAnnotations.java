@@ -20,9 +20,11 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
+import static dagger.internal.codegen.langmodel.DaggerElements.isAnnotationPresent;
 import static dagger.internal.codegen.xprocessing.XElements.asConstructor;
 import static dagger.internal.codegen.xprocessing.XElements.asTypeElement;
 import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
+import static kotlin.streams.jdk8.StreamsKt.asStream;
 
 import androidx.room.compiler.processing.XConstructorElement;
 import androidx.room.compiler.processing.XConstructorType;
@@ -33,6 +35,7 @@ import androidx.room.compiler.processing.XMethodType;
 import androidx.room.compiler.processing.XType;
 import androidx.room.compiler.processing.XTypeElement;
 import androidx.room.compiler.processing.XVariableElement;
+import com.google.auto.common.MoreElements;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.collect.ImmutableList;
@@ -43,11 +46,10 @@ import com.squareup.javapoet.TypeName;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
 import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.internal.codegen.xprocessing.XTypeElements;
-import dagger.internal.codegen.xprocessing.XTypes;
 import dagger.spi.model.BindingKind;
 import java.util.List;
 import java.util.Optional;
+import javax.lang.model.element.VariableElement;
 
 /** Assisted injection utility methods. */
 public final class AssistedInjectionAnnotations {
@@ -58,7 +60,7 @@ public final class AssistedInjectionAnnotations {
 
   /** Returns the list of abstract factory methods for the given factory {@link XTypeElement}. */
   public static ImmutableSet<XMethodElement> assistedFactoryMethods(XTypeElement factory) {
-    return XTypeElements.getAllNonPrivateInstanceMethods(factory).stream()
+    return asStream(factory.getAllNonPrivateInstanceMethods())
         .filter(XHasModifiers::isAbstract)
         .filter(method -> !method.isJavaDefault())
         .collect(toImmutableSet());
@@ -144,6 +146,11 @@ public final class AssistedInjectionAnnotations {
   /** Returns {@code true} if this binding is uses assisted injection. */
   public static boolean isAssistedParameter(XVariableElement param) {
     return param.hasAnnotation(TypeNames.ASSISTED);
+  }
+
+  /** Returns {@code true} if this binding is uses assisted injection. */
+  public static boolean isAssistedParameter(VariableElement param) {
+    return isAnnotationPresent(MoreElements.asVariable(param), TypeNames.ASSISTED);
   }
 
   /** Metadata about an {@link dagger.assisted.AssistedFactory} annotated type. */
@@ -244,8 +251,8 @@ public final class AssistedInjectionAnnotations {
     @Override
     public final String toString() {
       return qualifier().isEmpty()
-          ? String.format("@Assisted %s", XTypes.toStableString(type()))
-          : String.format("@Assisted(\"%s\") %s", qualifier(), XTypes.toStableString(type()));
+          ? String.format("@Assisted %s", type())
+          : String.format("@Assisted(\"%s\") %s", qualifier(), type());
     }
   }
 

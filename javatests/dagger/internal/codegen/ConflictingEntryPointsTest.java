@@ -16,47 +16,40 @@
 
 package dagger.internal.codegen;
 
-import androidx.room.compiler.processing.util.Source;
-import com.google.common.collect.ImmutableList;
-import dagger.testing.compile.CompilerTests;
+import static com.google.testing.compile.CompilationSubject.assertThat;
+import static dagger.internal.codegen.Compilers.daggerCompiler;
+import static dagger.internal.codegen.TestUtils.message;
+
+import com.google.testing.compile.Compilation;
+import com.google.testing.compile.JavaFileObjects;
+import javax.tools.JavaFileObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
+import org.junit.runners.JUnit4;
 
-@RunWith(Parameterized.class)
-public class ConflictingEntryPointsTest {
-  @Parameters(name = "{0}")
-  public static ImmutableList<Object[]> parameters() {
-    return CompilerMode.TEST_PARAMETERS;
-  }
-
-  private final CompilerMode compilerMode;
-
-  public ConflictingEntryPointsTest(CompilerMode compilerMode) {
-    this.compilerMode = compilerMode;
-  }
+@RunWith(JUnit4.class)
+public final class ConflictingEntryPointsTest {
 
   @Test
   public void covariantType() {
-    Source base1 =
-        CompilerTests.javaSource(
+    JavaFileObject base1 =
+        JavaFileObjects.forSourceLines(
             "test.Base1", //
             "package test;",
             "",
             "interface Base1 {",
             "  Long foo();",
             "}");
-    Source base2 =
-        CompilerTests.javaSource(
+    JavaFileObject base2 =
+        JavaFileObjects.forSourceLines(
             "test.Base2", //
             "package test;",
             "",
             "interface Base2 {",
             "  Number foo();",
             "}");
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -73,42 +66,38 @@ public class ConflictingEntryPointsTest {
             "    TestComponent build();",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(base1, base2, component)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      String.join(
-                          "\n",
-                          "can only implement the method once. Found:",
-                          "    Long test.Base1.foo()",
-                          "    Number test.Base2.foo()"))
-                  .onSource(component)
-                  .onLineContaining("interface TestComponent");
-            });
+    Compilation compilation = daggerCompiler().compile(base1, base2, component);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            message(
+                "conflicting entry point declarations:",
+                "    Long test.Base1.foo()",
+                "    Number test.Base2.foo()"))
+        .inFile(component)
+        .onLineContaining("interface TestComponent ");
   }
 
   @Test
   public void covariantTypeFromGenericSupertypes() {
-    Source base1 =
-        CompilerTests.javaSource(
+    JavaFileObject base1 =
+        JavaFileObjects.forSourceLines(
             "test.Base1", //
             "package test;",
             "",
             "interface Base1<T> {",
             "  T foo();",
             "}");
-    Source base2 =
-        CompilerTests.javaSource(
+    JavaFileObject base2 =
+        JavaFileObjects.forSourceLines(
             "test.Base2", //
             "package test;",
             "",
             "interface Base2<T> {",
             "  T foo();",
             "}");
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -125,34 +114,30 @@ public class ConflictingEntryPointsTest {
             "    TestComponent build();",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(base1, base2, component)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      String.join(
-                          "\n",
-                          "can only implement the method once. Found:",
-                          "    Long test.Base1.foo()",
-                          "    Number test.Base2.foo()"))
-                  .onSource(component)
-                  .onLineContaining("interface TestComponent");
-            });
+    Compilation compilation = daggerCompiler().compile(base1, base2, component);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            message(
+                "conflicting entry point declarations:",
+                "    Long test.Base1.foo()",
+                "    Number test.Base2.foo()"))
+        .inFile(component)
+        .onLineContaining("interface TestComponent ");
   }
 
   @Test
   public void differentQualifier() {
-    Source base1 =
-        CompilerTests.javaSource(
+    JavaFileObject base1 =
+        JavaFileObjects.forSourceLines(
             "test.Base1", //
             "package test;",
             "",
             "interface Base1 {",
             "  Object foo();",
             "}");
-    Source base2 =
-        CompilerTests.javaSource(
+    JavaFileObject base2 =
+        JavaFileObjects.forSourceLines(
             "test.Base2", //
             "package test;",
             "",
@@ -161,8 +146,8 @@ public class ConflictingEntryPointsTest {
             "interface Base2 {",
             "  @Named(\"foo\") Object foo();",
             "}");
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -180,42 +165,38 @@ public class ConflictingEntryPointsTest {
             "    TestComponent build();",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(base1, base2, component)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      String.join(
-                          "\n",
-                          "can only implement the method once. Found:",
-                          "    Object test.Base1.foo()",
-                          "    @Named(\"foo\") Object test.Base2.foo()"))
-                  .onSource(component)
-                  .onLineContaining("interface TestComponent");
-            });
+    Compilation compilation = daggerCompiler().compile(base1, base2, component);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            message(
+                "conflicting entry point declarations:",
+                "    Object test.Base1.foo()",
+                "    @Named(\"foo\") Object test.Base2.foo()"))
+        .inFile(component)
+        .onLineContaining("interface TestComponent ");
   }
 
   @Test
   public void sameKey() {
-    Source base1 =
-        CompilerTests.javaSource(
+    JavaFileObject base1 =
+        JavaFileObjects.forSourceLines(
             "test.Base1", //
             "package test;",
             "",
             "interface Base1 {",
             "  Object foo();",
             "}");
-    Source base2 =
-        CompilerTests.javaSource(
+    JavaFileObject base2 =
+        JavaFileObjects.forSourceLines(
             "test.Base2", //
             "package test;",
             "",
             "interface Base2 {",
             "  Object foo();",
             "}");
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -231,15 +212,14 @@ public class ConflictingEntryPointsTest {
             "    TestComponent build();",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(base1, base2, component)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(subject -> subject.hasErrorCount(0));
+    Compilation compilation = daggerCompiler().compile(base1, base2, component);
+    assertThat(compilation).succeeded();
   }
 
   @Test
   public void sameQualifiedKey() {
-    Source base1 =
-        CompilerTests.javaSource(
+    JavaFileObject base1 =
+        JavaFileObjects.forSourceLines(
             "test.Base1", //
             "package test;",
             "",
@@ -248,8 +228,8 @@ public class ConflictingEntryPointsTest {
             "interface Base1 {",
             "  @Named(\"foo\") Object foo();",
             "}");
-    Source base2 =
-        CompilerTests.javaSource(
+    JavaFileObject base2 =
+        JavaFileObjects.forSourceLines(
             "test.Base2", //
             "package test;",
             "",
@@ -258,8 +238,8 @@ public class ConflictingEntryPointsTest {
             "interface Base2 {",
             "  @Named(\"foo\") Object foo();",
             "}");
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -276,8 +256,7 @@ public class ConflictingEntryPointsTest {
             "    TestComponent build();",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(base1, base2, component)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(subject -> subject.hasErrorCount(0));
+    Compilation compilation = daggerCompiler().compile(base1, base2, component);
+    assertThat(compilation).succeeded();
   }
 }

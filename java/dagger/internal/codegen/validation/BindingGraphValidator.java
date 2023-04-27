@@ -17,8 +17,6 @@
 package dagger.internal.codegen.validation;
 
 import androidx.room.compiler.processing.XTypeElement;
-import com.google.common.base.Optional;
-import com.google.common.base.Supplier;
 import dagger.internal.codegen.compileroption.CompilerOptions;
 import dagger.internal.codegen.compileroption.ValidationType;
 import dagger.spi.model.BindingGraph;
@@ -53,23 +51,17 @@ public final class BindingGraphValidator {
   }
 
   /** Returns {@code true} if no errors are reported for {@code graph}. */
-  public boolean isValid(BindingGraph fullGraph) {
-    return visitValidationPlugins(Optional.absent(), () -> fullGraph)
-        && visitExternalPlugins(fullGraph);
-  }
-
-  public boolean isValid(BindingGraph prunedGraph, Supplier<BindingGraph> fullGraphSupplier) {
-    return visitValidationPlugins(Optional.of(prunedGraph), fullGraphSupplier)
-        && visitExternalPlugins(prunedGraph);
+  public boolean isValid(BindingGraph graph) {
+    return visitValidationPlugins(graph) && visitExternalPlugins(graph);
   }
 
   /** Returns {@code true} if validation plugins report no errors. */
-  private boolean visitValidationPlugins(
-    Optional<BindingGraph> prunedGraph, Supplier<BindingGraph> fullGraphSupplier) {
-    if (!prunedGraph.isPresent() && !requiresFullBindingGraphValidation()) {
+  private boolean visitValidationPlugins(BindingGraph graph) {
+    if (graph.isFullBindingGraph() && !requiresFullBindingGraphValidation()) {
       return true;
     }
-    return validationPlugins.visit(prunedGraph, fullGraphSupplier);
+
+    return validationPlugins.visit(graph);
   }
 
   /** Returns {@code true} if external plugins report no errors. */
