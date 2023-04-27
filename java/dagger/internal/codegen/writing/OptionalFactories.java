@@ -61,6 +61,7 @@ import dagger.internal.codegen.binding.ContributionBinding;
 import dagger.internal.codegen.binding.FrameworkType;
 import dagger.internal.codegen.javapoet.AnnotationSpecs;
 import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.writing.ComponentImplementation.ShardImplementation;
 import dagger.producers.Producer;
 import dagger.producers.internal.Producers;
 import dagger.spi.model.RequestKind;
@@ -108,14 +109,15 @@ final class OptionalFactories {
   }
 
   private final PerGeneratedFileCache perGeneratedFileCache;
-  private final GeneratedImplementation topLevelImplementation;
+  private final ShardImplementation rootComponentShard;
 
   @Inject
   OptionalFactories(
       PerGeneratedFileCache perGeneratedFileCache,
-      @TopLevel GeneratedImplementation topLevelImplementation) {
+      ComponentImplementation componentImplementation) {
     this.perGeneratedFileCache = perGeneratedFileCache;
-    this.topLevelImplementation = topLevelImplementation;
+    this.rootComponentShard =
+        componentImplementation.rootComponentImplementation().getComponentShard();
   }
 
   /**
@@ -134,7 +136,7 @@ final class OptionalFactories {
             optionalKind,
             kind -> {
               MethodSpec method = absentOptionalProviderMethod(kind);
-              topLevelImplementation.addMethod(ABSENT_OPTIONAL_METHOD, method);
+              rootComponentShard.addMethod(ABSENT_OPTIONAL_METHOD, method);
               return method;
             }));
   }
@@ -163,7 +165,7 @@ final class OptionalFactories {
                 optionalKind,
                 kind -> {
                   FieldSpec field = absentOptionalProviderField(kind);
-                  topLevelImplementation.addField(ABSENT_OPTIONAL_FIELD, field);
+                  rootComponentShard.addField(ABSENT_OPTIONAL_FIELD, field);
                   return field;
                 }))
         .addStatement("return provider")
@@ -312,7 +314,7 @@ final class OptionalFactories {
             PresentFactorySpec.of(binding),
             spec -> {
               TypeSpec type = presentOptionalFactoryClass(spec);
-              topLevelImplementation.addType(PRESENT_FACTORY, type);
+              rootComponentShard.addType(PRESENT_FACTORY, type);
               return type;
             }),
         delegateFactory);
@@ -376,8 +378,7 @@ final class OptionalFactories {
                 spec.optionalKind()
                     .presentExpression(
                         FrameworkType.PROVIDER.to(
-                            spec.valueKind(),
-                            CodeBlock.of("$N", delegateField))))
+                            spec.valueKind(), CodeBlock.of("$N", delegateField))))
             .build();
 
       case PRODUCER_NODE:
@@ -393,8 +394,7 @@ final class OptionalFactories {
                     spec.optionalKind()
                         .presentExpression(
                             FrameworkType.PRODUCER_NODE.to(
-                                spec.valueKind(),
-                                CodeBlock.of("$N", delegateField))))
+                                spec.valueKind(), CodeBlock.of("$N", delegateField))))
                 .build();
 
           case INSTANCE: // return a ListenableFuture<Optional<T>>

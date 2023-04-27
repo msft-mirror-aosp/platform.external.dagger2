@@ -47,8 +47,7 @@ public class TransitiveScopeTest {
                 // Note: this fails on the subcomponent rather than Foo because the subcomponent is
                 // validated before any of its dependencies.
                 + "\n      => element (INTERFACE): library1.MySubcomponent"
-                + "\n      => annotation: @MyScope"
-                + "\n      => type (ERROR annotation type): library2.MyScope");
+                + "\n      => annotation: @library2.MyScope");
   }
 
   @Test

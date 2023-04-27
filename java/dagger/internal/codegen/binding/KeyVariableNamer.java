@@ -50,14 +50,14 @@ public final class KeyVariableNamer {
 
   public static String name(Key key) {
     if (key.multibindingContributionIdentifier().isPresent()) {
-      return key.multibindingContributionIdentifier().get().bindingMethod();
+      return key.multibindingContributionIdentifier().get().bindingElement();
     }
 
     StringBuilder builder = new StringBuilder();
 
     if (key.qualifier().isPresent()) {
       // TODO(gak): Use a better name for fields with qualifiers with members.
-      builder.append(getSimpleName(key.qualifier().get().xprocessing().getType().getTypeElement()));
+      builder.append(key.qualifier().get().java().getAnnotationType().asElement().getSimpleName());
     }
 
     typeNamer(key.type().xprocessing(), builder);

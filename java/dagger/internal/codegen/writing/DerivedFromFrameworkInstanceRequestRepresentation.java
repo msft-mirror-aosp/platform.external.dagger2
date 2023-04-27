@@ -19,7 +19,6 @@ package dagger.internal.codegen.writing;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static dagger.internal.codegen.writing.DelegateRequestRepresentation.instanceRequiresCast;
 
-import androidx.room.compiler.processing.XProcessingEnv;
 import com.squareup.javapoet.ClassName;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
@@ -29,6 +28,8 @@ import dagger.internal.codegen.binding.ComponentDescriptor.ComponentMethodDescri
 import dagger.internal.codegen.binding.ContributionBinding;
 import dagger.internal.codegen.binding.FrameworkType;
 import dagger.internal.codegen.javapoet.Expression;
+import dagger.internal.codegen.langmodel.DaggerElements;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.spi.model.BindingKind;
 import dagger.spi.model.RequestKind;
 
@@ -38,7 +39,7 @@ final class DerivedFromFrameworkInstanceRequestRepresentation extends RequestRep
   private final RequestRepresentation frameworkRequestRepresentation;
   private final RequestKind requestKind;
   private final FrameworkType frameworkType;
-  private final XProcessingEnv processingEnv;
+  private final DaggerTypes types;
   private final BindsTypeChecker bindsTypeChecker;
 
   @AssistedInject
@@ -47,14 +48,14 @@ final class DerivedFromFrameworkInstanceRequestRepresentation extends RequestRep
       @Assisted RequestRepresentation frameworkRequestRepresentation,
       @Assisted RequestKind requestKind,
       @Assisted FrameworkType frameworkType,
-      XProcessingEnv processingEnv,
-      BindsTypeChecker bindsTypeChecker) {
+      DaggerTypes types,
+      DaggerElements elements) {
     this.binding = binding;
     this.frameworkRequestRepresentation = checkNotNull(frameworkRequestRepresentation);
     this.requestKind = requestKind;
     this.frameworkType = checkNotNull(frameworkType);
-    this.processingEnv = processingEnv;
-    this.bindsTypeChecker = bindsTypeChecker;
+    this.types = types;
+    this.bindsTypeChecker = new BindsTypeChecker(types, elements);
   }
 
   @Override
@@ -63,7 +64,7 @@ final class DerivedFromFrameworkInstanceRequestRepresentation extends RequestRep
         frameworkType.to(
             requestKind,
             frameworkRequestRepresentation.getDependencyExpression(requestingClass),
-            processingEnv);
+            types);
     return requiresTypeCast(expression, requestingClass)
         ? expression.castTo(binding.contributedType())
         : expression;
@@ -77,7 +78,7 @@ final class DerivedFromFrameworkInstanceRequestRepresentation extends RequestRep
             requestKind,
             frameworkRequestRepresentation.getDependencyExpressionForComponentMethod(
                 componentMethod, component),
-            processingEnv);
+            types);
     return requiresTypeCast(expression, component.name())
         ? expression.castTo(binding.contributedType())
         : expression;

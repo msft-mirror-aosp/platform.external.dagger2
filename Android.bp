@@ -177,7 +177,6 @@ java_library_host {
         "jsr330",
         "kotlin-stdlib",
         "kotlin-stdlib-jdk8",
-        "kotlinpoet",
         "kotlinx_metadata_jvm",
     ],
 
@@ -188,7 +187,6 @@ java_library_host {
         "auto_value_annotations",
         "auto_value_memoized_extension_annotations",
         "dagger2-android-annotation-stubs",
-        "kotlin_symbol_processing_api",
     ],
 
     plugins: [

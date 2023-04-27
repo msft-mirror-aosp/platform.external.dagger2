@@ -16,31 +16,22 @@
 
 package dagger.internal.codegen;
 
-import androidx.room.compiler.processing.util.Source;
-import com.google.common.collect.ImmutableList;
-import dagger.testing.compile.CompilerTests;
+import static com.google.testing.compile.CompilationSubject.assertThat;
+import static dagger.internal.codegen.Compilers.daggerCompiler;
+
+import com.google.testing.compile.Compilation;
+import com.google.testing.compile.JavaFileObjects;
+import javax.tools.JavaFileObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
+import org.junit.runners.JUnit4;
 
-@RunWith(Parameterized.class)
+@RunWith(JUnit4.class)
 public class OptionalBindingTest {
-  @Parameters(name = "{0}")
-  public static ImmutableList<Object[]> parameters() {
-    return CompilerMode.TEST_PARAMETERS;
-  }
-
-  private final CompilerMode compilerMode;
-
-  public OptionalBindingTest(CompilerMode compilerMode) {
-    this.compilerMode = compilerMode;
-  }
-
   @Test
   public void provideExplicitOptionalInParent_AndBindsOptionalOfInChild() {
-    Source parent =
-        CompilerTests.javaSource(
+    JavaFileObject parent =
+        JavaFileObjects.forSourceLines(
             "test.Parent",
             "package test;",
             "",
@@ -52,8 +43,8 @@ public class OptionalBindingTest {
             "  Optional<String> optional();",
             "  Child child();",
             "}");
-    Source parentModule =
-        CompilerTests.javaSource(
+    JavaFileObject parentModule =
+        JavaFileObjects.forSourceLines(
             "test.ParentModule",
             "package test;",
             "",
@@ -69,8 +60,8 @@ public class OptionalBindingTest {
             "  }",
             "}");
 
-    Source child =
-        CompilerTests.javaSource(
+    JavaFileObject child =
+        JavaFileObjects.forSourceLines(
             "test.Child",
             "package test;",
             "",
@@ -81,8 +72,8 @@ public class OptionalBindingTest {
             "interface Child {",
             "  Optional<String> optional();",
             "}");
-    Source childModule =
-        CompilerTests.javaSource(
+    JavaFileObject childModule =
+        JavaFileObjects.forSourceLines(
             "test.ChildModule",
             "package test;",
             "",
@@ -95,14 +86,11 @@ public class OptionalBindingTest {
             "  String optionalString();",
             "}");
 
-    CompilerTests.daggerCompiler(parent, parentModule, child, childModule)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining("Optional<String> is bound multiple times")
-                  .onSource(parent)
-                  .onLineContaining("interface Parent");
-            });
+    Compilation compilation = daggerCompiler().compile(parent, parentModule, child, childModule);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining("Optional<String> is bound multiple times")
+        .inFile(parent)
+        .onLineContaining("interface Parent");
   }
 }

@@ -17,7 +17,7 @@
 package dagger.internal.codegen.binding;
 
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
-import static dagger.internal.codegen.javapoet.TypeNames.isFutureType;
+import static dagger.internal.codegen.langmodel.DaggerTypes.isFutureType;
 
 import androidx.room.compiler.processing.XMethodElement;
 import androidx.room.compiler.processing.XType;
@@ -26,7 +26,6 @@ import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
-import com.google.errorprone.annotations.CheckReturnValue;
 import dagger.internal.codegen.base.ContributionType;
 import dagger.internal.codegen.base.SetType;
 import dagger.spi.model.DependencyRequest;
@@ -35,7 +34,6 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /** A value object representing the mechanism by which a {@link Key} can be produced. */
-@CheckReturnValue
 @AutoValue
 public abstract class ProductionBinding extends ContributionBinding {
 
@@ -128,10 +126,10 @@ public abstract class ProductionBinding extends ContributionBinding {
 
   /** A {@link ProductionBinding} builder. */
   @AutoValue.Builder
+  @CanIgnoreReturnValue
   public abstract static class Builder
       extends ContributionBinding.Builder<ProductionBinding, Builder> {
 
-    @CanIgnoreReturnValue
     @Override
     public Builder dependencies(Iterable<DependencyRequest> dependencies) {
       return explicitDependencies(dependencies);

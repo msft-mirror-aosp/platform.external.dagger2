@@ -16,33 +16,25 @@
 
 package dagger.internal.codegen;
 
-import androidx.room.compiler.processing.util.Source;
-import com.google.common.collect.ImmutableList;
-import dagger.testing.compile.CompilerTests;
+import static com.google.testing.compile.CompilationSubject.assertThat;
+import static dagger.internal.codegen.Compilers.daggerCompiler;
+
+import com.google.testing.compile.Compilation;
+import com.google.testing.compile.JavaFileObjects;
+import javax.tools.JavaFileObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
+import org.junit.runners.JUnit4;
 
 // Tests an invalid inject constructor that avoids validation in its own library by using
 // a dependency on jsr330 rather than Dagger gets validated when used in a component.
-@RunWith(Parameterized.class)
-public class InvalidInjectConstructorTest {
-  @Parameters(name = "{0}")
-  public static ImmutableList<Object[]> parameters() {
-    return CompilerMode.TEST_PARAMETERS;
-  }
-
-  private final CompilerMode compilerMode;
-
-  public InvalidInjectConstructorTest(CompilerMode compilerMode) {
-    this.compilerMode = compilerMode;
-  }
+@RunWith(JUnit4.class)
+public final class InvalidInjectConstructorTest {
 
   @Test
   public void usedInvalidConstructorFails() {
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -53,28 +45,27 @@ public class InvalidInjectConstructorTest {
             "interface TestComponent {",
             "  InvalidInjectConstructor invalidInjectConstructor();",
             "}");
-    CompilerTests.daggerCompiler(component)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              // subject.hasErrorCount(2);
-              subject.hasErrorContaining(
-                  "Type dagger.internal.codegen.InvalidInjectConstructor may only contain one "
-                      + "injected constructor. Found: ["
-                      + "@Inject dagger.internal.codegen.InvalidInjectConstructor(), "
-                      + "@Inject dagger.internal.codegen.InvalidInjectConstructor(String)"
-                      + "]");
-              // TODO(b/215620949): Avoid reporting missing bindings on a type that has errors.
-              subject.hasErrorContaining(
-                  "InvalidInjectConstructor cannot be provided without an @Inject constructor or "
-                      + "an @Provides-annotated method.");
-            });
+    Compilation compilation = daggerCompiler().compile(component);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(2);
+    assertThat(compilation)
+        .hadErrorContaining(
+            "Type dagger.internal.codegen.InvalidInjectConstructor may only contain one injected "
+                + "constructor. Found: ["
+                + "InvalidInjectConstructor(), "
+                + "InvalidInjectConstructor(java.lang.String)"
+                + "]");
+    // TODO(b/215620949): Avoid reporting missing bindings on a type that has errors.
+    assertThat(compilation)
+        .hadErrorContaining(
+            "InvalidInjectConstructor cannot be provided without an @Inject constructor or an "
+                + "@Provides-annotated method.");
   }
 
   @Test
   public void unusedInvalidConstructorFails() {
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -87,21 +78,20 @@ public class InvalidInjectConstructorTest {
             // the constructors
             "  void inject(InvalidInjectConstructor instance);",
             "}");
-    CompilerTests.daggerCompiler(component)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              // subject.hasErrorCount(2);
-              subject.hasErrorContaining(
-                  "Type dagger.internal.codegen.InvalidInjectConstructor may only contain one "
-                      + "injected constructor. Found: ["
-                      + "@Inject dagger.internal.codegen.InvalidInjectConstructor(), "
-                      + "@Inject dagger.internal.codegen.InvalidInjectConstructor(String)"
-                      + "]");
-              // TODO(b/215620949): Avoid reporting missing bindings on a type that has errors.
-              subject.hasErrorContaining(
-                  "InvalidInjectConstructor cannot be provided without an @Inject constructor or "
-                      + "an @Provides-annotated method.");
-            });
+    Compilation compilation = daggerCompiler().compile(component);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorCount(2);
+    assertThat(compilation)
+        .hadErrorContaining(
+            "Type dagger.internal.codegen.InvalidInjectConstructor may only contain one injected "
+                + "constructor. Found: ["
+                + "InvalidInjectConstructor(), "
+                + "InvalidInjectConstructor(java.lang.String)"
+                + "]");
+    // TODO(b/215620949): Avoid reporting missing bindings on a type that has errors.
+    assertThat(compilation)
+        .hadErrorContaining(
+            "InvalidInjectConstructor cannot be provided without an @Inject constructor or an "
+                + "@Provides-annotated method.");
   }
 }

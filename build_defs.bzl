@@ -18,8 +18,11 @@ DOCLINT_HTML_AND_SYNTAX = ["-Xdoclint:html,syntax"]
 
 DOCLINT_REFERENCES = ["-Xdoclint:reference"]
 
-JAVA_RELEASE_MIN = [
-    "-source 7 -target 7",
+SOURCE_7_TARGET_7 = [
+    "-source",
+    "1.7",
+    "-target",
+    "1.7",
 ]
 
 POM_VERSION = "${project.version}"

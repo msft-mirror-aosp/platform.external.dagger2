@@ -17,26 +17,26 @@
 // TODO(beder): Merge the error-handling tests with the ModuleFactoryGeneratorTest.
 package dagger.internal.codegen;
 
+import static com.google.common.truth.Truth.assertAbout;
+import static com.google.testing.compile.CompilationSubject.assertThat;
+import static com.google.testing.compile.JavaSourceSubjectFactory.javaSource;
+import static dagger.internal.codegen.Compilers.daggerCompiler;
 import static dagger.internal.codegen.DaggerModuleMethodSubject.Factory.assertThatMethodInUnannotatedClass;
 import static dagger.internal.codegen.DaggerModuleMethodSubject.Factory.assertThatProductionModuleMethod;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import androidx.room.compiler.processing.util.Source;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ListenableFuture;
-import dagger.testing.compile.CompilerTests;
-import dagger.testing.golden.GoldenFileRule;
+import com.google.testing.compile.Compilation;
+import com.google.testing.compile.JavaFileObjects;
 import java.lang.annotation.Retention;
 import javax.inject.Qualifier;
-import org.junit.Rule;
+import javax.tools.JavaFileObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class ProducerModuleFactoryGeneratorTest {
-
-  @Rule public GoldenFileRule goldenFileRule = new GoldenFileRule();
 
   @Test public void producesMethodNotInModule() {
     assertThatMethodInUnannotatedClass("@Produces String produceString() { return null; }")
@@ -156,33 +156,28 @@ public class ProducerModuleFactoryGeneratorTest {
   }
 
   @Test public void multipleProducesMethodsWithSameName() {
-    Source moduleFile =
-        CompilerTests.javaSource(
-            "test.TestModule",
-            "package test;",
-            "",
-            "import dagger.producers.ProducerModule;",
-            "import dagger.producers.Produces;",
-            "",
-            "@ProducerModule",
-            "final class TestModule {",
-            "  @Produces Object produce(int i) {",
-            "    return i;",
-            "  }",
-            "",
-            "  @Produces String produce() {",
-            "    return \"\";",
-            "  }",
-            "}");
+    JavaFileObject moduleFile = JavaFileObjects.forSourceLines("test.TestModule",
+        "package test;",
+        "",
+        "import dagger.producers.ProducerModule;",
+        "import dagger.producers.Produces;",
+        "",
+        "@ProducerModule",
+        "final class TestModule {",
+        "  @Produces Object produce(int i) {",
+        "    return i;",
+        "  }",
+        "",
+        "  @Produces String produce() {",
+        "    return \"\";",
+        "  }",
+        "}");
     String errorMessage =
         "Cannot have more than one binding method with the same name in a single module";
-    CompilerTests.daggerCompiler(moduleFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(2);
-              subject.hasErrorContaining(errorMessage).onSource(moduleFile).onLine(8);
-              subject.hasErrorContaining(errorMessage).onSource(moduleFile).onLine(12);
-            });
+    Compilation compilation = daggerCompiler().compile(moduleFile);
+    assertThat(compilation).failed();
+    assertThat(compilation).hadErrorContaining(errorMessage).inFile(moduleFile).onLine(8);
+    assertThat(compilation).hadErrorContaining(errorMessage).inFile(moduleFile).onLine(12);
   }
 
   @Test
@@ -200,8 +195,7 @@ public class ProducerModuleFactoryGeneratorTest {
 
   @Test
   public void privateModule() {
-    Source moduleFile =
-        CompilerTests.javaSource("test.Enclosing",
+    JavaFileObject moduleFile = JavaFileObjects.forSourceLines("test.Enclosing",
         "package test;",
         "",
         "import dagger.producers.ProducerModule;",
@@ -210,52 +204,42 @@ public class ProducerModuleFactoryGeneratorTest {
         "  @ProducerModule private static final class PrivateModule {",
         "  }",
         "}");
-    CompilerTests.daggerCompiler(moduleFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining("Modules cannot be private")
-                  .onSource(moduleFile)
-                  .onLine(6);
-            });
+    Compilation compilation = daggerCompiler().compile(moduleFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining("Modules cannot be private")
+        .inFile(moduleFile)
+        .onLine(6);
   }
 
 
   @Test
   public void enclosedInPrivateModule() {
-    Source moduleFile =
-        CompilerTests.javaSource(
-            "test.Enclosing",
-            "package test;",
-            "",
-            "import dagger.producers.ProducerModule;",
-            "",
-            "final class Enclosing {",
-            "  private static final class PrivateEnclosing {",
-            "    @ProducerModule static final class TestModule {",
-            "    }",
-            "  }",
-            "}");
-    CompilerTests.daggerCompiler(moduleFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining("Modules cannot be enclosed in private types")
-                  .onSource(moduleFile)
-                  .onLine(7);
-            });
+    JavaFileObject moduleFile = JavaFileObjects.forSourceLines("test.Enclosing",
+        "package test;",
+        "",
+        "import dagger.producers.ProducerModule;",
+        "",
+        "final class Enclosing {",
+        "  private static final class PrivateEnclosing {",
+        "    @ProducerModule static final class TestModule {",
+        "    }",
+        "  }",
+        "}");
+    Compilation compilation = daggerCompiler().compile(moduleFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining("Modules cannot be enclosed in private types")
+        .inFile(moduleFile)
+        .onLine(7);
   }
 
   @Test
   public void includesNonModule() {
-    Source xFile =
-        CompilerTests.javaSource(
-            "test.X",
-            "package test;",
-            "",
-            "public final class X {}");
-    Source moduleFile =
-        CompilerTests.javaSource(
+    JavaFileObject xFile =
+        JavaFileObjects.forSourceLines("test.X", "package test;", "", "public final class X {}");
+    JavaFileObject moduleFile =
+        JavaFileObjects.forSourceLines(
             "test.FooModule",
             "package test;",
             "",
@@ -264,33 +248,29 @@ public class ProducerModuleFactoryGeneratorTest {
             "@ProducerModule(includes = X.class)",
             "public final class FooModule {",
             "}");
-    CompilerTests.daggerCompiler(xFile, moduleFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                      "X is listed as a module, but is not annotated with one of @Module, "
-                          + "@ProducerModule");
-            });
+    Compilation compilation = daggerCompiler().compile(xFile, moduleFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            "X is listed as a module, but is not annotated with one of @Module, @ProducerModule");
   }
 
   // TODO(ronshapiro): merge this with the equivalent test in ModuleFactoryGeneratorTest and make it
   // parameterized
   @Test
   public void publicModuleNonPublicIncludes() {
-    Source publicModuleFile =
-        CompilerTests.javaSource(
-            "test.PublicModule",
-            "package test;",
-            "",
-            "import dagger.producers.ProducerModule;",
-            "",
-            "@ProducerModule(includes = {",
-            "    BadNonPublicModule.class, OtherPublicModule.class, OkNonPublicModule.class",
-            "})",
-            "public final class PublicModule {}");
-    Source badNonPublicModuleFile =
-        CompilerTests.javaSource(
+    JavaFileObject publicModuleFile = JavaFileObjects.forSourceLines("test.PublicModule",
+        "package test;",
+        "",
+        "import dagger.producers.ProducerModule;",
+        "",
+        "@ProducerModule(includes = {",
+        "    BadNonPublicModule.class, OtherPublicModule.class, OkNonPublicModule.class",
+        "})",
+        "public final class PublicModule {",
+        "}");
+    JavaFileObject badNonPublicModuleFile =
+        JavaFileObjects.forSourceLines(
             "test.BadNonPublicModule",
             "package test;",
             "",
@@ -304,98 +284,135 @@ public class ProducerModuleFactoryGeneratorTest {
             "    return 42;",
             "  }",
             "}");
-    Source okNonPublicModuleFile =
-        CompilerTests.javaSource(
-            "test.OkNonPublicModule",
-            "package test;",
-            "",
-            "import dagger.producers.ProducerModule;",
-            "import dagger.producers.Produces;",
-            "",
-            "@ProducerModule",
-            "final class OkNonPublicModule {",
-            "  @Produces",
-            "  static String produceString() {",
-            "    return \"foo\";",
-            "  }",
-            "}");
-    Source otherPublicModuleFile =
-        CompilerTests.javaSource(
-            "test.OtherPublicModule",
-            "package test;",
-            "",
-            "import dagger.producers.ProducerModule;",
-            "",
-            "@ProducerModule",
-            "public final class OtherPublicModule {",
-            "}");
-    CompilerTests.daggerCompiler(
-            publicModuleFile,
-            badNonPublicModuleFile,
-            okNonPublicModuleFile,
-            otherPublicModuleFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining(
-                  "This module is public, but it includes non-public (or effectively non-public) "
-                      + "modules (test.BadNonPublicModule) that have non-static, non-abstract "
-                      + "binding methods. Either reduce the visibility of this module, make the "
-                      + "included modules public, or make all of the binding methods on the "
-                      + "included modules abstract or static.")
-                  .onSource(publicModuleFile)
-                  .onLine(8);
-            });
+    JavaFileObject okNonPublicModuleFile = JavaFileObjects.forSourceLines("test.OkNonPublicModule",
+        "package test;",
+        "",
+        "import dagger.producers.ProducerModule;",
+        "import dagger.producers.Produces;",
+        "",
+        "@ProducerModule",
+        "final class OkNonPublicModule {",
+        "  @Produces",
+        "  static String produceString() {",
+        "    return \"foo\";",
+        "  }",
+        "}");
+    JavaFileObject otherPublicModuleFile = JavaFileObjects.forSourceLines("test.OtherPublicModule",
+        "package test;",
+        "",
+        "import dagger.producers.ProducerModule;",
+        "",
+        "@ProducerModule",
+        "public final class OtherPublicModule {",
+        "}");
+    Compilation compilation =
+        daggerCompiler()
+            .compile(
+                publicModuleFile,
+                badNonPublicModuleFile,
+                okNonPublicModuleFile,
+                otherPublicModuleFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining(
+            "This module is public, but it includes non-public (or effectively non-public) modules "
+                + "(test.BadNonPublicModule) that have non-static, non-abstract binding methods. "
+                + "Either reduce the visibility of this module, make the included modules public, "
+                + "or make all of the binding methods on the included modules abstract or static.")
+        .inFile(publicModuleFile)
+        .onLine(8);
   }
 
   @Test public void argumentNamedModuleCompiles() {
-    Source moduleFile =
-        CompilerTests.javaSource(
-            "test.TestModule",
-            "package test;",
-            "",
-            "import dagger.producers.ProducerModule;",
-            "import dagger.producers.Produces;",
-            "",
-            "@ProducerModule",
-            "final class TestModule {",
-            "  @Produces String produceString(int module) {",
-            "    return null;",
-            "  }",
-            "}");
-    CompilerTests.daggerCompiler(moduleFile)
-        .compile(subject -> subject.hasErrorCount(0));
+    JavaFileObject moduleFile = JavaFileObjects.forSourceLines("test.TestModule",
+        "package test;",
+        "",
+        "import dagger.producers.ProducerModule;",
+        "import dagger.producers.Produces;",
+        "",
+        "@ProducerModule",
+        "final class TestModule {",
+        "  @Produces String produceString(int module) {",
+        "    return null;",
+        "  }",
+        "}");
+    Compilation compilation = daggerCompiler().compile(moduleFile);
+    assertThat(compilation).succeeded();
   }
 
   @Test public void singleProducesMethodNoArgsFuture() {
-    Source moduleFile =
-        CompilerTests.javaSource(
-            "test.TestModule",
+    JavaFileObject moduleFile = JavaFileObjects.forSourceLines("test.TestModule",
+        "package test;",
+        "",
+        "import com.google.common.util.concurrent.ListenableFuture;",
+        "import dagger.producers.ProducerModule;",
+        "import dagger.producers.Produces;",
+        "",
+        "@ProducerModule",
+        "final class TestModule {",
+        "  @Produces ListenableFuture<String> produceString() {",
+        "    return null;",
+        "  }",
+        "}");
+    JavaFileObject factoryFile =
+        JavaFileObjects.forSourceLines(
+            "TestModule_ProduceStringFactory",
             "package test;",
             "",
-            "import com.google.common.util.concurrent.ListenableFuture;",
-            "import dagger.producers.ProducerModule;",
-            "import dagger.producers.Produces;",
+            GeneratedLines.generatedImports(
+                "import com.google.common.util.concurrent.Futures;",
+                "import com.google.common.util.concurrent.ListenableFuture;",
+                "import dagger.producers.internal.AbstractProducesMethodProducer;",
+                "import dagger.producers.monitoring.ProducerToken;",
+                "import dagger.producers.monitoring.ProductionComponentMonitor;",
+                "import java.util.concurrent.Executor;",
+                "import javax.inject.Provider;"),
             "",
-            "@ProducerModule",
-            "final class TestModule {",
-            "  @Produces ListenableFuture<String> produceString() {",
-            "    return null;",
+            GeneratedLines.generatedAnnotationsWithoutSuppressWarnings(),
+            "@SuppressWarnings({\"FutureReturnValueIgnored\", \"unchecked\", \"rawtypes\"})",
+            "public final class TestModule_ProduceStringFactory",
+            "    extends AbstractProducesMethodProducer<Void, String> {",
+            "  private final TestModule module;",
+            "",
+            "  private TestModule_ProduceStringFactory(",
+            "      TestModule module,",
+            "      Provider<Executor> executorProvider,",
+            "      Provider<ProductionComponentMonitor> productionComponentMonitorProvider) {",
+            "    super(",
+            "        productionComponentMonitorProvider,",
+            "        ProducerToken.create(TestModule_ProduceStringFactory.class),",
+            "        executorProvider);",
+            "    this.module = module;",
+            "  }",
+            "",
+            "  public static TestModule_ProduceStringFactory create(",
+            "      TestModule module,",
+            "      Provider<Executor> executorProvider,",
+            "      Provider<ProductionComponentMonitor> productionComponentMonitorProvider) {",
+            "    return new TestModule_ProduceStringFactory(",
+            "        module, executorProvider, productionComponentMonitorProvider);",
+            "  }",
+            "",
+            "  @Override protected ListenableFuture<Void> collectDependencies() {",
+            "    return Futures.<Void>immediateFuture(null);",
+            "  }",
+            "",
+            "  @Override public ListenableFuture<String> callProducesMethod(Void ignoredVoidArg) {",
+            "    return module.produceString();",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(moduleFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/TestModule_ProduceStringFactory"));
-            });
+    assertAbout(javaSource())
+        .that(moduleFile)
+        .processedWith(new ComponentProcessor())
+        .compilesWithoutError()
+        .and()
+        .generatesSources(factoryFile);
   }
 
   @Test
   public void singleProducesMethodNoArgsFutureWithProducerName() {
-    Source moduleFile =
-        CompilerTests.javaSource(
+    JavaFileObject moduleFile =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -410,14 +427,60 @@ public class ProducerModuleFactoryGeneratorTest {
             "    return Futures.immediateFuture(\"\");",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(moduleFile)
-        .withProcessingOptions(ImmutableMap.of("dagger.writeProducerNameInToken", "ENABLED"))
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/TestModule_ProduceStringFactory"));
-            });
+    JavaFileObject factoryFile =
+        JavaFileObjects.forSourceLines(
+            "TestModule_ProduceStringFactory",
+            "package test;",
+            "",
+            GeneratedLines.generatedImports(
+                "import com.google.common.util.concurrent.Futures;",
+                "import com.google.common.util.concurrent.ListenableFuture;",
+                "import dagger.producers.internal.AbstractProducesMethodProducer;",
+                "import dagger.producers.monitoring.ProducerToken;",
+                "import dagger.producers.monitoring.ProductionComponentMonitor;",
+                "import java.util.concurrent.Executor;",
+                "import javax.inject.Provider;"),
+            "",
+            GeneratedLines.generatedAnnotationsWithoutSuppressWarnings(),
+            "@SuppressWarnings({\"FutureReturnValueIgnored\", \"unchecked\", \"rawtypes\"})",
+            "public final class TestModule_ProduceStringFactory",
+            "    extends AbstractProducesMethodProducer<Void, String> {",
+            "  private final TestModule module;",
+            "",
+            "  private TestModule_ProduceStringFactory(",
+            "      TestModule module,",
+            "      Provider<Executor> executorProvider,",
+            "      Provider<ProductionComponentMonitor> productionComponentMonitorProvider) {",
+            "    super(",
+            "        productionComponentMonitorProvider,",
+            "        ProducerToken.create(\"test.TestModule#produceString\"),",
+            "        executorProvider);",
+            "    this.module = module;",
+            "  }",
+            "",
+            "  public static TestModule_ProduceStringFactory create(",
+            "      TestModule module,",
+            "      Provider<Executor> executorProvider,",
+            "      Provider<ProductionComponentMonitor> productionComponentMonitorProvider) {",
+            "    return new TestModule_ProduceStringFactory(",
+            "        module, executorProvider, productionComponentMonitorProvider);",
+            "  }",
+            "",
+            "  @Override protected ListenableFuture<Void> collectDependencies() {",
+            "    return Futures.<Void>immediateFuture(null);",
+            "  }",
+            "",
+            "  @Override public ListenableFuture<String> callProducesMethod(Void ignoredVoidArg) {",
+            "    return module.produceString();",
+            "  }",
+            "}");
+    assertAbout(javaSource())
+        .that(moduleFile)
+        .withCompilerOptions("-Adagger.writeProducerNameInToken=ENABLED")
+        .processedWith(new ComponentProcessor())
+        .compilesWithoutError()
+        .and()
+        .generatesSources(factoryFile);
   }
 
   @Test

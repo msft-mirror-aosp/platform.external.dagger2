@@ -20,11 +20,11 @@
 package dagger.internal.codegen.kythe;
 
 import static androidx.room.compiler.processing.compat.XConverters.toJavac;
-import static androidx.room.compiler.processing.compat.XConverters.toXProcessing;
+import static dagger.internal.codegen.langmodel.DaggerElements.isAnyAnnotationPresent;
 
 import androidx.room.compiler.processing.XElement;
 import androidx.room.compiler.processing.XProcessingEnv;
-import androidx.room.compiler.processing.XTypeElement;
+import androidx.room.compiler.processing.compat.XConverters;
 import com.google.auto.service.AutoService;
 import com.google.common.collect.Iterables;
 import com.google.devtools.kythe.analyzers.base.EntrySet;
@@ -54,6 +54,7 @@ import java.util.Optional;
 import java.util.logging.Logger;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import javax.lang.model.element.Element;
 
 /**
  * A plugin which emits nodes and edges for <a href="https://github.com/google/dagger">Dagger</a>
@@ -70,13 +71,13 @@ public class DaggerKythePlugin extends Plugin.Scanner<Void, Void> {
 
   @Override
   public Void visitClassDef(JCClassDecl tree, Void p) {
-    if (tree.sym != null) {
-      XTypeElement type = toXProcessing(tree.sym, xProcessingEnv);
-      if (type.hasAnyAnnotation(TypeNames.COMPONENT, TypeNames.PRODUCTION_COMPONENT)) {
-        addNodesForGraph(
-            bindingGraphFactory.create(
-                componentDescriptorFactory.rootComponentDescriptor(type), false));
-      }
+    if (tree.sym != null
+        && isAnyAnnotationPresent(tree.sym, TypeNames.COMPONENT, TypeNames.PRODUCTION_COMPONENT)) {
+      addNodesForGraph(
+          bindingGraphFactory.create(
+              componentDescriptorFactory.rootComponentDescriptor(
+                  XConverters.toXProcessing(tree.sym, xProcessingEnv)),
+              false));
     }
     return super.visitClassDef(tree, p);
   }
@@ -132,8 +133,8 @@ public class DaggerKythePlugin extends Plugin.Scanner<Void, Void> {
 
   private void addDependencyEdge(
       DependencyRequest dependency, BindingDeclaration bindingDeclaration) {
-    XElement requestElement = dependency.requestElement().get().xprocessing();
-    XElement bindingElement = bindingDeclaration.bindingElement().get();
+    Element requestElement = dependency.requestElement().get().java();
+    Element bindingElement = toJavac(bindingDeclaration.bindingElement().get());
     Optional<VName> requestElementNode = jvmNode(requestElement, "request element");
     Optional<VName> bindingElementNode = jvmNode(bindingElement, "binding element");
     emitEdge(requestElementNode, "/inject/satisfiedby", bindingElementNode);
@@ -160,8 +161,11 @@ public class DaggerKythePlugin extends Plugin.Scanner<Void, Void> {
   }
 
   private Optional<VName> jvmNode(XElement element, String name) {
-    Optional<VName> jvmNode =
-        kytheGraph.getJvmNode((Symbol) toJavac(element)).map(KytheNode::getVName);
+    return jvmNode(toJavac(element), name);
+  }
+
+  private Optional<VName> jvmNode(Element element, String name) {
+    Optional<VName> jvmNode = kytheGraph.getJvmNode((Symbol) element).map(KytheNode::getVName);
     if (!jvmNode.isPresent()) {
       logger.warning(String.format("Missing JVM node for %s: %s", name, element));
     }

@@ -23,29 +23,29 @@ import library2.MyTransitiveType;
  * A class used to test that Dagger won't fail on unresolvable transitive types used in non-dagger
  * related elements and annotations.
  */
-// TODO(b/219587431): Support @MyTransitiveAnnotation (We shouldn't need scope/qualifier here).
+// @MyTransitiveAnnotation: Not yet supported
 @MyAnnotation(MyTransitiveType.VALUE)
 @MyOtherAnnotation(MyTransitiveType.class)
 public abstract class MyBaseComponent {
-  // @MyTransitiveAnnotation cannot be used here.
   @MyQualifier
+  // @MyTransitiveAnnotation: Not yet supported
   @MyAnnotation(MyTransitiveType.VALUE)
   @MyOtherAnnotation(MyTransitiveType.class)
   public abstract MyComponentModule.UnscopedQualifiedBindsType unscopedQualifiedBindsTypeBase();
 
-  // @MyTransitiveAnnotation cannot be used here.
+  // @MyTransitiveAnnotation: Not yet supported
   @MyAnnotation(MyTransitiveType.VALUE)
   @MyOtherAnnotation(MyTransitiveType.class)
   public abstract MyComponentModule.UnscopedUnqualifiedBindsType unscopedUnqualifiedBindsTypeBase();
 
-  // TODO(b/219587431): Support @MyTransitiveAnnotation (We shouldn't need scope/qualifier here).
+  // @MyTransitiveAnnotation: Not yet supported
   @MyAnnotation(MyTransitiveType.VALUE)
   @MyOtherAnnotation(MyTransitiveType.class)
   public abstract void injectFooBase(
-      // TODO(b/219587431): Support @MyTransitiveAnnotation (We shouldn't need scope/qualifier here)
+      // @MyTransitiveAnnotation: Not yet supported
       @MyAnnotation(MyTransitiveType.VALUE) @MyOtherAnnotation(MyTransitiveType.class) Foo binding);
 
-  // TODO(b/219587431): Support @MyTransitiveAnnotation (We shouldn't need scope/qualifier here).
+  // @MyTransitiveAnnotation: Not yet supported
   @MyAnnotation(MyTransitiveType.VALUE)
   @MyOtherAnnotation(MyTransitiveType.class)
   public abstract static class Factory {

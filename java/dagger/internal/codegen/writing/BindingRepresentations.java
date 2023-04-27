@@ -22,21 +22,17 @@ import static dagger.internal.codegen.javapoet.TypeNames.SINGLE_CHECK;
 import com.squareup.javapoet.CodeBlock;
 import dagger.internal.codegen.binding.Binding;
 import dagger.internal.codegen.writing.FrameworkFieldInitializer.FrameworkInstanceCreationExpression;
-import javax.inject.Inject;
 
 /** Holds common methods for BindingRepresentations. */
 final class BindingRepresentations {
-
-  @Inject BindingRepresentations() {}
-
-  FrameworkInstanceCreationExpression scope(
+  static FrameworkInstanceCreationExpression scope(
       Binding binding, FrameworkInstanceCreationExpression unscoped) {
     return () ->
         CodeBlock.of(
             "$T.provider($L)",
-            binding.scope().get().isReusable()
-                ? SINGLE_CHECK
-                : DOUBLE_CHECK,
+            binding.scope().get().isReusable() ? SINGLE_CHECK : DOUBLE_CHECK,
             unscoped.creationExpression());
   }
+
+  private BindingRepresentations() {}
 }

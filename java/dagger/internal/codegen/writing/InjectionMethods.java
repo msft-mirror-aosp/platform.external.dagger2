@@ -16,9 +16,10 @@
 
 package dagger.internal.codegen.writing;
 
-import static androidx.room.compiler.processing.XElementKt.isConstructor;
-import static androidx.room.compiler.processing.XElementKt.isMethod;
-import static androidx.room.compiler.processing.XTypeKt.isVoid;
+import static androidx.room.compiler.processing.compat.XConverters.toJavac;
+import static com.google.auto.common.MoreElements.asExecutable;
+import static com.google.auto.common.MoreElements.asType;
+import static com.google.auto.common.MoreElements.asVariable;
 import static com.google.common.base.CaseFormat.LOWER_CAMEL;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -29,7 +30,6 @@ import static dagger.internal.codegen.binding.SourceFiles.generatedClassNameForB
 import static dagger.internal.codegen.binding.SourceFiles.memberInjectedFieldSignatureForVariable;
 import static dagger.internal.codegen.binding.SourceFiles.membersInjectorNameForType;
 import static dagger.internal.codegen.binding.SourceFiles.protectAgainstKeywords;
-import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableMap;
 import static dagger.internal.codegen.javapoet.CodeBlocks.makeParametersCodeBlock;
 import static dagger.internal.codegen.javapoet.CodeBlocks.toConcatenatedCodeBlock;
@@ -38,27 +38,17 @@ import static dagger.internal.codegen.javapoet.TypeNames.rawTypeName;
 import static dagger.internal.codegen.langmodel.Accessibility.isElementAccessibleFrom;
 import static dagger.internal.codegen.langmodel.Accessibility.isRawTypeAccessible;
 import static dagger.internal.codegen.langmodel.Accessibility.isRawTypePubliclyAccessible;
-import static dagger.internal.codegen.xprocessing.XElements.asConstructor;
+import static dagger.internal.codegen.langmodel.Accessibility.isTypeAccessibleFrom;
 import static dagger.internal.codegen.xprocessing.XElements.asExecutable;
-import static dagger.internal.codegen.xprocessing.XElements.asField;
-import static dagger.internal.codegen.xprocessing.XElements.asMethod;
 import static dagger.internal.codegen.xprocessing.XElements.asMethodParameter;
-import static dagger.internal.codegen.xprocessing.XElements.asTypeElement;
-import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
-import static dagger.internal.codegen.xprocessing.XTypeElements.typeVariableNames;
-import static dagger.internal.codegen.xprocessing.XTypes.erasedTypeName;
+import static java.util.stream.Collectors.toList;
 import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
+import static javax.lang.model.type.TypeKind.VOID;
 
-import androidx.room.compiler.processing.XAnnotation;
-import androidx.room.compiler.processing.XConstructorElement;
 import androidx.room.compiler.processing.XExecutableElement;
 import androidx.room.compiler.processing.XExecutableParameterElement;
-import androidx.room.compiler.processing.XFieldElement;
-import androidx.room.compiler.processing.XMethodElement;
-import androidx.room.compiler.processing.XType;
-import androidx.room.compiler.processing.XTypeElement;
-import androidx.room.compiler.processing.XVariableElement;
+import com.google.auto.common.MoreElements;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -68,20 +58,29 @@ import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.TypeName;
+import com.squareup.javapoet.TypeVariableName;
 import dagger.internal.Preconditions;
 import dagger.internal.codegen.base.UniqueNameSet;
 import dagger.internal.codegen.binding.MembersInjectionBinding.InjectionSite;
 import dagger.internal.codegen.binding.ProvisionBinding;
 import dagger.internal.codegen.compileroption.CompilerOptions;
 import dagger.internal.codegen.extension.DaggerCollectors;
+import dagger.internal.codegen.javapoet.CodeBlocks;
 import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.internal.codegen.xprocessing.XAnnotations;
+import dagger.internal.codegen.kotlin.KotlinMetadataUtil;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.spi.model.DaggerAnnotation;
 import dagger.spi.model.DependencyRequest;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 import javax.lang.model.SourceVersion;
+import javax.lang.model.element.AnnotationMirror;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Parameterizable;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.TypeMirror;
 
 /** Convenience methods for creating and invoking {@link InjectionMethod}s. */
 final class InjectionMethods {
@@ -119,23 +118,24 @@ final class InjectionMethods {
      * Returns a method that invokes the binding's {@linkplain ProvisionBinding#bindingElement()
      * constructor} and injects the instance's members.
      */
-    static MethodSpec create(ProvisionBinding binding, CompilerOptions compilerOptions) {
-      XExecutableElement executableElement = asExecutable(binding.bindingElement().get());
-      if (isConstructor(executableElement)) {
-        return constructorProxy(asConstructor(executableElement));
-      } else if (isMethod(executableElement)) {
-        XMethodElement method = asMethod(executableElement);
-        String methodName =
-            BANNED_PROXY_NAMES.contains(getSimpleName(method))
-                ? "proxy" + LOWER_CAMEL.to(UPPER_CAMEL, getSimpleName(method))
-                : getSimpleName(method);
-        return methodProxy(
-            method,
-            methodName,
-            InstanceCastPolicy.IGNORE,
-            CheckNotNullPolicy.get(binding, compilerOptions));
+    static MethodSpec create(
+        ProvisionBinding binding,
+        CompilerOptions compilerOptions,
+        KotlinMetadataUtil metadataUtil) {
+      ExecutableElement element = asExecutable(toJavac(binding.bindingElement().get()));
+      switch (element.getKind()) {
+        case CONSTRUCTOR:
+          return constructorProxy(element);
+        case METHOD:
+          return methodProxy(
+              element,
+              methodName(element),
+              InstanceCastPolicy.IGNORE,
+              CheckNotNullPolicy.get(binding, compilerOptions),
+              metadataUtil);
+        default:
+          throw new AssertionError(element);
       }
-      throw new AssertionError(executableElement);
     }
 
     /**
@@ -145,24 +145,25 @@ final class InjectionMethods {
     static CodeBlock invoke(
         ProvisionBinding binding,
         Function<DependencyRequest, CodeBlock> dependencyUsage,
-        Function<XVariableElement, String> uniqueAssistedParameterName,
+        Function<VariableElement, String> uniqueAssistedParameterName,
         ClassName requestingClass,
         Optional<CodeBlock> moduleReference,
-        CompilerOptions compilerOptions) {
+        CompilerOptions compilerOptions,
+        KotlinMetadataUtil metadataUtil) {
       ImmutableList.Builder<CodeBlock> arguments = ImmutableList.builder();
       moduleReference.ifPresent(arguments::add);
       invokeArguments(binding, dependencyUsage, uniqueAssistedParameterName)
           .forEach(arguments::add);
 
       ClassName enclosingClass = generatedClassNameForBinding(binding);
-      MethodSpec methodSpec = create(binding, compilerOptions);
+      MethodSpec methodSpec = create(binding, compilerOptions, metadataUtil);
       return invokeMethod(methodSpec, arguments.build(), enclosingClass, requestingClass);
     }
 
     static ImmutableList<CodeBlock> invokeArguments(
         ProvisionBinding binding,
         Function<DependencyRequest, CodeBlock> dependencyUsage,
-        Function<XVariableElement, String> uniqueAssistedParameterName) {
+        Function<VariableElement, String> uniqueAssistedParameterName) {
       ImmutableMap<XExecutableParameterElement, DependencyRequest> dependencyRequestMap =
           binding.provisionDependencies().stream()
               .collect(
@@ -174,7 +175,7 @@ final class InjectionMethods {
       XExecutableElement method = asExecutable(binding.bindingElement().get());
       for (XExecutableParameterElement parameter : method.getParameters()) {
         if (isAssistedParameter(parameter)) {
-          arguments.add(CodeBlock.of("$L", uniqueAssistedParameterName.apply(parameter)));
+          arguments.add(CodeBlock.of("$L", uniqueAssistedParameterName.apply(toJavac(parameter))));
         } else if (dependencyRequestMap.containsKey(parameter)) {
           DependencyRequest request = dependencyRequestMap.get(parameter);
           arguments.add(dependencyUsage.apply(request));
@@ -186,22 +187,20 @@ final class InjectionMethods {
       return arguments.build();
     }
 
-    private static MethodSpec constructorProxy(XConstructorElement constructor) {
-      XTypeElement enclosingType = constructor.getEnclosingElement();
+    private static MethodSpec constructorProxy(ExecutableElement constructor) {
+      TypeElement enclosingType = MoreElements.asType(constructor.getEnclosingElement());
       MethodSpec.Builder builder =
-          methodBuilder("newInstance")
+          methodBuilder(methodName(constructor))
               .addModifiers(PUBLIC, STATIC)
               .varargs(constructor.isVarArgs())
-              .returns(enclosingType.getType().getTypeName())
-              .addTypeVariables(typeVariableNames(enclosingType));
+              .returns(TypeName.get(enclosingType.asType()));
 
+      copyTypeParameters(builder, enclosingType);
       copyThrows(builder, constructor);
 
       CodeBlock arguments =
           copyParameters(builder, new UniqueNameSet(), constructor.getParameters());
-      return builder
-          .addStatement("return new $T($L)", enclosingType.getType().getTypeName(), arguments)
-          .build();
+      return builder.addStatement("return new $T($L)", enclosingType, arguments).build();
     }
 
     /**
@@ -210,14 +209,33 @@ final class InjectionMethods {
      */
     static boolean requiresInjectionMethod(
         ProvisionBinding binding, CompilerOptions compilerOptions, ClassName requestingClass) {
-      XExecutableElement executableElement = asExecutable(binding.bindingElement().get());
+      ExecutableElement method = asExecutable(toJavac(binding.bindingElement().get()));
       return !binding.injectionSites().isEmpty()
           || binding.shouldCheckForNull(compilerOptions)
-          || !isElementAccessibleFrom(executableElement, requestingClass.packageName())
+          || !isElementAccessibleFrom(method, requestingClass.packageName())
           // This check should be removable once we drop support for -source 7
-          || executableElement.getParameters().stream()
-              .map(XExecutableParameterElement::getType)
+          || method.getParameters().stream()
+              .map(VariableElement::asType)
               .anyMatch(type -> !isRawTypeAccessible(type, requestingClass.packageName()));
+    }
+
+    /**
+     * Returns the name of the {@code static} method that wraps {@code method}. For methods that are
+     * associated with {@code @Inject} constructors, the method will also inject all {@link
+     * InjectionSite}s.
+     */
+    private static String methodName(ExecutableElement method) {
+      switch (method.getKind()) {
+        case CONSTRUCTOR:
+          return "newInstance";
+        case METHOD:
+          String methodName = method.getSimpleName().toString();
+          return BANNED_PROXY_NAMES.contains(methodName)
+              ? "proxy" + LOWER_CAMEL.to(UPPER_CAMEL, methodName)
+              : methodName;
+        default:
+          throw new AssertionError(method);
+      }
     }
   }
 
@@ -246,24 +264,25 @@ final class InjectionMethods {
      * receives its own method, as the subclass may need to inject them in a different order from
      * the parent class.
      */
-    static MethodSpec create(InjectionSite injectionSite) {
+    static MethodSpec create(InjectionSite injectionSite, KotlinMetadataUtil metadataUtil) {
       String methodName = methodName(injectionSite);
       switch (injectionSite.kind()) {
         case METHOD:
           return methodProxy(
-              asMethod(injectionSite.element()),
+              asExecutable(injectionSite.element()),
               methodName,
               InstanceCastPolicy.CAST_IF_NOT_PUBLIC,
-              CheckNotNullPolicy.IGNORE);
+              CheckNotNullPolicy.IGNORE,
+              metadataUtil);
         case FIELD:
-          Optional<XAnnotation> qualifier =
+          Optional<AnnotationMirror> qualifier =
               injectionSite.dependencies().stream()
                   // methods for fields have a single dependency request
                   .collect(DaggerCollectors.onlyElement())
                   .key()
                   .qualifier()
-                  .map(DaggerAnnotation::xprocessing);
-          return fieldProxy(asField(injectionSite.element()), methodName, qualifier);
+                  .map(DaggerAnnotation::java);
+          return fieldProxy(asVariable(injectionSite.element()), methodName, qualifier);
       }
       throw new AssertionError(injectionSite);
     }
@@ -278,12 +297,15 @@ final class InjectionMethods {
         ImmutableSet<InjectionSite> injectionSites,
         ClassName generatedTypeName,
         CodeBlock instanceCodeBlock,
-        XType instanceType,
-        Function<DependencyRequest, CodeBlock> dependencyUsage) {
+        TypeMirror instanceType,
+        Function<DependencyRequest, CodeBlock> dependencyUsage,
+        DaggerTypes types,
+        KotlinMetadataUtil metadataUtil) {
       return injectionSites.stream()
           .map(
               injectionSite -> {
-                XType injectSiteType = injectionSite.enclosingTypeElement().getType();
+                TypeMirror injectSiteType =
+                    types.erasure(injectionSite.element().getEnclosingElement().asType());
 
                 // If instance has been declared as Object because it is not accessible from the
                 // component, but the injectionSite is in a supertype of instanceType that is
@@ -291,13 +313,18 @@ final class InjectionMethods {
                 // Object as the first parameter. If so, cast to the supertype which is accessible
                 // from within generatedTypeName
                 CodeBlock maybeCastedInstance =
-                    instanceType.getTypeName().equals(TypeName.OBJECT)
-                            && isRawTypeAccessible(injectSiteType, generatedTypeName.packageName())
-                        ? CodeBlock.of("($T) $L", erasedTypeName(injectSiteType), instanceCodeBlock)
+                    !types.isSubtype(instanceType, injectSiteType)
+                            && isTypeAccessibleFrom(injectSiteType, generatedTypeName.packageName())
+                        ? CodeBlock.of("($T) $L", injectSiteType, instanceCodeBlock)
                         : instanceCodeBlock;
                 return CodeBlock.of(
                     "$L;",
-                    invoke(injectionSite, generatedTypeName, maybeCastedInstance, dependencyUsage));
+                    invoke(
+                        injectionSite,
+                        generatedTypeName,
+                        maybeCastedInstance,
+                        dependencyUsage,
+                        metadataUtil));
               })
           .collect(toConcatenatedCodeBlock());
     }
@@ -310,18 +337,19 @@ final class InjectionMethods {
         InjectionSite injectionSite,
         ClassName generatedTypeName,
         CodeBlock instanceCodeBlock,
-        Function<DependencyRequest, CodeBlock> dependencyUsage) {
-      ImmutableList<CodeBlock> arguments =
-          ImmutableList.<CodeBlock>builder()
-              .add(instanceCodeBlock)
-              .addAll(
-                  injectionSite.dependencies().stream()
-                      .map(dependencyUsage)
-                      .collect(toImmutableList()))
-              .build();
-      ClassName enclosingClass = membersInjectorNameForType(injectionSite.enclosingTypeElement());
-      MethodSpec methodSpec = create(injectionSite);
-      return invokeMethod(methodSpec, arguments, enclosingClass, generatedTypeName);
+        Function<DependencyRequest, CodeBlock> dependencyUsage,
+        KotlinMetadataUtil metadataUtil) {
+      ImmutableList.Builder<CodeBlock> arguments = ImmutableList.builder();
+      arguments.add(instanceCodeBlock);
+      if (!injectionSite.dependencies().isEmpty()) {
+        arguments.addAll(
+            injectionSite.dependencies().stream().map(dependencyUsage).collect(toList()));
+      }
+
+      ClassName enclosingClass =
+          membersInjectorNameForType(asType(injectionSite.element().getEnclosingElement()));
+      MethodSpec methodSpec = create(injectionSite, metadataUtil);
+      return invokeMethod(methodSpec, arguments.build(), enclosingClass, generatedTypeName);
     }
 
     /*
@@ -343,7 +371,7 @@ final class InjectionMethods {
       int index = injectionSite.indexAmongAtInjectMembersWithSameSimpleName();
       String indexString = index == 0 ? "" : String.valueOf(index + 1);
       return "inject"
-          + LOWER_CAMEL.to(UPPER_CAMEL, getSimpleName(injectionSite.element()))
+          + LOWER_CAMEL.to(UPPER_CAMEL, injectionSite.element().getSimpleName().toString())
           + indexString;
     }
   }
@@ -351,7 +379,7 @@ final class InjectionMethods {
   private enum InstanceCastPolicy {
     CAST_IF_NOT_PUBLIC, IGNORE;
 
-    boolean useObjectType(XType instanceType) {
+    boolean useObjectType(TypeMirror instanceType) {
       return this == CAST_IF_NOT_PUBLIC && !isRawTypePubliclyAccessible(instanceType);
     }
   }
@@ -371,73 +399,69 @@ final class InjectionMethods {
   }
 
   private static MethodSpec methodProxy(
-      XMethodElement method,
+      ExecutableElement method,
       String methodName,
       InstanceCastPolicy instanceCastPolicy,
-      CheckNotNullPolicy checkNotNullPolicy) {
-    XTypeElement enclosingType = asTypeElement(method.getEnclosingElement());
-
+      CheckNotNullPolicy checkNotNullPolicy,
+      KotlinMetadataUtil metadataUtil) {
     MethodSpec.Builder builder =
-        methodBuilder(methodName)
-            .addModifiers(PUBLIC, STATIC)
-            .varargs(method.isVarArgs())
-            .addTypeVariables(method.getExecutableType().getTypeVariableNames());
+        methodBuilder(methodName).addModifiers(PUBLIC, STATIC).varargs(method.isVarArgs());
 
+    TypeElement enclosingType = asType(method.getEnclosingElement());
+    boolean isMethodInKotlinObject = metadataUtil.isObjectClass(enclosingType);
+    boolean isMethodInKotlinCompanionObject = metadataUtil.isCompanionObjectClass(enclosingType);
     UniqueNameSet parameterNameSet = new UniqueNameSet();
     CodeBlock instance;
-    if (method.isStatic() || enclosingType.isCompanionObject()) {
-      instance = CodeBlock.of("$T", rawTypeName(enclosingType.getType().getTypeName()));
-    } else if (enclosingType.isKotlinObject()) {
+    if (isMethodInKotlinCompanionObject || method.getModifiers().contains(STATIC)) {
+      instance = CodeBlock.of("$T", rawTypeName(TypeName.get(enclosingType.asType())));
+    } else if (isMethodInKotlinObject) {
       // Call through the singleton instance.
       // See: https://kotlinlang.org/docs/reference/java-to-kotlin-interop.html#static-methods
-      instance = CodeBlock.of("$T.INSTANCE", rawTypeName(enclosingType.getType().getTypeName()));
+      instance = CodeBlock.of("$T.INSTANCE", rawTypeName(TypeName.get(enclosingType.asType())));
     } else {
-      builder.addTypeVariables(typeVariableNames(enclosingType));
-      boolean useObject = instanceCastPolicy.useObjectType(enclosingType.getType());
-      instance = copyInstance(builder, parameterNameSet, enclosingType.getType(), useObject);
+      copyTypeParameters(builder, enclosingType);
+      boolean useObject = instanceCastPolicy.useObjectType(enclosingType.asType());
+      instance = copyInstance(builder, parameterNameSet, enclosingType.asType(), useObject);
     }
     CodeBlock arguments = copyParameters(builder, parameterNameSet, method.getParameters());
     CodeBlock invocation =
         checkNotNullPolicy.checkForNull(
-            CodeBlock.of("$L.$L($L)", instance, method.getJvmName(), arguments));
+            CodeBlock.of("$L.$L($L)", instance, method.getSimpleName(), arguments));
 
+    copyTypeParameters(builder, method);
     copyThrows(builder, method);
 
-    if (isVoid(method.getReturnType())) {
+    if (method.getReturnType().getKind().equals(VOID)) {
       return builder.addStatement("$L", invocation).build();
     } else {
       getNullableType(method)
-          .map(XType::getTypeElement)
-          .map(XTypeElement::getClassName)
-          .ifPresent(builder::addAnnotation);
+          .ifPresent(annotation -> CodeBlocks.addAnnotation(builder, annotation));
       return builder
-          .returns(method.getReturnType().getTypeName())
-          .addStatement("return $L", invocation)
-          .build();
+          .returns(TypeName.get(method.getReturnType()))
+          .addStatement("return $L", invocation).build();
     }
   }
 
   private static MethodSpec fieldProxy(
-      XFieldElement field, String methodName, Optional<XAnnotation> qualifier) {
-    XTypeElement enclosingType = asTypeElement(field.getEnclosingElement());
-
+      VariableElement field, String methodName, Optional<AnnotationMirror> qualifierAnnotation) {
     MethodSpec.Builder builder =
         methodBuilder(methodName)
             .addModifiers(PUBLIC, STATIC)
             .addAnnotation(
                 AnnotationSpec.builder(TypeNames.INJECTED_FIELD_SIGNATURE)
                     .addMember("value", "$S", memberInjectedFieldSignatureForVariable(field))
-                    .build())
-            .addTypeVariables(typeVariableNames(enclosingType));
+                    .build());
 
-    qualifier.map(XAnnotations::getAnnotationSpec).ifPresent(builder::addAnnotation);
+    qualifierAnnotation.map(AnnotationSpec::get).ifPresent(builder::addAnnotation);
 
-    boolean useObject = !isRawTypePubliclyAccessible(enclosingType.getType());
+    TypeElement enclosingType = asType(field.getEnclosingElement());
+    copyTypeParameters(builder, enclosingType);
+
+    boolean useObject = !isRawTypePubliclyAccessible(enclosingType.asType());
     UniqueNameSet parameterNameSet = new UniqueNameSet();
-    CodeBlock instance =
-        copyInstance(builder, parameterNameSet, enclosingType.getType(), useObject);
+    CodeBlock instance = copyInstance(builder, parameterNameSet, enclosingType.asType(), useObject);
     CodeBlock argument = copyParameters(builder, parameterNameSet, ImmutableList.of(field));
-    return builder.addStatement("$L.$L = $L", instance, getSimpleName(field), argument).build();
+    return builder.addStatement("$L.$L = $L", instance, field.getSimpleName(), argument).build();
   }
 
   private static CodeBlock invokeMethod(
@@ -452,35 +476,44 @@ final class InjectionMethods {
         : CodeBlock.of("$T.$L($L)", enclosingClass, methodSpec.name, parameterBlock);
   }
 
-  private static void copyThrows(MethodSpec.Builder methodBuilder, XExecutableElement method) {
-    method.getThrownTypes().stream().map(XType::getTypeName).forEach(methodBuilder::addException);
+  private static void copyTypeParameters(
+      MethodSpec.Builder methodBuilder, Parameterizable element) {
+    element.getTypeParameters().stream()
+        .map(TypeVariableName::get)
+        .forEach(methodBuilder::addTypeVariable);
+  }
+
+  private static void copyThrows(MethodSpec.Builder methodBuilder, ExecutableElement method) {
+    method.getThrownTypes().stream().map(TypeName::get).forEach(methodBuilder::addException);
   }
 
   private static CodeBlock copyParameters(
       MethodSpec.Builder methodBuilder,
       UniqueNameSet parameterNameSet,
-      List<? extends XVariableElement> parameters) {
+      List<? extends VariableElement> parameters) {
     return parameters.stream()
         .map(
             parameter -> {
-              String name = parameterNameSet.getUniqueName(validJavaName(getSimpleName(parameter)));
-              boolean useObject = !isRawTypePubliclyAccessible(parameter.getType());
-              return copyParameter(methodBuilder, parameter.getType(), name, useObject);
+              String name =
+                  parameterNameSet.getUniqueName(validJavaName(parameter.getSimpleName()));
+              TypeMirror type = parameter.asType();
+              boolean useObject = !isRawTypePubliclyAccessible(type);
+              return copyParameter(methodBuilder, type, name, useObject);
             })
         .collect(toParametersCodeBlock());
   }
 
   private static CodeBlock copyParameter(
-      MethodSpec.Builder methodBuilder, XType type, String name, boolean useObject) {
-    TypeName typeName = useObject ? TypeName.OBJECT : type.getTypeName();
+      MethodSpec.Builder methodBuilder, TypeMirror type, String name, boolean useObject) {
+    TypeName typeName = useObject ? TypeName.OBJECT : TypeName.get(type);
     methodBuilder.addParameter(ParameterSpec.builder(typeName, name).build());
-    return useObject ? CodeBlock.of("($T) $L", type.getTypeName(), name) : CodeBlock.of("$L", name);
+    return useObject ? CodeBlock.of("($T) $L", type, name) : CodeBlock.of("$L", name);
   }
 
   private static CodeBlock copyInstance(
       MethodSpec.Builder methodBuilder,
       UniqueNameSet parameterNameSet,
-      XType type,
+      TypeMirror type,
       boolean useObject) {
     CodeBlock instance =
         copyParameter(methodBuilder, type, parameterNameSet.getUniqueName("instance"), useObject);

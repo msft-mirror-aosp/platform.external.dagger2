@@ -16,16 +16,20 @@
 
 package dagger.internal.codegen;
 
-import androidx.room.compiler.processing.util.Source;
-import dagger.testing.compile.CompilerTests;
+import static com.google.testing.compile.CompilationSubject.assertThat;
+import static dagger.internal.codegen.Compilers.daggerCompiler;
+
+import com.google.testing.compile.Compilation;
+import com.google.testing.compile.JavaFileObjects;
+import javax.tools.JavaFileObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class RepeatedModuleValidationTest {
-  private static final Source MODULE_FILE =
-        CompilerTests.javaSource(
+  private static final JavaFileObject MODULE_FILE =
+      JavaFileObjects.forSourceLines(
           "test.TestModule",
           "package test;",
           "",
@@ -36,8 +40,8 @@ public class RepeatedModuleValidationTest {
 
   @Test
   public void moduleRepeatedInSubcomponentFactoryMethod() {
-    Source subcomponentFile =
-        CompilerTests.javaSource(
+    JavaFileObject subcomponentFile =
+        JavaFileObjects.forSourceLines(
             "test.TestSubcomponent",
             "package test;",
             "",
@@ -46,8 +50,8 @@ public class RepeatedModuleValidationTest {
             "@Subcomponent(modules = TestModule.class)",
             "interface TestSubcomponent {",
             "}");
-    Source componentFile =
-        CompilerTests.javaSource(
+    JavaFileObject componentFile =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -57,20 +61,20 @@ public class RepeatedModuleValidationTest {
             "interface TestComponent {",
             "  TestSubcomponent newTestSubcomponent(TestModule module);",
             "}");
-    CompilerTests.daggerCompiler(MODULE_FILE, subcomponentFile, componentFile)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(1);
-              subject.hasErrorContaining("TestModule is present in test.TestComponent.")
-                  .onSource(componentFile)
-                  .onLine(7);
-            });
+    Compilation compilation =
+        daggerCompiler().compile(MODULE_FILE, subcomponentFile, componentFile);
+    assertThat(compilation).failed();
+    assertThat(compilation)
+        .hadErrorContaining("TestModule is present in test.TestComponent.")
+        .inFile(componentFile)
+        .onLine(7)
+        .atColumn(51);
   }
 
   @Test
   public void moduleRepeatedInSubcomponentBuilderMethod() {
-    Source subcomponentFile =
-        CompilerTests.javaSource(
+    JavaFileObject subcomponentFile =
+        JavaFileObjects.forSourceLines(
             "test.TestSubcomponent",
             "package test;",
             "",
@@ -84,8 +88,8 @@ public class RepeatedModuleValidationTest {
             "    TestSubcomponent build();",
             "  }",
             "}");
-    Source componentFile =
-        CompilerTests.javaSource(
+    JavaFileObject componentFile =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -95,15 +99,16 @@ public class RepeatedModuleValidationTest {
             "interface TestComponent {",
             "  TestSubcomponent.Builder newTestSubcomponentBuilder();",
             "}");
-    CompilerTests.daggerCompiler(MODULE_FILE, subcomponentFile, componentFile)
-        .compile(subject -> subject.hasErrorCount(0));
+    Compilation compilation =
+        daggerCompiler().compile(MODULE_FILE, subcomponentFile, componentFile);
+    assertThat(compilation).succeeded();
     // TODO(gak): assert about the warning when we have that ability
   }
 
   @Test
   public void moduleRepeatedButNotPassed() {
-    Source subcomponentFile =
-        CompilerTests.javaSource(
+    JavaFileObject subcomponentFile =
+        JavaFileObjects.forSourceLines(
             "test.TestSubcomponent",
             "package test;",
             "",
@@ -112,8 +117,8 @@ public class RepeatedModuleValidationTest {
             "@Subcomponent(modules = TestModule.class)",
             "interface TestSubcomponent {",
             "}");
-    Source componentFile =
-        CompilerTests.javaSource(
+    JavaFileObject componentFile =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -123,7 +128,8 @@ public class RepeatedModuleValidationTest {
             "interface TestComponent {",
             "  TestSubcomponent newTestSubcomponent();",
             "}");
-    CompilerTests.daggerCompiler(MODULE_FILE, subcomponentFile, componentFile)
-        .compile(subject -> subject.hasErrorCount(0));
+    Compilation compilation =
+        daggerCompiler().compile(MODULE_FILE, subcomponentFile, componentFile);
+    assertThat(compilation).succeeded();
   }
 }

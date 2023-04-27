@@ -16,8 +16,14 @@
 
 package dagger.internal.codegen.base;
 
+import static androidx.room.compiler.processing.compat.XConverters.toJavac;
+import static com.google.auto.common.MoreElements.isAnnotationPresent;
+
 import androidx.room.compiler.processing.XElement;
-import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.multibindings.ElementsIntoSet;
+import dagger.multibindings.IntoMap;
+import dagger.multibindings.IntoSet;
+import javax.lang.model.element.Element;
 
 /** Whether a binding or declaration is for a unique contribution or a map or set multibinding. */
 public enum ContributionType {
@@ -45,17 +51,29 @@ public enum ContributionType {
 
   /**
    * The contribution type from a binding element's annotations. Presumes a well-formed binding
-   * element (at most one of @IntoSet, @IntoMap, and @ElementsIntoSet). {@link
+   * element (at most one of @IntoSet, @IntoMap, @ElementsIntoSet and @Provides.type). {@link
    * dagger.internal.codegen.validation.BindingMethodValidator} and {@link
    * dagger.internal.codegen.validation.BindsInstanceProcessingStep} validate correctness on their
    * own.
    */
   public static ContributionType fromBindingElement(XElement element) {
-    if (element.hasAnnotation(TypeNames.INTO_MAP)) {
+    return fromBindingElement(toJavac(element));
+  }
+
+  /**
+   * The contribution type from a binding element's annotations. Presumes a well-formed binding
+   * element (at most one of @IntoSet, @IntoMap, @ElementsIntoSet and @Provides.type). {@link
+   * dagger.internal.codegen.validation.BindingMethodValidator} and {@link
+   * dagger.internal.codegen.validation.BindsInstanceProcessingStep} validate correctness on their
+   * own.
+   */
+  public static ContributionType fromBindingElement(Element element) {
+    // TODO(bcorso): Replace these class references with ClassName.
+    if (isAnnotationPresent(element, IntoMap.class)) {
       return ContributionType.MAP;
-    } else if (element.hasAnnotation(TypeNames.INTO_SET)) {
+    } else if (isAnnotationPresent(element, IntoSet.class)) {
       return ContributionType.SET;
-    } else if (element.hasAnnotation(TypeNames.ELEMENTS_INTO_SET)) {
+    } else if (isAnnotationPresent(element, ElementsIntoSet.class)) {
       return ContributionType.SET_VALUES;
     }
     return ContributionType.UNIQUE;

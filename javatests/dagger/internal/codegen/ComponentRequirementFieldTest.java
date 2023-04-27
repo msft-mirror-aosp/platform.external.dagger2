@@ -16,11 +16,15 @@
 
 package dagger.internal.codegen;
 
-import androidx.room.compiler.processing.util.Source;
-import dagger.testing.compile.CompilerTests;
-import dagger.testing.golden.GoldenFileRule;
+import static com.google.testing.compile.CompilationSubject.assertThat;
+import static dagger.internal.codegen.CompilerMode.DEFAULT_MODE;
+import static dagger.internal.codegen.CompilerMode.FAST_INIT_MODE;
+import static dagger.internal.codegen.Compilers.compilerWithOptions;
+
+import com.google.testing.compile.Compilation;
+import com.google.testing.compile.JavaFileObjects;
 import java.util.Collection;
-import org.junit.Rule;
+import javax.tools.JavaFileObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -33,8 +37,6 @@ public class ComponentRequirementFieldTest {
     return CompilerMode.TEST_PARAMETERS;
   }
 
-  @Rule public GoldenFileRule goldenFileRule = new GoldenFileRule();
-
   private final CompilerMode compilerMode;
 
   public ComponentRequirementFieldTest(CompilerMode compilerMode) {
@@ -42,9 +44,9 @@ public class ComponentRequirementFieldTest {
   }
 
   @Test
-  public void bindsInstance() throws Exception {
-    Source component =
-        CompilerTests.javaSource(
+  public void bindsInstance() {
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -64,19 +66,66 @@ public class ComponentRequirementFieldTest {
             "    TestComponent build();",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(component)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
-            });
+    Compilation compilation =
+        compilerWithOptions(compilerMode.javacopts()).compile(component);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .generatedSourceFile("test.DaggerTestComponent")
+        .containsElementsIn(
+            JavaFileObjects.forSourceLines(
+                "test.DaggerTestComponent",
+                "package test;",
+                "",
+                GeneratedLines.generatedAnnotations(),
+                "final class DaggerTestComponent implements TestComponent {",
+                "  private final Integer i;",
+                "  private final List<String> list;",
+                "",
+                "  private DaggerTestComponent(Integer iParam, List<String> listParam) {",
+                "    this.i = iParam;",
+                "    this.list = listParam;",
+                "  }",
+                "",
+                "  @Override",
+                "  public int i() {",
+                "    return i;",
+                "  }",
+                "",
+                "  @Override",
+                "  public List<String> list() {",
+                "    return list;",
+                "  }",
+                "",
+                "  private static final class Builder implements TestComponent.Builder {",
+                "    private Integer i;",
+                "    private List<String> list;",
+                "",
+                "    @Override",
+                "    public Builder i(int i) {",
+                "      this.i = Preconditions.checkNotNull(i);",
+                "      return this;",
+                "    }",
+                "",
+                "    @Override",
+                "    public Builder list(List<String> list) {",
+                "      this.list = Preconditions.checkNotNull(list);",
+                "      return this;",
+                "    }",
+                "",
+                "    @Override",
+                "    public TestComponent build() {",
+                "      Preconditions.checkBuilderRequirement(i, Integer.class);",
+                "      Preconditions.checkBuilderRequirement(list, List.class);",
+                "      return new DaggerTestComponent(i, list);",
+                "    }",
+                "  }",
+                "}"));
   }
 
   @Test
-  public void instanceModuleMethod() throws Exception {
-    Source module =
-        CompilerTests.javaSource(
+  public void instanceModuleMethod() {
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "test.ParentModule",
             "package test;",
             "",
@@ -87,8 +136,8 @@ public class ComponentRequirementFieldTest {
             "class ParentModule {",
             "  @Provides int i() { return 0; }",
             "}");
-    Source otherPackageModule =
-        CompilerTests.javaSource(
+    JavaFileObject otherPackageModule =
+        JavaFileObjects.forSourceLines(
             "other.OtherPackageModule",
             "package other;",
             "",
@@ -99,8 +148,8 @@ public class ComponentRequirementFieldTest {
             "public class OtherPackageModule {",
             "  @Provides long l() { return 0L; }",
             "}");
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -112,19 +161,42 @@ public class ComponentRequirementFieldTest {
             "  int i();",
             "  long l();",
             "}");
-    CompilerTests.daggerCompiler(module, otherPackageModule, component)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
-            });
+    Compilation compilation =
+        compilerWithOptions(compilerMode.javacopts())
+            .compile(module, otherPackageModule, component);
+    assertThat(compilation).succeeded();
+    JavaFileObject generatedComponent =
+        JavaFileObjects.forSourceLines(
+            "test.DaggerTestComponent",
+            "package test;",
+            "",
+            "import other.OtherPackageModule;",
+            "import other.OtherPackageModule_LFactory;",
+            "",
+            GeneratedLines.generatedAnnotations(),
+            "final class DaggerTestComponent implements TestComponent {",
+            "  private final ParentModule parentModule;",
+            "  private final OtherPackageModule otherPackageModule;",
+            "",
+            "  @Override",
+            "  public int i() {",
+            "    return parentModule.i();",
+            "  }",
+            "",
+            "  @Override",
+            "  public long l() {",
+            "    return OtherPackageModule_LFactory.l(otherPackageModule);",
+            "  }",
+            "}");
+    assertThat(compilation)
+        .generatedSourceFile("test.DaggerTestComponent")
+        .containsElementsIn(generatedComponent);
   }
 
   @Test
-  public void componentInstances() throws Exception {
-    Source dependency =
-        CompilerTests.javaSource(
+  public void componentInstances() {
+    JavaFileObject dependency =
+        JavaFileObjects.forSourceLines(
             "test.Dep",
             "package test;",
             "",
@@ -133,8 +205,8 @@ public class ComponentRequirementFieldTest {
             "  Object object();",
             "}");
 
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -149,9 +221,9 @@ public class ComponentRequirementFieldTest {
             "  String methodOnDep();",
             "  Object otherMethodOnDep();",
             "}");
-    Source subcomponent =
-        CompilerTests.javaSource(
-            "test.TestSubcomponent",
+    JavaFileObject subcomponent =
+        JavaFileObjects.forSourceLines(
+            "test.TestComponent",
             "package test;",
             "",
             "import dagger.Subcomponent;",
@@ -162,19 +234,64 @@ public class ComponentRequirementFieldTest {
             "  Dep depFromSubcomponent();",
             "}");
 
-    CompilerTests.daggerCompiler(dependency, component, subcomponent)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
-            });
+    Compilation compilation =
+        compilerWithOptions(compilerMode.javacopts())
+            .compile(dependency, component, subcomponent);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .generatedSourceFile("test.DaggerTestComponent")
+        .containsElementsIn(
+            JavaFileObjects.forSourceLines(
+                "test.DaggerTestComponent",
+                "package test;",
+                "",
+                GeneratedLines.generatedAnnotations(),
+                "final class DaggerTestComponent implements TestComponent {",
+                "  private final Dep dep;",
+                "",
+                "  private DaggerTestComponent(Dep depParam) {",
+                "    this.dep = depParam;",
+                "  }",
+                "",
+                "  @Override",
+                "  public TestComponent self() {",
+                "    return this;",
+                "  }",
+                "",
+                "  @Override",
+                "  public Dep dep() {",
+                "    return dep;",
+                "  }",
+                "",
+                "  @Override",
+                "  public String methodOnDep() {",
+                "    return Preconditions.checkNotNullFromComponent(",
+                "        dep.string());",
+                "  }",
+                "",
+                "  @Override",
+                "  public Object otherMethodOnDep() {",
+                "    return Preconditions.checkNotNullFromComponent(dep.object());",
+                "  }",
+                "",
+                "  private static final class TestSubcomponentImpl implements TestSubcomponent {",
+                "    @Override",
+                "    public TestComponent parent() {",
+                "      return testComponent;",
+                "    }",
+                "",
+                "    @Override",
+                "    public Dep depFromSubcomponent() {",
+                "      return testComponent.dep;",
+                "    }",
+                "  }",
+                "}"));
   }
 
   @Test
-  public void componentRequirementNeededInFactoryCreationOfSubcomponent() throws Exception {
-    Source parentModule =
-        CompilerTests.javaSource(
+  public void componentRequirementNeededInFactoryCreationOfSubcomponent() {
+    JavaFileObject parentModule =
+        JavaFileObjects.forSourceLines(
             "test.ParentModule",
             "package test;",
             "",
@@ -193,8 +310,8 @@ public class ComponentRequirementFieldTest {
             "  @Provides @IntoSet static Object contribution() { return new Object(); }",
             "}");
 
-    Source childModule =
-        CompilerTests.javaSource(
+    JavaFileObject childModule =
+        JavaFileObjects.forSourceLines(
             "test.ChildModule",
             "package test;",
             "",
@@ -207,8 +324,8 @@ public class ComponentRequirementFieldTest {
             "  @Provides @IntoSet static Object contribution() { return new Object(); }",
             "}");
 
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -221,8 +338,8 @@ public class ComponentRequirementFieldTest {
             "  TestSubcomponent subcomponent();",
             "}");
 
-    Source subcomponent =
-        CompilerTests.javaSource(
+    JavaFileObject subcomponent =
+        JavaFileObjects.forSourceLines(
             "test.TestSubcomponent",
             "package test;",
             "",
@@ -234,12 +351,127 @@ public class ComponentRequirementFieldTest {
             "  Provider<Object> dependsOnMultibinding();",
             "}");
 
-    CompilerTests.daggerCompiler(parentModule, childModule, component, subcomponent)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
-            });
+    Compilation compilation =
+        compilerWithOptions(compilerMode.javacopts())
+            .compile(parentModule, childModule, component, subcomponent);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .generatedSourceFile("test.DaggerTestComponent")
+        .containsElementsIn(
+            compilerMode
+                .javaFileBuilder("test.DaggerSimpleComponent")
+                .addLines(
+                    "package test;",
+                    "",
+                    GeneratedLines.generatedAnnotations(),
+                    "final class DaggerTestComponent implements TestComponent {",
+                    "  private final ParentModule parentModule;",
+                    "",
+                    "  private DaggerTestComponent(ParentModule parentModuleParam) {",
+                    "    this.parentModule = parentModuleParam;",
+                    "    initialize(parentModuleParam);",
+                    "  }")
+                .addLinesIn(
+                    DEFAULT_MODE,
+                    "  @SuppressWarnings(\"unchecked\")",
+                    "  private void initialize(final ParentModule parentModuleParam) {",
+                    "    this.setOfObjectProvider =",
+                    "        SetFactory.<Object>builder(1, 0)",
+                    "            .addProvider(ParentModule_ContributionFactory.create())",
+                    "            .build();",
+                    "    this.reliesOnMultibindingProvider =",
+                    "        ParentModule_ReliesOnMultibindingFactory",
+                    "            .create(parentModuleParam, setOfObjectProvider);",
+                    "  }")
+                .addLinesIn(
+                    FAST_INIT_MODE,
+                    "",
+                    "  private Set<Object> setOfObject() {",
+                    "    return ImmutableSet.<Object>of(",
+                    "        ParentModule_ContributionFactory.contribution());",
+                    "  }",
+                    "",
+                    "  @SuppressWarnings(\"unchecked\")",
+                    "  private void initialize(final ParentModule parentModuleParam) {",
+                    "    this.reliesOnMultibindingProvider =",
+                    "        new SwitchingProvider<>(testComponent, 0);",
+                    "  }")
+                .addLines(
+                    "  @Override",
+                    "  public Provider<Object> dependsOnMultibinding() {",
+                    "    return reliesOnMultibindingProvider;",
+                    "  }",
+                    "",
+                    "  @Override",
+                    "  public TestSubcomponent subcomponent() {",
+                    "    return new TestSubcomponentImpl(testComponent);",
+                    "  }",
+                    "",
+                    "  private static final class TestSubcomponentImpl",
+                    "      implements TestSubcomponent {")
+                .addLinesIn(
+                    DEFAULT_MODE,
+                    "    @SuppressWarnings(\"unchecked\")",
+                    "    private void initialize() {",
+                    "      this.setOfObjectProvider =",
+                    "          SetFactory.<Object>builder(2, 0)",
+                    "              .addProvider(ParentModule_ContributionFactory.create())",
+                    "              .addProvider(ChildModule_ContributionFactory.create())",
+                    "              .build();",
+                    "      this.reliesOnMultibindingProvider =",
+                    "          ParentModule_ReliesOnMultibindingFactory",
+                    "              .create(testComponent.parentModule, setOfObjectProvider);",
+                    "    }")
+                .addLinesIn(
+                    FAST_INIT_MODE,
+                    "    private Set<Object> setOfObject() {",
+                    "      return ImmutableSet.<Object>of(",
+                    "          ParentModule_ContributionFactory.contribution(),",
+                    "          ChildModule_ContributionFactory.contribution());",
+                    "    }",
+                    "",
+                    "    @SuppressWarnings(\"unchecked\")",
+                    "    private void initialize() {",
+                    "      this.reliesOnMultibindingProvider =",
+                    "          new SwitchingProvider<>(testComponent, testSubcomponentImpl, 0);",
+                    "    }")
+                .addLines(
+                    "    @Override",
+                    "    public Provider<Object> dependsOnMultibinding() {",
+                    "      return reliesOnMultibindingProvider;",
+                    "    }")
+                .addLinesIn(
+                    FAST_INIT_MODE,
+                    "    private static final class SwitchingProvider<T> implements Provider<T> {",
+                    "      @SuppressWarnings(\"unchecked\")",
+                    "      @Override",
+                    "      public T get() {",
+                    "        switch (id) {",
+                    "          case 0:",
+                    "          return (T) ParentModule_ReliesOnMultibindingFactory",
+                    "            .reliesOnMultibinding(",
+                    "              testComponent.parentModule,",
+                    "              testSubcomponentImpl.setOfObject());",
+                    "          default: throw new AssertionError(id);",
+                    "        }",
+                    "      }",
+                    "    }",
+                    "  }",
+                    "",
+                    "  private static final class SwitchingProvider<T> implements Provider<T> {",
+                    "    @SuppressWarnings(\"unchecked\")",
+                    "    @Override",
+                    "    public T get() {",
+                    "      switch (id) {",
+                    "        case 0:",
+                    "        return (T) ParentModule_ReliesOnMultibindingFactory",
+                    "          .reliesOnMultibinding(",
+                    "             testComponent.parentModule, testComponent.setOfObject());",
+                    "        default: throw new AssertionError(id);",
+                    "      }",
+                    "    }",
+                    "  }",
+                    "}")
+                .build());
   }
 }
