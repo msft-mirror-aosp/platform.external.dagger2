@@ -67,6 +67,7 @@ java_library(
         "//third_party/java/guava/collect",
         "//third_party/java/javapoet",
         "@maven//:org_jetbrains_kotlin_kotlin_stdlib",
+        "@maven//:org_jetbrains_kotlinx_kotlinx_metadata_jvm",
     ],
 )
 
