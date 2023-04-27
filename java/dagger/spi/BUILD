@@ -74,6 +74,7 @@ gen_maven_artifact(
         "com.squareup:kotlinpoet",
         "javax.inject:javax.inject",
         "org.jetbrains.kotlin:kotlin-stdlib",
+        "org.jetbrains.kotlin:kotlin-stdlib-jdk8",
     ],
     javadoc_root_packages = [
         "dagger.model",
