@@ -17,15 +17,14 @@
 package dagger.internal.codegen;
 
 import static com.google.testing.compile.CompilationSubject.assertThat;
+import static dagger.internal.codegen.CompilerMode.DEFAULT_MODE;
+import static dagger.internal.codegen.CompilerMode.FAST_INIT_MODE;
 import static dagger.internal.codegen.Compilers.compilerWithOptions;
 
-import com.google.common.collect.ImmutableList;
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
-import dagger.testing.golden.GoldenFileRule;
 import java.util.Collection;
 import javax.tools.JavaFileObject;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -35,16 +34,8 @@ import org.junit.runners.Parameterized.Parameters;
 public class OptionalBindingRequestFulfillmentTest {
   @Parameters(name = "{0}")
   public static Collection<Object[]> parameters() {
-    return ImmutableList.copyOf(
-        new Object[][] {
-            {CompilerMode.DEFAULT_MODE},
-            {CompilerMode.DEFAULT_JAVA7_MODE},
-            {CompilerMode.FAST_INIT_MODE},
-            {CompilerMode.FAST_INIT_JAVA7_MODE}
-        });
+    return CompilerMode.TEST_PARAMETERS;
   }
-
-  @Rule public GoldenFileRule goldenFileRule = new GoldenFileRule();
 
   private final CompilerMode compilerMode;
 
@@ -53,7 +44,7 @@ public class OptionalBindingRequestFulfillmentTest {
   }
 
   @Test
-  public void inlinedOptionalBindings() throws Exception {
+  public void inlinedOptionalBindings() {
     JavaFileObject module =
         JavaFileObjects.forSourceLines(
             "test.TestModule",
@@ -110,17 +101,86 @@ public class OptionalBindingRequestFulfillmentTest {
             "  Optional<Provider<Lazy<DefinitelyNot>>> providerOfLazyOfDefinitelyNot();",
             "}");
 
+    JavaFileObject generatedComponent =
+        compilerMode
+            .javaFileBuilder("test.DaggerTestComponent")
+            .addLines(
+                "package test;",
+                "",
+                GeneratedLines.generatedAnnotations(),
+                "final class DaggerTestComponent implements TestComponent {")
+            .addLinesIn(
+                FAST_INIT_MODE,
+                "  private Provider<Maybe> provideMaybeProvider;",
+                "",
+                "  @SuppressWarnings(\"unchecked\")",
+                "  private void initialize() {",
+                "    this.provideMaybeProvider = new SwitchingProvider<>(testComponent, 0);",
+                "  }")
+            .addLinesIn(
+                DEFAULT_MODE,
+                "  @Override",
+                "  public Optional<Maybe> maybe() {",
+                "    return Optional.of(Maybe_MaybeModule_ProvideMaybeFactory.provideMaybe());",
+                "  }")
+            .addLinesIn(
+                FAST_INIT_MODE,
+                "  @Override",
+                "  public Optional<Maybe> maybe() {",
+                "    return Optional.of(provideMaybeProvider.get());",
+                "  }")
+            .addLinesIn(
+                DEFAULT_MODE,
+                "  @Override",
+                "  public Optional<Provider<Lazy<Maybe>>> providerOfLazyOfMaybe() {",
+                "    return Optional.of(ProviderOfLazy.create(",
+                "        Maybe_MaybeModule_ProvideMaybeFactory.create()));",
+                "  }")
+            .addLinesIn(
+                FAST_INIT_MODE,
+                "  @Override",
+                "  public Optional<Provider<Lazy<Maybe>>> providerOfLazyOfMaybe() {",
+                "    return Optional.of(ProviderOfLazy.create(provideMaybeProvider));",
+                "  }")
+            .addLines(
+                "  @Override",
+                "  public Optional<DefinitelyNot> definitelyNot() {",
+                "    return Optional.<DefinitelyNot>absent();",
+                "  }",
+                "",
+                "  @Override",
+                "  public Optional<Provider<Lazy<DefinitelyNot>>>",
+                "      providerOfLazyOfDefinitelyNot() {",
+                "    return Optional.<Provider<Lazy<DefinitelyNot>>>absent();",
+                "  }")
+            .addLinesIn(
+                FAST_INIT_MODE,
+                "  private static final class SwitchingProvider<T> implements Provider<T> {",
+                "    @SuppressWarnings(\"unchecked\")",
+                "    @Override",
+                "    public T get() {",
+                "      switch (id) {",
+                "        case 0: return (T) Maybe_MaybeModule_ProvideMaybeFactory.provideMaybe();",
+                "        default: throw new AssertionError(id);",
+                "      }",
+                "    }",
+                "  }",
+                "}")
+            .build();
     Compilation compilation =
-        compilerWithOptions(compilerMode)
+        compilerWithOptions(
+                compilerMode
+                , CompilerMode.JAVA7
+                )
             .compile(module, maybe, definitelyNot, component);
     assertThat(compilation).succeeded();
     assertThat(compilation)
         .generatedSourceFile("test.DaggerTestComponent")
-        .hasSourceEquivalentTo(goldenFileRule.goldenFile("test.DaggerTestComponent"));
+        .containsElementsIn(generatedComponent);
   }
 
   @Test
-  public void requestForFuture() throws Exception {
+  public void requestForFuture() {
     JavaFileObject module =
         JavaFileObjects.forSourceLines(
             "test.TestModule",
@@ -174,12 +234,40 @@ public class OptionalBindingRequestFulfillmentTest {
             "  ListenableFuture<Optional<Maybe>> maybe();",
             "  ListenableFuture<Optional<DefinitelyNot>> definitelyNot();",
             "}");
+    JavaFileObject generatedComponent =
+        JavaFileObjects.forSourceLines(
+            "test.DaggerTestComponent",
+            "package test;",
+            "",
+            "import com.google.common.base.Optional;",
+            "import dagger.producers.internal.CancellationListener;",
+            "",
+            GeneratedLines.generatedAnnotations(),
+            "final class DaggerTestComponent implements TestComponent, CancellationListener {",
+            "  @Override",
+            "  public ListenableFuture<Optional<Maybe>> maybe() {",
+            "    return Futures.immediateFuture(",
+            "        Optional.of(Maybe_MaybeModule_ProvideMaybeFactory.provideMaybe()));",
+            "  }",
+            "",
+            "  @Override",
+            "  public ListenableFuture<Optional<DefinitelyNot>> definitelyNot() {",
+            "    return Futures.immediateFuture(Optional.<DefinitelyNot>absent());",
+            "  }",
+            "",
+            "  @Override",
+            "  public void onProducerFutureCancelled(boolean mayInterruptIfRunning) {}",
+            "}");
 
     Compilation compilation =
-        compilerWithOptions(compilerMode).compile(module, maybe, definitelyNot, component);
+        compilerWithOptions(
+                compilerMode
+                , CompilerMode.JAVA7
+                )
+            .compile(module, maybe, definitelyNot, component);
     assertThat(compilation).succeeded();
     assertThat(compilation)
         .generatedSourceFile("test.DaggerTestComponent")
-        .hasSourceEquivalentTo(goldenFileRule.goldenFile("test.DaggerTestComponent"));
+        .containsElementsIn(generatedComponent);
   }
 }

@@ -17,26 +17,29 @@
 package dagger.internal.codegen.base;
 
 import static androidx.room.compiler.processing.JavaPoetExtKt.addOriginatingElement;
+import static androidx.room.compiler.processing.compat.XConverters.toJavac;
+import static com.google.auto.common.GeneratedAnnotations.generatedAnnotation;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static dagger.internal.codegen.javapoet.AnnotationSpecs.Suppression.KOTLIN_INTERNAL;
 import static dagger.internal.codegen.javapoet.AnnotationSpecs.Suppression.RAWTYPES;
 import static dagger.internal.codegen.javapoet.AnnotationSpecs.Suppression.UNCHECKED;
-import static dagger.internal.codegen.xprocessing.XElements.closestEnclosingTypeElement;
 
 import androidx.room.compiler.processing.XElement;
 import androidx.room.compiler.processing.XFiler;
 import androidx.room.compiler.processing.XMessager;
-import androidx.room.compiler.processing.XProcessingEnv;
+import androidx.room.compiler.processing.compat.XConverters;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.squareup.javapoet.AnnotationSpec;
+import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.TypeSpec;
 import dagger.internal.DaggerGenerated;
 import dagger.internal.codegen.javapoet.AnnotationSpecs;
 import dagger.internal.codegen.javapoet.AnnotationSpecs.Suppression;
+import dagger.internal.codegen.langmodel.DaggerElements;
 import java.util.Optional;
+import javax.lang.model.SourceVersion;
 
 /**
  * A template class that provides a framework for properly handling IO while generating source files
@@ -49,15 +52,17 @@ public abstract class SourceFileGenerator<T> {
   private static final String GENERATED_COMMENTS = "https://dagger.dev";
 
   private final XFiler filer;
-  private final XProcessingEnv processingEnv;
+  private final DaggerElements elements;
+  private final SourceVersion sourceVersion;
 
-  public SourceFileGenerator(XFiler filer, XProcessingEnv processingEnv) {
+  public SourceFileGenerator(XFiler filer, DaggerElements elements, SourceVersion sourceVersion) {
     this.filer = checkNotNull(filer);
-    this.processingEnv = checkNotNull(processingEnv);
+    this.elements = checkNotNull(elements);
+    this.sourceVersion = checkNotNull(sourceVersion);
   }
 
   public SourceFileGenerator(SourceFileGenerator<T> delegate) {
-    this(delegate.filer, delegate.processingEnv);
+    this(delegate.filer, delegate.elements, delegate.sourceVersion);
   }
 
   /**
@@ -76,8 +81,8 @@ public abstract class SourceFileGenerator<T> {
   public void generate(T input) throws SourceFileGenerationException {
     for (TypeSpec.Builder type : topLevelTypes(input)) {
       try {
-        filer.write(buildJavaFile(input, type), XFiler.Mode.Isolating);
-      } catch (RuntimeException e) {
+        buildJavaFile(input, type).writeTo(XConverters.toJavac(filer));
+      } catch (Exception e) {
         // if the code above threw a SFGE, use that
         Throwables.propagateIfPossible(e, SourceFileGenerationException.class);
         // otherwise, throw a new one
@@ -87,31 +92,34 @@ public abstract class SourceFileGenerator<T> {
   }
 
   private JavaFile buildJavaFile(T input, TypeSpec.Builder typeSpecBuilder) {
-    XElement originatingElement = originatingElement(input);
-    addOriginatingElement(typeSpecBuilder, originatingElement);
+    addOriginatingElement(typeSpecBuilder, originatingElement(input));
     typeSpecBuilder.addAnnotation(DaggerGenerated.class);
     Optional<AnnotationSpec> generatedAnnotation =
-        Optional.ofNullable(processingEnv.findGeneratedAnnotation())
+        generatedAnnotation(elements, sourceVersion)
             .map(
                 annotation ->
-                    AnnotationSpec.builder(annotation.getClassName())
+                    AnnotationSpec.builder(ClassName.get(annotation))
                         .addMember("value", "$S", "dagger.internal.codegen.ComponentProcessor")
                         .addMember("comments", "$S", GENERATED_COMMENTS)
                         .build());
     generatedAnnotation.ifPresent(typeSpecBuilder::addAnnotation);
 
-    // TODO(b/134590785): Remove UNCHECKED/RAWTYPES and suppress locally where necessary.
-    // TODO(b/263891456): Remove KOTLIN_INTERNAL and use Object/raw types where necessary.
+    // TODO(b/134590785): remove this and only suppress annotations locally, if necessary
     typeSpecBuilder.addAnnotation(
         AnnotationSpecs.suppressWarnings(
             ImmutableSet.<Suppression>builder()
                 .addAll(warningSuppressions())
-                .add(UNCHECKED, RAWTYPES, KOTLIN_INTERNAL)
+                .add(UNCHECKED, RAWTYPES)
                 .build()));
 
-    String packageName = closestEnclosingTypeElement(originatingElement).getPackageName();
     JavaFile.Builder javaFileBuilder =
-        JavaFile.builder(packageName, typeSpecBuilder.build()).skipJavaLangImports(true);
+        JavaFile.builder(
+                elements
+                    .getPackageOf(toJavac(originatingElement(input)))
+                    .getQualifiedName()
+                    .toString(),
+                typeSpecBuilder.build())
+            .skipJavaLangImports(true);
     if (!generatedAnnotation.isPresent()) {
       javaFileBuilder.addFileComment("Generated by Dagger ($L).", GENERATED_COMMENTS);
     }

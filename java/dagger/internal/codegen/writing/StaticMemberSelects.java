@@ -16,6 +16,7 @@
 
 package dagger.internal.codegen.writing;
 
+import static androidx.room.compiler.processing.compat.XConverters.toJavac;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static dagger.internal.codegen.binding.SourceFiles.bindingTypeElementTypeVariableNames;
@@ -28,9 +29,9 @@ import static dagger.internal.codegen.javapoet.TypeNames.PRODUCER;
 import static dagger.internal.codegen.javapoet.TypeNames.PRODUCERS;
 import static dagger.internal.codegen.javapoet.TypeNames.PROVIDER;
 import static dagger.internal.codegen.langmodel.Accessibility.isTypeAccessibleFrom;
-import static dagger.internal.codegen.xprocessing.XTypes.isDeclared;
+import static javax.lang.model.type.TypeKind.DECLARED;
 
-import androidx.room.compiler.processing.XType;
+import com.google.auto.common.MoreTypes;
 import com.google.common.collect.ImmutableList;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
@@ -40,19 +41,23 @@ import dagger.internal.codegen.binding.Binding;
 import dagger.internal.codegen.binding.BindingType;
 import dagger.internal.codegen.binding.ContributionBinding;
 import dagger.internal.codegen.javapoet.CodeBlocks;
+import java.util.List;
+import javax.lang.model.type.TypeMirror;
 
 /** Helper class for static member select creation. */
 final class StaticMemberSelects {
   /** A {@link MemberSelect} for a factory of an empty map. */
   static MemberSelect emptyMapFactory(Binding binding) {
     BindingType bindingType = binding.bindingType();
-    ImmutableList<XType> typeParameters =
-        ImmutableList.copyOf(binding.key().type().xprocessing().getTypeArguments());
-    return bindingType.equals(BindingType.PRODUCTION)
-        ? new ParameterizedStaticMethod(
-            PRODUCERS, typeParameters, CodeBlock.of("emptyMapProducer()"), PRODUCER)
-        : new ParameterizedStaticMethod(
-            MAP_FACTORY, typeParameters, CodeBlock.of("emptyMapProvider()"), PROVIDER);
+    ImmutableList<TypeMirror> typeParameters =
+        ImmutableList.copyOf(MoreTypes.asDeclared(binding.key().type().java()).getTypeArguments());
+    if (bindingType.equals(BindingType.PRODUCTION)) {
+      return new ParameterizedStaticMethod(
+          PRODUCERS, typeParameters, CodeBlock.of("emptyMapProducer()"), PRODUCER);
+    } else {
+      return new ParameterizedStaticMethod(
+          MAP_FACTORY, typeParameters, CodeBlock.of("emptyMapProvider()"), PROVIDER);
+    }
   }
 
   /**
@@ -63,7 +68,7 @@ final class StaticMemberSelects {
   static MemberSelect emptySetFactory(ContributionBinding binding) {
     return new ParameterizedStaticMethod(
         setFactoryClassName(binding),
-        ImmutableList.of(SetType.from(binding.key()).elementType()),
+        ImmutableList.of(toJavac(SetType.from(binding.key()).elementType())),
         CodeBlock.of("empty()"),
         FACTORY);
   }
@@ -83,13 +88,13 @@ final class StaticMemberSelects {
         binding);
 
     ClassName factoryName = generatedClassNameForBinding(binding);
-    XType keyType = binding.key().type().xprocessing();
-    if (isDeclared(keyType)) {
+    TypeMirror keyType = binding.key().type().java();
+    if (keyType.getKind().equals(DECLARED)) {
       ImmutableList<TypeVariableName> typeVariables = bindingTypeElementTypeVariableNames(binding);
       if (!typeVariables.isEmpty()) {
-        ImmutableList<XType> typeArguments = ImmutableList.copyOf(keyType.getTypeArguments());
+        List<? extends TypeMirror> typeArguments = MoreTypes.asDeclared(keyType).getTypeArguments();
         return new ParameterizedStaticMethod(
-            factoryName, typeArguments, CodeBlock.of("create()"), FACTORY);
+            factoryName, ImmutableList.copyOf(typeArguments), CodeBlock.of("create()"), FACTORY);
       }
     }
     return new StaticMethod(factoryName, CodeBlock.of("create()"));
@@ -112,13 +117,13 @@ final class StaticMemberSelects {
   }
 
   private static final class ParameterizedStaticMethod extends MemberSelect {
-    private final ImmutableList<XType> typeParameters;
+    private final ImmutableList<TypeMirror> typeParameters;
     private final CodeBlock methodCodeBlock;
     private final ClassName rawReturnType;
 
     ParameterizedStaticMethod(
         ClassName owningClass,
-        ImmutableList<XType> typeParameters,
+        ImmutableList<TypeMirror> typeParameters,
         CodeBlock methodCodeBlock,
         ClassName rawReturnType) {
       super(owningClass, true);
@@ -129,10 +134,12 @@ final class StaticMemberSelects {
 
     @Override
     CodeBlock getExpressionFor(ClassName usingClass) {
-      boolean isAccessible =
-          typeParameters.stream().allMatch(t -> isTypeAccessibleFrom(t, usingClass.packageName()));
+      boolean accessible = true;
+      for (TypeMirror typeParameter : typeParameters) {
+        accessible &= isTypeAccessibleFrom(typeParameter, usingClass.packageName());
+      }
 
-      if (isAccessible) {
+      if (accessible) {
         return CodeBlock.of(
             "$T.<$L>$L",
             owningClass(),

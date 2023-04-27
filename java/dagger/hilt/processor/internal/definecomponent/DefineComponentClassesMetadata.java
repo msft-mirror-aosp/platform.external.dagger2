@@ -47,7 +47,7 @@ public abstract class DefineComponentClassesMetadata {
    * Returns the element annotated with {@code dagger.hilt.internal.definecomponent.DefineComponent}
    * or {@code dagger.hilt.internal.definecomponent.DefineComponent.Builder}.
    */
-  public abstract TypeElement element();
+  abstract TypeElement element();
 
   /** Returns {@code true} if this element represents a component. */
   abstract boolean isComponent();
@@ -112,6 +112,6 @@ public abstract class DefineComponentClassesMetadata {
   public static DefineComponentClassesIr toIr(DefineComponentClassesMetadata metadata) {
     return new DefineComponentClassesIr(
         ClassName.get(metadata.aggregatingElement()),
-        ClassName.get(metadata.element()).canonicalName());
+        ClassName.get(metadata.element()));
   }
 }

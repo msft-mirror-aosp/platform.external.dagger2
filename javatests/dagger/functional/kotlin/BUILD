@@ -21,37 +21,32 @@ load("//:test_defs.bzl", "GenJavaTests")
 
 package(default_visibility = ["//:src"])
 
-GenJavaTests(
-    name = "PropertyQualifierTest",
-    srcs = ["PropertyQualifierTest.java"],
-    functional = True,
-    test_only_deps = [
-        "//third_party/java/guava/base",
-        "//third_party/java/guava/collect",
-        "//third_party/java/junit",
-        "//third_party/java/truth",
-    ],
-    deps = [
-        ":FooWithInjectedQualifier",
-        ":PropertyQualifierClasses",
-    ],
-)
-
 kt_jvm_library(
-    name = "PropertyQualifierClasses",
-    srcs = ["PropertyQualifierClasses.kt"],
+    name = "kotlin",
+    srcs = glob(
+        [
+            "*.java",
+            "*.kt",
+        ],
+        exclude = [
+            "*Test.java",
+            "JavaTestQualifier.java",
+            "FooWithInjectedQualifier.kt",
+        ],
+    ),
     # TODO(danysantiago): Remove 'plugins' once kt_jvm_library supports 'exported_plugins'.
     plugins = ["//javatests/dagger/functional/kotlin/processor:plugin"],
     deps = [
-        ":FooWithInjectedQualifier",
+        ":foo_with_injected_qualifier",
         ":java_qualifier",
         "//:dagger_with_compiler",
         "//javatests/dagger/functional/kotlin/processor:annotation",
+        "//third_party/java/auto:factory",
     ],
 )
 
 kt_jvm_library(
-    name = "FooWithInjectedQualifier",
+    name = "foo_with_injected_qualifier",
     srcs = ["FooWithInjectedQualifier.kt"],
     deps = [
         ":java_qualifier",
@@ -61,18 +56,15 @@ kt_jvm_library(
 
 java_library(
     name = "java_qualifier",
-    srcs = [
-        "JavaTestQualifier.java",
-        "JavaTestQualifierWithTarget.java",
-    ],
+    srcs = ["JavaTestQualifier.java"],
     deps = [
         "//:dagger_with_compiler",
     ],
 )
 
 GenJavaTests(
-    name = "ObjectModuleTest",
-    srcs = ["ObjectModuleTest.java"],
+    name = "kotlin_tests",
+    srcs = glob(["*Test.java"]),
     functional = True,
     test_only_deps = [
         "//third_party/java/guava/base",
@@ -81,70 +73,8 @@ GenJavaTests(
         "//third_party/java/truth",
     ],
     deps = [
-        ":ObjectModuleClasses",
-    ],
-)
-
-kt_jvm_library(
-    name = "ObjectModuleClasses",
-    srcs = [
-        "ObjectModuleClasses.kt",
-        "PublicModuleWithNonPublicInclude.java",
-    ],
-    # TODO(danysantiago): Remove 'plugins' once kt_jvm_library supports 'exported_plugins'.
-    plugins = ["//javatests/dagger/functional/kotlin/processor:plugin"],
-    deps = [
-        "//:dagger_with_compiler",
-    ],
-)
-
-GenJavaTests(
-    name = "DependsOnGeneratedCodeTest",
-    srcs = ["DependsOnGeneratedCodeTest.java"],
-    functional = True,
-    test_only_deps = [
-        "//third_party/java/guava/base",
-        "//third_party/java/guava/collect",
-        "//third_party/java/junit",
-        "//third_party/java/truth",
-    ],
-    deps = [
-        ":DependsOnGeneratedCodeClasses",
-    ],
-)
-
-kt_jvm_library(
-    name = "DependsOnGeneratedCodeClasses",
-    srcs = ["DependsOnGeneratedCodeClasses.kt"],
-    # TODO(danysantiago): Remove 'plugins' once kt_jvm_library supports 'exported_plugins'.
-    plugins = ["//javatests/dagger/functional/kotlin/processor:plugin"],
-    deps = [
-        "//:dagger_with_compiler",
-        "//third_party/java/auto:factory",
-    ],
-)
-
-GenJavaTests(
-    name = "CompanionModuleTest",
-    srcs = ["CompanionModuleTest.java"],
-    functional = True,
-    test_only_deps = [
-        "//third_party/java/guava/base",
-        "//third_party/java/guava/collect",
-        "//third_party/java/junit",
-        "//third_party/java/truth",
-    ],
-    deps = [
-        ":CompanionModuleClasses",
-    ],
-)
-
-kt_jvm_library(
-    name = "CompanionModuleClasses",
-    srcs = ["CompanionModuleClasses.kt"],
-    # TODO(danysantiago): Remove 'plugins' once kt_jvm_library supports 'exported_plugins'.
-    plugins = ["//javatests/dagger/functional/kotlin/processor:plugin"],
-    deps = [
+        ":foo_with_injected_qualifier",
+        ":kotlin",
         "//:dagger_with_compiler",
     ],
 )

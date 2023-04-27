@@ -26,18 +26,18 @@ import com.squareup.javapoet.ClassName
  */
 data class AggregatedDepsIr(
   val fqName: ClassName,
-  val components: List<String>,
-  val test: String?,
-  val replaces: List<String>,
-  val module: String?,
-  val entryPoint: String?,
-  val componentEntryPoint: String?,
+  val components: List<ClassName>,
+  val test: ClassName?,
+  val replaces: List<ClassName>,
+  val module: ClassName?,
+  val entryPoint: ClassName?,
+  val componentEntryPoint: ClassName?,
 )
 
 /** Represents [dagger.hilt.android.internal.earlyentrypoint.AggregatedEarlyEntryPoint] */
 data class AggregatedEarlyEntryPointIr(
   val fqName: ClassName,
-  val earlyEntryPoint: String,
+  val earlyEntryPoint: ClassName,
 )
 
 /** Represents [dagger.hilt.android.internal.legacy.AggregatedElementProxy] */
@@ -53,7 +53,7 @@ data class AggregatedRootIr(
   val originatingRoot: ClassName,
   val rootAnnotation: ClassName,
   // External property from the annotation that indicates if root can use a shared component.
-  val allowsSharingComponent: Boolean = true,
+  val allowsSharingComponent: Boolean = true
 ) {
   // Equivalent to RootType.isTestRoot()
   val isTestRoot = TEST_ROOT_ANNOTATIONS.contains(rootAnnotation.toString())
@@ -70,8 +70,8 @@ data class AggregatedRootIr(
 /** Represents [dagger.hilt.android.internal.uninstallmodules.AggregatedUninstallModules] */
 data class AggregatedUninstallModulesIr(
   val fqName: ClassName,
-  val test: String,
-  val uninstallModules: List<String>
+  val test: ClassName,
+  val uninstallModules: List<ClassName>
 )
 
 /** Represents [dagger.hilt.internal.aliasof.AliasOfPropagatedData] */
@@ -95,8 +95,8 @@ data class ComponentTreeDepsIr(
 /** Represents [dagger.hilt.internal.definecomponent.DefineComponentClasses] */
 data class DefineComponentClassesIr(
   val fqName: ClassName,
-  val component: String,
+  val component: ClassName,
 )
 
 /** Represents [dagger.hilt.internal.processedrootsentinel.ProcessedRootSentinel] */
-data class ProcessedRootSentinelIr(val fqName: ClassName, val roots: List<String>)
+data class ProcessedRootSentinelIr(val fqName: ClassName, val roots: List<ClassName>)

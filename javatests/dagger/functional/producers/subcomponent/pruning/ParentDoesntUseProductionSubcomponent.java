@@ -33,7 +33,7 @@ import javax.inject.Qualifier;
 @ProductionComponent(
   modules = {
     ParentDoesntUseProductionSubcomponent.ParentModule.class,
-    dagger.functional.producers.subcomponent.ExecutorModule.class
+    dagger.functional.producers.ExecutorModule.class
   }
 )
 interface ParentDoesntUseProductionSubcomponent {

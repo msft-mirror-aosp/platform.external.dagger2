@@ -16,8 +16,6 @@
 
 package dagger.internal.codegen.validation;
 
-import static androidx.room.compiler.processing.XElementKt.isTypeElement;
-import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Predicates.equalTo;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.Iterables.filter;
@@ -30,17 +28,14 @@ import static dagger.internal.codegen.extension.DaggerStreams.instancesOf;
 import static dagger.internal.codegen.extension.DaggerStreams.presentValues;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
-import static dagger.internal.codegen.xprocessing.XElements.asExecutable;
-import static dagger.internal.codegen.xprocessing.XElements.asTypeElement;
-import static dagger.internal.codegen.xprocessing.XElements.closestEnclosingTypeElement;
-import static dagger.internal.codegen.xprocessing.XElements.isExecutable;
+import static dagger.internal.codegen.langmodel.DaggerElements.DECLARATION_ORDER;
+import static dagger.internal.codegen.langmodel.DaggerElements.closestEnclosingTypeElement;
 import static java.util.Collections.min;
 import static java.util.Comparator.comparing;
 import static java.util.Comparator.comparingInt;
 
-import androidx.room.compiler.processing.XElement;
-import androidx.room.compiler.processing.XType;
-import androidx.room.compiler.processing.XTypeElement;
+import com.google.auto.common.MoreElements;
+import com.google.auto.common.MoreTypes;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -52,6 +47,7 @@ import com.google.common.collect.Table;
 import dagger.internal.codegen.base.ElementFormatter;
 import dagger.internal.codegen.base.Formatter;
 import dagger.internal.codegen.binding.DependencyRequestFormatter;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.spi.model.Binding;
 import dagger.spi.model.BindingGraph;
 import dagger.spi.model.BindingGraph.DependencyEdge;
@@ -61,30 +57,35 @@ import dagger.spi.model.BindingGraph.Node;
 import dagger.spi.model.ComponentPath;
 import dagger.spi.model.DaggerElement;
 import java.util.Comparator;
-import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 import javax.inject.Inject;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.TypeElement;
 
 /** Helper class for generating diagnostic messages. */
 public final class DiagnosticMessageGenerator {
 
   /** Injectable factory for {@code DiagnosticMessageGenerator}. */
   public static final class Factory {
+    private final DaggerTypes types;
     private final DependencyRequestFormatter dependencyRequestFormatter;
     private final ElementFormatter elementFormatter;
 
     @Inject
     Factory(
+        DaggerTypes types,
         DependencyRequestFormatter dependencyRequestFormatter,
         ElementFormatter elementFormatter) {
+      this.types = types;
       this.dependencyRequestFormatter = dependencyRequestFormatter;
       this.elementFormatter = elementFormatter;
     }
 
     /** Creates a {@code DiagnosticMessageGenerator} for the given binding graph. */
     public DiagnosticMessageGenerator create(BindingGraph graph) {
-      return new DiagnosticMessageGenerator(graph, dependencyRequestFormatter, elementFormatter);
+      return new DiagnosticMessageGenerator(
+          graph, types, dependencyRequestFormatter, elementFormatter);
     }
   }
 
@@ -93,7 +94,7 @@ public final class DiagnosticMessageGenerator {
   private final ElementFormatter elementFormatter;
 
   /** A cached function from type to all of its supertypes in breadth-first order. */
-  private final Function<XTypeElement, Iterable<XTypeElement>> supertypes;
+  private final Function<TypeElement, Iterable<TypeElement>> supertypes;
 
   /** The shortest path (value) from an entry point (column) to a binding (row). */
   private final Table<MaybeBinding, DependencyEdge, ImmutableList<Node>> shortestPaths =
@@ -121,13 +122,15 @@ public final class DiagnosticMessageGenerator {
 
   private DiagnosticMessageGenerator(
       BindingGraph graph,
+      DaggerTypes types,
       DependencyRequestFormatter dependencyRequestFormatter,
       ElementFormatter elementFormatter) {
     this.graph = graph;
     this.dependencyRequestFormatter = dependencyRequestFormatter;
     this.elementFormatter = elementFormatter;
     supertypes =
-        memoize(component -> transform(component.getType().getSuperTypes(), XType::getTypeElement));
+        memoize(
+            component -> transform(types.supertypes(component.asType()), MoreTypes::asTypeElement));
   }
 
   public String getMessage(MaybeBinding binding) {
@@ -187,7 +190,7 @@ public final class DiagnosticMessageGenerator {
       ImmutableSet<DependencyEdge> entryPoints) {
     StringBuilder message = new StringBuilder();
     // Print any dependency requests that aren't shown as part of the dependency trace.
-    ImmutableSet<XElement> requestsToPrint =
+    ImmutableSet<Element> requestsToPrint =
         requests.stream()
             // if printing entry points, skip entry points and the traced request
             .filter(
@@ -196,7 +199,7 @@ public final class DiagnosticMessageGenerator {
                         || (!request.isEntryPoint() && !isTracedRequest(dependencyTrace, request)))
             .map(request -> request.dependencyRequest().requestElement())
             .flatMap(presentValues())
-            .map(DaggerElement::xprocessing)
+            .map(DaggerElement::java)
             .collect(toImmutableSet());
     if (!requestsToPrint.isEmpty()) {
       message
@@ -237,19 +240,17 @@ public final class DiagnosticMessageGenerator {
       new Formatter<DependencyEdge>() {
         @Override
         public String format(DependencyEdge object) {
-          XElement requestElement = object.dependencyRequest().requestElement().get().xprocessing();
-          StringBuilder builder = new StringBuilder(elementToString(requestElement));
+          Element requestElement = object.dependencyRequest().requestElement().get().java();
+          StringBuilder element = new StringBuilder(elementToString(requestElement));
 
           // For entry points declared in subcomponents or supertypes of the root component,
           // append the component path to make clear to the user which component it's in.
           ComponentPath componentPath = source(object).componentPath();
           if (!componentPath.atRoot()
-              || !requestElement
-                  .getEnclosingElement()
-                  .equals(componentPath.rootComponent().xprocessing())) {
-            builder.append(String.format(" [%s]", componentPath));
+              || !requestElement.getEnclosingElement().equals(componentPath.rootComponent().java())) {
+            element.append(String.format(" [%s]", componentPath));
           }
-          return builder.toString();
+          return element.toString();
         }
       };
 
@@ -321,7 +322,7 @@ public final class DiagnosticMessageGenerator {
    * Returns a comparator that sorts entry points in components whose paths from the root are
    * shorter first.
    */
-  private Comparator<DependencyEdge> rootComponentFirst() {
+  Comparator<DependencyEdge> rootComponentFirst() {
     return comparingInt(entryPoint -> source(entryPoint).componentPath().components().size());
   }
 
@@ -329,12 +330,11 @@ public final class DiagnosticMessageGenerator {
    * Returns a comparator that puts entry points whose shortest dependency path to {@code binding}
    * is shortest first.
    */
-  private Comparator<DependencyEdge> shortestDependencyPathFirst(MaybeBinding binding) {
+  Comparator<DependencyEdge> shortestDependencyPathFirst(MaybeBinding binding) {
     return comparing(entryPoint -> shortestPathFromEntryPoint(entryPoint, binding).size());
   }
 
-  private ImmutableList<Node> shortestPathFromEntryPoint(
-      DependencyEdge entryPoint, MaybeBinding binding) {
+  ImmutableList<Node> shortestPathFromEntryPoint(DependencyEdge entryPoint, MaybeBinding binding) {
     return shortestPaths
         .row(binding)
         .computeIfAbsent(
@@ -355,7 +355,7 @@ public final class DiagnosticMessageGenerator {
    * declared in a direct supertype, which would sort before one declared in a supertype of a
    * supertype.
    */
-  private Comparator<DependencyEdge> nearestComponentSupertypeFirst() {
+  Comparator<DependencyEdge> nearestComponentSupertypeFirst() {
     return comparingInt(
         entryPoint ->
             indexOf(
@@ -363,25 +363,25 @@ public final class DiagnosticMessageGenerator {
                 equalTo(typeDeclaringEntryPoint(entryPoint))));
   }
 
-  private XTypeElement componentContainingEntryPoint(DependencyEdge entryPoint) {
-    return source(entryPoint).componentPath().currentComponent().xprocessing();
+  TypeElement componentContainingEntryPoint(DependencyEdge entryPoint) {
+    return source(entryPoint).componentPath().currentComponent().java();
   }
 
-  private XTypeElement typeDeclaringEntryPoint(DependencyEdge entryPoint) {
-    return asTypeElement(
-        entryPoint.dependencyRequest().requestElement().get().xprocessing().getEnclosingElement());
+  TypeElement typeDeclaringEntryPoint(DependencyEdge entryPoint) {
+    return MoreElements.asType(
+        entryPoint.dependencyRequest().requestElement().get().java().getEnclosingElement());
   }
 
   /**
    * Returns a comparator that sorts dependency edges lexicographically by the qualified name of the
    * type that contains them. Only appropriate for edges with request elements.
    */
-  private Comparator<DependencyEdge> requestEnclosingTypeName() {
+  Comparator<DependencyEdge> requestEnclosingTypeName() {
     return comparing(
         edge ->
-            closestEnclosingTypeElement(
-                    edge.dependencyRequest().requestElement().get().xprocessing())
-                .getQualifiedName());
+            closestEnclosingTypeElement(edge.dependencyRequest().requestElement().get().java())
+                .getQualifiedName()
+                .toString());
   }
 
   /**
@@ -390,25 +390,9 @@ public final class DiagnosticMessageGenerator {
    *
    * <p>Only useful to compare edges whose request elements were declared in the same type.
    */
-  private Comparator<DependencyEdge> requestElementDeclarationOrder() {
+  Comparator<DependencyEdge> requestElementDeclarationOrder() {
     return comparing(
-        edge -> edge.dependencyRequest().requestElement().get().xprocessing(),
-        // TODO(bcorso): This is inefficient as it requires each element to iterate through all of
-        // its siblings to find its order. Ideally, the order of all elements would be calculated in
-        // a single pass and cached, but the organization of the current code makes that a bit
-        // difficult. I'm leaving this for now since this is only called on failures.
-        comparing(
-            element -> {
-              XElement enclosingElement = element.getEnclosingElement();
-              checkState(isTypeElement(enclosingElement) || isExecutable(enclosingElement));
-              List<? extends XElement> siblings =
-                  isTypeElement(enclosingElement)
-                      ? asTypeElement(enclosingElement).getEnclosedElements()
-                      // For parameter elements, element.getEnclosingElement().getEnclosedElements()
-                      // is empty, so instead look at the parameter list of the enclosing executable
-                      : asExecutable(enclosingElement).getParameters();
-              return siblings.indexOf(element);
-            }));
+        edge -> edge.dependencyRequest().requestElement().get().java(), DECLARATION_ORDER);
   }
 
   private Node source(Edge edge) {

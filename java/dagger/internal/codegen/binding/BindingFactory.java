@@ -19,10 +19,12 @@ package dagger.internal.codegen.binding;
 import static androidx.room.compiler.processing.XElementKt.isMethod;
 import static androidx.room.compiler.processing.XElementKt.isTypeElement;
 import static androidx.room.compiler.processing.XElementKt.isVariableElement;
+import static androidx.room.compiler.processing.compat.XConverters.toJavac;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.getOnlyElement;
+import static dagger.internal.codegen.base.MoreAnnotationMirrors.wrapOptionalInEquivalence;
 import static dagger.internal.codegen.binding.ComponentDescriptor.isComponentProductionMethod;
 import static dagger.internal.codegen.binding.ConfigurationAnnotations.getNullableType;
 import static dagger.internal.codegen.binding.MapKeys.getMapKey;
@@ -30,7 +32,6 @@ import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
 import static dagger.internal.codegen.xprocessing.XElements.asMethod;
 import static dagger.internal.codegen.xprocessing.XElements.asTypeElement;
 import static dagger.internal.codegen.xprocessing.XElements.asVariable;
-import static dagger.internal.codegen.xprocessing.XTypes.erasedTypeName;
 import static dagger.internal.codegen.xprocessing.XTypes.isDeclared;
 import static dagger.spi.model.BindingKind.ASSISTED_FACTORY;
 import static dagger.spi.model.BindingKind.ASSISTED_INJECTION;
@@ -53,7 +54,6 @@ import androidx.room.compiler.processing.XElement;
 import androidx.room.compiler.processing.XExecutableParameterElement;
 import androidx.room.compiler.processing.XMethodElement;
 import androidx.room.compiler.processing.XMethodType;
-import androidx.room.compiler.processing.XProcessingEnv;
 import androidx.room.compiler.processing.XType;
 import androidx.room.compiler.processing.XTypeElement;
 import androidx.room.compiler.processing.XVariableElement;
@@ -69,8 +69,8 @@ import dagger.internal.codegen.base.SetType;
 import dagger.internal.codegen.binding.MembersInjectionBinding.InjectionSite;
 import dagger.internal.codegen.binding.ProductionBinding.ProductionKind;
 import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.spi.model.BindingKind;
-import dagger.spi.model.DaggerAnnotation;
 import dagger.spi.model.DaggerType;
 import dagger.spi.model.DependencyRequest;
 import dagger.spi.model.Key;
@@ -81,6 +81,7 @@ import javax.inject.Inject;
 
 /** A factory for {@link Binding} objects. */
 public final class BindingFactory {
+  private final DaggerTypes types;
   private final KeyFactory keyFactory;
   private final DependencyRequestFactory dependencyRequestFactory;
   private final InjectionSiteFactory injectionSiteFactory;
@@ -88,11 +89,12 @@ public final class BindingFactory {
 
   @Inject
   BindingFactory(
-      XProcessingEnv processingEnv,
+      DaggerTypes types,
       KeyFactory keyFactory,
       DependencyRequestFactory dependencyRequestFactory,
       InjectionSiteFactory injectionSiteFactory,
       InjectionAnnotations injectionAnnotations) {
+    this.types = types;
     this.keyFactory = keyFactory;
     this.dependencyRequestFactory = dependencyRequestFactory;
     this.injectionSiteFactory = injectionSiteFactory;
@@ -229,7 +231,7 @@ public final class BindingFactory {
           Key key,
           BiFunction<XMethodElement, XTypeElement, C> create) {
     XMethodType methodType = method.asMemberOf(contributedBy.getType());
-    if (!methodType.isSameType(method.getExecutableType())) {
+    if (!types.isSameType(toJavac(methodType), toJavac(method.getExecutableType()))) {
       checkState(isTypeElement(method.getEnclosingElement()));
       builder.unresolved(create.apply(method, asTypeElement(method.getEnclosingElement())));
     }
@@ -239,9 +241,9 @@ public final class BindingFactory {
         .contributingModule(contributedBy)
         .key(key)
         .dependencies(
-            dependencyRequestFactory.forRequiredResolvedVariables(
+            dependencyRequestFactory.forRequiredResolvedXVariables(
                 method.getParameters(), methodType.getParameterTypes()))
-        .mapKey(getMapKey(method).map(DaggerAnnotation::from));
+        .wrappedMapKeyAnnotation(wrapOptionalInEquivalence(getMapKey(method)));
   }
 
   /**
@@ -452,7 +454,7 @@ public final class BindingFactory {
         .contributingModule(delegateDeclaration.contributingModule().get())
         .key(keyFactory.forDelegateBinding(delegateDeclaration, frameworkType))
         .dependencies(delegateDeclaration.delegateRequest())
-        .mapKey(delegateDeclaration.mapKey())
+        .wrappedMapKeyAnnotation(delegateDeclaration.wrappedMapKey())
         .kind(DELEGATE)
         .build();
   }
@@ -534,10 +536,10 @@ public final class BindingFactory {
 
   private void checkIsSameErasedType(XType type1, XType type2) {
     checkState(
-        erasedTypeName(type1).equals(erasedTypeName(type2)),
+        types.isSameType(types.erasure(toJavac(type1)), types.erasure(toJavac(type2))),
         "erased expected type: %s, erased actual type: %s",
-        erasedTypeName(type1),
-        erasedTypeName(type2));
+        types.erasure(toJavac(type1)),
+        types.erasure(toJavac(type2)));
   }
 
   private static boolean hasNonDefaultTypeParameters(XType type) {

@@ -199,16 +199,13 @@ final class ComponentHierarchyValidator {
     StringBuilder error = new StringBuilder();
     Formatter formatter = new Formatter(error);
 
-    formatter.format(
-        "%s repeats @ProducerModules:", componentDescriptor.typeElement().getQualifiedName());
+    formatter.format("%s repeats @ProducerModules:", componentDescriptor.typeElement());
 
     for (Map.Entry<ComponentDescriptor, Collection<ModuleDescriptor>> entry :
         repeatedModules.asMap().entrySet()) {
-      formatter.format("\n  %s also installs: ", entry.getKey().typeElement().getQualifiedName());
+      formatter.format("\n  %s also installs: ", entry.getKey().typeElement());
       COMMA_SEPARATED_JOINER
-          .appendTo(
-              error,
-              Iterables.transform(entry.getValue(), m -> m.moduleElement().getQualifiedName()));
+          .appendTo(error, Iterables.transform(entry.getValue(), m -> m.moduleElement()));
     }
 
     report.addError(error.toString());

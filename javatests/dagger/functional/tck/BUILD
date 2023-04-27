@@ -27,11 +27,12 @@ package(default_visibility = ["//:src"])
 GenJavaTests(
     name = "tck_tests",
     srcs = glob(["*.java"]),
-    javacopts = [
+    javacopts = DOCLINT_HTML_AND_SYNTAX + DOCLINT_REFERENCES,
+    lib_javacopts = [
         "-Adagger.privateMemberValidation=warning",
         "-Adagger.staticMemberValidation=warning",
         "-Adagger.ignorePrivateAndStaticInjectionForComponent=enabled",
-    ] + DOCLINT_HTML_AND_SYNTAX + DOCLINT_REFERENCES,
+    ],
     deps = [
         "//:dagger_with_compiler",
         "//third_party/java/jsr330_inject",

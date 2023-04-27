@@ -45,12 +45,11 @@ public final class EarlyEntryPoints {
   // this method easier to use, since most code will use this with an Application or Context type.
   @Nonnull
   public static <T> T get(Context applicationContext, Class<T> entryPoint) {
-    Application application = Contexts.getApplication(applicationContext);
+    Application application = Contexts.getApplication(applicationContext.getApplicationContext());
     Preconditions.checkState(
         application instanceof GeneratedComponentManagerHolder,
-        "Expected application to implement GeneratedComponentManagerHolder. "
-            + "Check that you're passing in an application context that uses Hilt. "
-            + "Application class found: %s", application.getClass());
+        "Expected application context to implement GeneratedComponentManagerHolder. "
+            + "Check that you're passing in an application context that uses Hilt.");
     Object componentManager =
         ((GeneratedComponentManagerHolder) application).componentManager();
     if (componentManager instanceof TestSingletonComponentManager) {

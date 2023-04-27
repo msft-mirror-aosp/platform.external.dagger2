@@ -16,11 +16,16 @@
 
 package dagger.internal.codegen;
 
-import androidx.room.compiler.processing.util.Source;
-import dagger.testing.compile.CompilerTests;
-import dagger.testing.golden.GoldenFileRule;
+import static com.google.testing.compile.CompilationSubject.assertThat;
+import static dagger.internal.codegen.CompilerMode.DEFAULT_MODE;
+import static dagger.internal.codegen.CompilerMode.FAST_INIT_MODE;
+import static dagger.internal.codegen.Compilers.compilerWithOptions;
+
+import com.google.testing.compile.Compilation;
+import com.google.testing.compile.CompilationSubject;
+import com.google.testing.compile.JavaFileObjects;
 import java.util.Collection;
-import org.junit.Rule;
+import javax.tools.JavaFileObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -33,16 +38,14 @@ public class DelegateRequestRepresentationTest {
     return CompilerMode.TEST_PARAMETERS;
   }
 
-  @Rule public GoldenFileRule goldenFileRule = new GoldenFileRule();
-
   private final CompilerMode compilerMode;
 
   public DelegateRequestRepresentationTest(CompilerMode compilerMode) {
     this.compilerMode = compilerMode;
   }
 
-  private static final Source REGULAR_SCOPED =
-      CompilerTests.javaSource(
+  private static final JavaFileObject REGULAR_SCOPED =
+      JavaFileObjects.forSourceLines(
           "test.RegularScoped",
           "package test;",
           "",
@@ -56,8 +59,8 @@ public class DelegateRequestRepresentationTest {
           "  @Scope @interface CustomScope {}",
           "}");
 
-  private static final Source REUSABLE_SCOPED =
-      CompilerTests.javaSource(
+  private static final JavaFileObject REUSABLE_SCOPED =
+      JavaFileObjects.forSourceLines(
           "test.ReusableScoped",
           "package test;",
           "",
@@ -69,8 +72,8 @@ public class DelegateRequestRepresentationTest {
           "  @Inject ReusableScoped() {}",
           "}");
 
-  private static final Source UNSCOPED =
-      CompilerTests.javaSource(
+  private static final JavaFileObject UNSCOPED =
+      JavaFileObjects.forSourceLines(
           "test.Unscoped",
           "package test;",
           "",
@@ -80,8 +83,8 @@ public class DelegateRequestRepresentationTest {
           "  @Inject Unscoped() {}",
           "}");
 
-  private static final Source COMPONENT =
-      CompilerTests.javaSource(
+  private static final JavaFileObject COMPONENT =
+      JavaFileObjects.forSourceLines(
           "test.TestComponent",
           "package test;",
           "",
@@ -100,8 +103,8 @@ public class DelegateRequestRepresentationTest {
           "  Object unscoped();",
           "}");
 
-  private static final Source QUALIFIER =
-      CompilerTests.javaSource(
+  private static final JavaFileObject QUALIFIER =
+      JavaFileObjects.forSourceLines(
           "test.Qualifier",
           "package test;",
           "",
@@ -111,9 +114,9 @@ public class DelegateRequestRepresentationTest {
           "}");
 
   @Test
-  public void toDoubleCheck() throws Exception {
-    Source module =
-        CompilerTests.javaSource(
+  public void toDoubleCheck() {
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -132,20 +135,66 @@ public class DelegateRequestRepresentationTest {
             "  Object unscoped(Unscoped delegate);",
             "}");
 
-    CompilerTests.daggerCompiler(
-            module, COMPONENT, QUALIFIER, REGULAR_SCOPED, REUSABLE_SCOPED, UNSCOPED)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
-            });
+    assertThatCompilationWithModule(module)
+        .generatedSourceFile("test.DaggerTestComponent")
+        .containsElementsIn(
+            compilerMode
+                .javaFileBuilder("test.DaggerTestComponent")
+                .addLines(
+                    "package test;",
+                    "",
+                    GeneratedLines.generatedAnnotations(),
+                    "final class DaggerTestComponent implements TestComponent {")
+                .addLinesIn(
+                    FAST_INIT_MODE,
+                    "  @SuppressWarnings(\"unchecked\")",
+                    "  private void initialize() {",
+                    "    this.regularScopedProvider =",
+                    "        DoubleCheck.provider(",
+                    "            new SwitchingProvider<RegularScoped>(testComponent, 0));",
+                    "    this.reusableScopedProvider =",
+                    "        SingleCheck.provider(",
+                    "            new SwitchingProvider<ReusableScoped>(testComponent, 1));",
+                    "    this.reusableProvider =",
+                    "        DoubleCheck.provider((Provider) reusableScopedProvider);",
+                    "    this.unscopedProvider = new SwitchingProvider<>(testComponent, 2);",
+                    "    this.unscopedProvider2 =",
+                    "        DoubleCheck.provider((Provider) unscopedProvider);",
+                    "  }")
+                .addLinesIn(
+                    DEFAULT_MODE,
+                    "  @SuppressWarnings(\"unchecked\")",
+                    "  private void initialize() {",
+                    "    this.regularScopedProvider = ",
+                    "        DoubleCheck.provider(RegularScoped_Factory.create());",
+                    "    this.reusableScopedProvider = ",
+                    "        SingleCheck.provider(ReusableScoped_Factory.create());",
+                    "    this.reusableProvider = DoubleCheck.provider(",
+                    "        (Provider) reusableScopedProvider);",
+                    "    this.unscopedProvider = DoubleCheck.provider(",
+                    "        (Provider) Unscoped_Factory.create());",
+                    "  }")
+                .addLinesIn(
+                    FAST_INIT_MODE,
+                    "  private static final class SwitchingProvider<T> implements Provider<T> {",
+                    "    @SuppressWarnings(\"unchecked\")",
+                    "    @Override",
+                    "    public T get() {",
+                    "      switch (id) {",
+                    "        case 0: return (T) new RegularScoped();",
+                    "        case 1: return (T) new ReusableScoped();",
+                    "        case 2: return (T) new Unscoped();",
+                    "        default: throw new AssertionError(id);",
+                    "      }",
+                    "    }",
+                    "  }")
+                .build());
   }
 
   @Test
-  public void toSingleCheck() throws Exception {
-    Source module =
-        CompilerTests.javaSource(
+  public void toSingleCheck() {
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -165,20 +214,48 @@ public class DelegateRequestRepresentationTest {
             "  Object unscoped(Unscoped delegate);",
             "}");
 
-    CompilerTests.daggerCompiler(
-            module, COMPONENT, QUALIFIER, REGULAR_SCOPED, REUSABLE_SCOPED, UNSCOPED)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
-            });
+    assertThatCompilationWithModule(module)
+        .generatedSourceFile("test.DaggerTestComponent")
+        .containsElementsIn(
+            compilerMode
+                .javaFileBuilder("test.DaggerTestComponent")
+                .addLines(
+                    "package test;",
+                    "",
+                    GeneratedLines.generatedAnnotations(),
+                    "final class DaggerTestComponent implements TestComponent {")
+                .addLinesIn(
+                    FAST_INIT_MODE,
+                    "  @SuppressWarnings(\"unchecked\")",
+                    "  private void initialize() {",
+                    "    this.regularScopedProvider =",
+                    "        DoubleCheck.provider(",
+                    "            new SwitchingProvider<RegularScoped>(testComponent, 0));",
+                    "    this.reusableScopedProvider =",
+                    "        SingleCheck.provider(",
+                    "            new SwitchingProvider<ReusableScoped>(testComponent, 1));",
+                    "    this.unscopedProvider = new SwitchingProvider<>(testComponent, 2);",
+                    "    this.unscopedProvider2 =",
+                    "        SingleCheck.provider((Provider) unscopedProvider);",
+                    "  }")
+                .addLinesIn(
+                    DEFAULT_MODE,
+                    "  @SuppressWarnings(\"unchecked\")",
+                    "  private void initialize() {",
+                    "    this.regularScopedProvider = ",
+                    "        DoubleCheck.provider(RegularScoped_Factory.create());",
+                    "    this.reusableScopedProvider = ",
+                    "        SingleCheck.provider(ReusableScoped_Factory.create());",
+                    "    this.unscopedProvider = SingleCheck.provider(",
+                    "        (Provider) Unscoped_Factory.create());",
+                    "  }")
+                .build());
   }
 
   @Test
-  public void toUnscoped() throws Exception {
-    Source module =
-        CompilerTests.javaSource(
+  public void toUnscoped() {
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -197,27 +274,52 @@ public class DelegateRequestRepresentationTest {
             "  Object unscoped(Unscoped delegate);",
             "}");
 
-    CompilerTests.daggerCompiler(
-            module, COMPONENT, QUALIFIER, REGULAR_SCOPED, REUSABLE_SCOPED, UNSCOPED)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
-            });
+    assertThatCompilationWithModule(module)
+        .generatedSourceFile("test.DaggerTestComponent")
+        .containsElementsIn(
+            compilerMode
+                .javaFileBuilder("test.DaggerTestComponent")
+                .addLines(
+                    "package test;",
+                    "",
+                    GeneratedLines.generatedAnnotations(),
+                    "final class DaggerTestComponent implements TestComponent {",
+                    "  private Provider<RegularScoped> regularScopedProvider;",
+                    "  private Provider<ReusableScoped> reusableScopedProvider;")
+                .addLinesIn(
+                    DEFAULT_MODE,
+                    "  @SuppressWarnings(\"unchecked\")",
+                    "  private void initialize() {",
+                    "    this.regularScopedProvider = ",
+                    "        DoubleCheck.provider(RegularScoped_Factory.create());",
+                    "    this.reusableScopedProvider = ",
+                    "        SingleCheck.provider(ReusableScoped_Factory.create());",
+                    "  }")
+                .addLinesIn(
+                    FAST_INIT_MODE,
+                    "  @SuppressWarnings(\"unchecked\")",
+                    "  private void initialize() {",
+                    "  this.regularScopedProvider =",
+                    "      DoubleCheck.provider(",
+                    "          new SwitchingProvider<RegularScoped>(testComponent, 0));",
+                    "  this.reusableScopedProvider =",
+                    "      SingleCheck.provider(",
+                    "          new SwitchingProvider<ReusableScoped>(testComponent, 1));",
+                    "  }")
+                .build());
   }
 
   @Test
-  public void castNeeded_rawTypes_Provider_get() throws Exception {
-    Source accessibleSupertype =
-        CompilerTests.javaSource(
+  public void castNeeded_rawTypes_Provider_get() {
+    JavaFileObject accessibleSupertype =
+        JavaFileObjects.forSourceLines(
             "other.Supertype",
             "package other;",
             "",
             // accessible from the component, but the subtype is not
             "public interface Supertype {}");
-    Source inaccessibleSubtype =
-        CompilerTests.javaSource(
+    JavaFileObject inaccessibleSubtype =
+        JavaFileObjects.forSourceLines(
             "other.Subtype",
             "package other;",
             "",
@@ -228,8 +330,8 @@ public class DelegateRequestRepresentationTest {
             "class Subtype implements Supertype {",
             "  @Inject Subtype() {}",
             "}");
-    Source module =
-        CompilerTests.javaSource(
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "other.SupertypeModule",
             "package other;",
             "",
@@ -240,8 +342,8 @@ public class DelegateRequestRepresentationTest {
             "public interface SupertypeModule {",
             "  @Binds Supertype to(Subtype subtype);",
             "}");
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -253,26 +355,55 @@ public class DelegateRequestRepresentationTest {
             "interface TestComponent {",
             "  other.Supertype supertype();",
             "}");
-
-    CompilerTests.daggerCompiler(accessibleSupertype, inaccessibleSubtype, module, component)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
-            });
+    Compilation compilation =
+        compilerWithOptions(compilerMode.javacopts())
+            .compile(accessibleSupertype, inaccessibleSubtype, module, component);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .generatedSourceFile("test.DaggerTestComponent")
+        .containsElementsIn(
+            compilerMode
+                .javaFileBuilder("test.DaggerTestComponent")
+                .addLines(
+                    "package test;",
+                    "",
+                    GeneratedLines.generatedAnnotations(),
+                    "final class DaggerTestComponent implements TestComponent {",
+                    "  @SuppressWarnings(\"rawtypes\")",
+                    "  private Provider subtypeProvider;")
+                .addLinesIn(
+                    DEFAULT_MODE,
+                    "  @SuppressWarnings(\"unchecked\")",
+                    "  private void initialize() {",
+                    "    this.subtypeProvider = DoubleCheck.provider(Subtype_Factory.create());",
+                    "  }")
+                .addLinesIn(
+                    FAST_INIT_MODE,
+                    "  @SuppressWarnings(\"unchecked\")",
+                    "  private void initialize() {",
+                    "    this.subtypeProvider =",
+                    "        DoubleCheck.provider(",
+                    "            new SwitchingProvider<Object>(testComponent, 0));",
+                    "  }")
+                .addLines(
+                    "  @Override",
+                    "  public Supertype supertype() {",
+                    "    return (Supertype) subtypeProvider.get();",
+                    "  }",
+                    "}")
+                .build());
   }
 
   @Test
-  public void noCast_rawTypes_Provider_get_toInaccessibleType() throws Exception {
-    Source supertype =
-        CompilerTests.javaSource(
+  public void noCast_rawTypes_Provider_get_toInaccessibleType() {
+    JavaFileObject supertype =
+        JavaFileObjects.forSourceLines(
             "other.Supertype",
             "package other;",
             "",
             "interface Supertype {}");
-    Source subtype =
-        CompilerTests.javaSource(
+    JavaFileObject subtype =
+        JavaFileObjects.forSourceLines(
             "other.Subtype",
             "package other;",
             "",
@@ -283,8 +414,8 @@ public class DelegateRequestRepresentationTest {
             "class Subtype implements Supertype {",
             "  @Inject Subtype() {}",
             "}");
-    Source usesSupertype =
-        CompilerTests.javaSource(
+    JavaFileObject usesSupertype =
+        JavaFileObjects.forSourceLines(
             "other.UsesSupertype",
             "package other;",
             "",
@@ -293,8 +424,8 @@ public class DelegateRequestRepresentationTest {
             "public class UsesSupertype {",
             "  @Inject UsesSupertype(Supertype supertype) {}",
             "}");
-    Source module =
-        CompilerTests.javaSource(
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "other.SupertypeModule",
             "package other;",
             "",
@@ -305,8 +436,8 @@ public class DelegateRequestRepresentationTest {
             "public interface SupertypeModule {",
             "  @Binds Supertype to(Subtype subtype);",
             "}");
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -318,20 +449,36 @@ public class DelegateRequestRepresentationTest {
             "interface TestComponent {",
             "  other.UsesSupertype usesSupertype();",
             "}");
-
-    CompilerTests.daggerCompiler(supertype, subtype, usesSupertype, module, component)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
-            });
+    Compilation compilation =
+        compilerWithOptions(compilerMode.javacopts())
+            .compile(supertype, subtype, usesSupertype, module, component);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .generatedSourceFile("test.DaggerTestComponent")
+        .containsElementsIn(
+            compilerMode
+                .javaFileBuilder("test.DaggerTestComponent")
+                .addLines(
+                    "package test;",
+                    "",
+                    GeneratedLines.generatedAnnotations(),
+                    "final class DaggerTestComponent implements TestComponent {",
+                    "  @SuppressWarnings(\"rawtypes\")",
+                    "  private Provider subtypeProvider;",
+                    "",
+                    "  @Override",
+                    "  public UsesSupertype usesSupertype() {",
+                    //   can't cast the provider.get() to a type that's not accessible
+                    "    return UsesSupertype_Factory.newInstance(subtypeProvider.get());",
+                    "  }",
+                    "}")
+                .build());
   }
 
   @Test
-  public void castedToRawType() throws Exception {
-    Source module =
-        CompilerTests.javaSource(
+  public void castedToRawType() {
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -352,8 +499,8 @@ public class DelegateRequestRepresentationTest {
             "  @Named(\"named\")",
             "  String namedString(String string);",
             "}");
-    Source component =
-         CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -369,19 +516,73 @@ public class DelegateRequestRepresentationTest {
             "  @Named(\"named\") Provider<String> namedString();",
             "}");
 
-    CompilerTests.daggerCompiler(module, component)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
-            });
+    Compilation compilation =
+        compilerWithOptions(compilerMode.javacopts())
+            .compile(module, component);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .generatedSourceFile("test.DaggerTestComponent")
+        .containsElementsIn(
+            compilerMode
+                .javaFileBuilder("test.DaggerTestComponent")
+                .addLines(
+                    "package test;",
+                    "",
+                    GeneratedLines.generatedAnnotations(),
+                    "final class DaggerTestComponent implements TestComponent {")
+                .addLinesIn(
+                    DEFAULT_MODE,
+                    "  @Override",
+                    "  public Provider<CharSequence> charSequence() {",
+                    "    return ((Provider) TestModule_ProvideStringFactory.create());",
+                    "  }",
+                    "",
+                    "  @Override",
+                    "  public CharSequence charSequenceInstance() {",
+                    "    return TestModule_ProvideStringFactory.provideString();",
+                    "  }",
+                    "",
+                    "  @Override",
+                    "  public Provider<String> namedString() {",
+                    "    return TestModule_ProvideStringFactory.create();",
+                    "  }",
+                    "}")
+                .addLinesIn(
+                    FAST_INIT_MODE,
+                    "  private Provider<String> provideStringProvider;",
+                    "",
+                    "  @Override",
+                    "  public Provider<CharSequence> charSequence() {",
+                    "    return ((Provider) provideStringProvider);",
+                    "  }",
+                    "",
+                    "  @Override",
+                    "  public CharSequence charSequenceInstance() {",
+                    "    return (CharSequence) ((Provider) provideStringProvider).get();",
+                    "  }",
+                    "",
+                    "  @Override",
+                    "  public Provider<String> namedString() {",
+                    "    return provideStringProvider;",
+                    "  }",
+                    "",
+                    "  private static final class SwitchingProvider<T> implements Provider<T> {",
+                    "    @SuppressWarnings(\"unchecked\")",
+                    "    @Override",
+                    "    public T get() {",
+                    "      switch (id) {",
+                    "        case 0: return (T) TestModule_ProvideStringFactory.provideString();",
+                    "        default: throw new AssertionError(id);",
+                    "      }",
+                    "    }",
+                    "  }")
+                .build());
   }
 
   @Test
-  public void doubleBinds() throws Exception {
-    Source module =
-        CompilerTests.javaSource(
+  public void doubleBinds() {
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -400,8 +601,8 @@ public class DelegateRequestRepresentationTest {
             "  @Binds",
             "  Object object(CharSequence charSequence);",
             "}");
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -415,25 +616,70 @@ public class DelegateRequestRepresentationTest {
             "  Provider<Object> object();",
             "}");
 
-    CompilerTests.daggerCompiler(module, component)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
-            });
+    Compilation compilation =
+        compilerWithOptions(compilerMode.javacopts())
+            .compile(module, component);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .generatedSourceFile("test.DaggerTestComponent")
+        .containsElementsIn(
+            compilerMode
+                .javaFileBuilder("test.DaggerTestComponent")
+                .addLines(
+                    "package test;",
+                    "",
+                    GeneratedLines.generatedAnnotations(),
+                    "final class DaggerTestComponent implements TestComponent {")
+                .addLinesIn(
+                    DEFAULT_MODE,
+                    "  @Override",
+                    "  public Provider<CharSequence> charSequence() {",
+                    "    return ((Provider) TestModule_ProvideStringFactory.create());",
+                    "  }",
+                    "  @Override",
+                    "  public Provider<Object> object() {",
+                    "    return ((Provider) TestModule_ProvideStringFactory.create());",
+                    "  }",
+                    "}")
+                .addLinesIn(
+                    FAST_INIT_MODE,
+                    "  private Provider<String> provideStringProvider;",
+                    "",
+                    "  @SuppressWarnings(\"unchecked\")",
+                    "  private void initialize() {",
+                    "    this.provideStringProvider = new SwitchingProvider<>(testComponent, 0);",
+                    "  }",
+                    "",
+                    "  @Override",
+                    "  public Provider<CharSequence> charSequence() {",
+                    "    return ((Provider) provideStringProvider);",
+                    "  }",
+                    "",
+                    "  @Override",
+                    "  public Provider<Object> object() {",
+                    "    return ((Provider) provideStringProvider);",
+                    "  }",
+                    "",
+                    "  private static final class SwitchingProvider<T> implements Provider<T> {",
+                    "    @SuppressWarnings(\"unchecked\")",
+                    "    @Override",
+                    "    public T get() {",
+                    "      switch (id) {",
+                    "        case 0: return (T) TestModule_ProvideStringFactory.provideString();",
+                    "        default: throw new AssertionError(id);",
+                    "      }",
+                    "    }",
+                    "  }")
+                .build());
   }
 
   @Test
-  public void inlineFactoryOfInacessibleType() throws Exception {
-    Source supertype =
-        CompilerTests.javaSource(
-            "other.Supertype",
-            "package other;",
-            "",
-            "public interface Supertype {}");
-    Source injectableSubtype =
-        CompilerTests.javaSource(
+  public void inlineFactoryOfInacessibleType() {
+    JavaFileObject supertype =
+        JavaFileObjects.forSourceLines(
+            "other.Supertype", "package other;", "", "public interface Supertype {}");
+    JavaFileObject injectableSubtype =
+        JavaFileObjects.forSourceLines(
             "other.Subtype",
             "package other;",
             "",
@@ -444,8 +690,8 @@ public class DelegateRequestRepresentationTest {
             // to be referenced with an inline Subtype_Factory.create()
             "  @Inject Subtype() {}",
             "}");
-    Source module =
-        CompilerTests.javaSource(
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "other.TestModule",
             "package other;",
             "",
@@ -456,8 +702,8 @@ public class DelegateRequestRepresentationTest {
             "public interface TestModule {",
             "  @Binds Supertype to(Subtype subtype);",
             "}");
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.RequestsSubtypeAsProvider",
             "package test;",
             "",
@@ -469,20 +715,55 @@ public class DelegateRequestRepresentationTest {
             "  Provider<other.Supertype> supertypeProvider();",
             "}");
 
-    CompilerTests.daggerCompiler(supertype, injectableSubtype, module, component)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/DaggerRequestsSubtypeAsProvider"));
-            });
+    Compilation compilation =
+        compilerWithOptions(compilerMode.javacopts())
+            .compile(supertype, injectableSubtype, module, component);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .generatedSourceFile("test.DaggerRequestsSubtypeAsProvider")
+        .containsElementsIn(
+            compilerMode
+                .javaFileBuilder("test.DaggerRequestsSubtypeAsProvider")
+                .addLines(
+                    "package test;",
+                    "",
+                    GeneratedLines.generatedAnnotations(),
+                    "final class DaggerRequestsSubtypeAsProvider",
+                    "    implements RequestsSubtypeAsProvider {")
+                .addLinesIn(
+                    DEFAULT_MODE,
+                    "  @Override",
+                    "  public Provider<Supertype> supertypeProvider() {",
+                    "    return ((Provider) Subtype_Factory.create());",
+                    "  }",
+                    "}")
+                .addLinesIn(
+                    FAST_INIT_MODE,
+                    "  @SuppressWarnings(\"rawtypes\")",
+                    "  private Provider subtypeProvider;",
+                    "",
+                    "  @Override",
+                    "  public Provider<Supertype> supertypeProvider() {",
+                    "    return subtypeProvider;",
+                    "  }",
+                    "",
+                    "  private static final class SwitchingProvider<T> implements Provider<T> {",
+                    "    @SuppressWarnings(\"unchecked\")",
+                    "    @Override",
+                    "    public T get() {",
+                    "      switch (id) {",
+                    "        case 0: return (T) Subtype_Factory.newInstance();",
+                    "        default: throw new AssertionError(id);",
+                    "      }",
+                    "    }",
+                    "  }")
+                .build());
   }
 
   @Test
-  public void providerWhenBindsScopeGreaterThanDependencyScope() throws Exception {
-    Source module =
-        CompilerTests.javaSource(
+  public void providerWhenBindsScopeGreaterThanDependencyScope() {
+    JavaFileObject module =
+        JavaFileObjects.forSourceLines(
             "test.TestModule",
             "package test;",
             "",
@@ -504,8 +785,8 @@ public class DelegateRequestRepresentationTest {
             "  @Singleton",
             "  abstract Object bindString(String str);",
             "}");
-    Source component =
-        CompilerTests.javaSource(
+    JavaFileObject component =
+        JavaFileObjects.forSourceLines(
             "test.TestComponent",
             "package test;",
             "",
@@ -519,12 +800,71 @@ public class DelegateRequestRepresentationTest {
             "  Provider<Object> object();",
             "}");
 
-    CompilerTests.daggerCompiler(module, component)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
-            });
+    Compilation compilation = compilerWithOptions(compilerMode.javacopts())
+        .compile(module, component);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .generatedSourceFile("test.DaggerTestComponent")
+        .containsElementsIn(
+            compilerMode
+                .javaFileBuilder("test.DaggerTestComponent")
+                .addLines(
+                    "package test;",
+                    "",
+                    GeneratedLines.generatedAnnotations(),
+                    "final class DaggerTestComponent implements TestComponent {",
+                    "  private Provider<String> provideStringProvider;",
+                    "  private Provider<Object> bindStringProvider;")
+                .addLinesIn(
+                    DEFAULT_MODE,
+                    "  @SuppressWarnings(\"unchecked\")",
+                    "  private void initialize() {",
+                    "    this.provideStringProvider =",
+                    "        SingleCheck.provider(TestModule_ProvideStringFactory.create());",
+                    "    this.bindStringProvider =",
+                    "        DoubleCheck.provider((Provider) provideStringProvider);",
+                    "  }")
+                .addLinesIn(
+                    FAST_INIT_MODE,
+                    "  @SuppressWarnings(\"unchecked\")",
+                    "  private void initialize() {",
+                    "    this.provideStringProvider =",
+                    "        SingleCheck.provider(",
+                    "            new SwitchingProvider<String>(testComponent, 0));",
+                    "    this.bindStringProvider =",
+                    "        DoubleCheck.provider((Provider) provideStringProvider);",
+                    "  }")
+                .addLines(
+                    "  @Override",
+                    "  public Provider<Object> object() {",
+                    "    return bindStringProvider;",
+                    "  }")
+                .addLinesIn(
+                    FAST_INIT_MODE,
+                    "  private static final class SwitchingProvider<T> implements Provider<T> {",
+                    "    @SuppressWarnings(\"unchecked\")",
+                    "    @Override",
+                    "    public T get() {",
+                    "      switch (id) {",
+                    "        case 0: return (T) TestModule_ProvideStringFactory.provideString();",
+                    "        default: throw new AssertionError(id);",
+                    "      }",
+                    "    }",
+                    "  }")
+                .build());
+  }
+
+  private CompilationSubject assertThatCompilationWithModule(JavaFileObject module) {
+    Compilation compilation =
+        compilerWithOptions(compilerMode.javacopts())
+            .compile(
+                module,
+                COMPONENT,
+                QUALIFIER,
+                REGULAR_SCOPED,
+                REUSABLE_SCOPED,
+                UNSCOPED);
+    assertThat(compilation).succeeded();
+    return assertThat(compilation);
   }
 }

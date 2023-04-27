@@ -72,8 +72,6 @@ public final class RootFileFormatterTest {
         .contains(
             JOINER.join(
                 "  public abstract static class ActivityC implements ActivityComponent,",
-                "      DefaultViewModelFactories.ActivityEntryPoint,",
-                "      HiltWrapper_HiltViewModelFactory_ActivityCreatorEntryPoint,",
                 "      FragmentComponentManager.FragmentComponentBuilderEntryPoint,",
                 "      ViewComponentManager.ViewComponentBuilderEntryPoint,",
                 "      GeneratedComponent,",
@@ -121,8 +119,6 @@ public final class RootFileFormatterTest {
         .contains(
             JOINER.join(
                 "  public abstract static class ActivityC implements ActivityComponent,",
-                "      DefaultViewModelFactories.ActivityEntryPoint,",
-                "      HiltWrapper_HiltViewModelFactory_ActivityCreatorEntryPoint,",
                 "      FragmentComponentManager.FragmentComponentBuilderEntryPoint,",
                 "      ViewComponentManager.ViewComponentBuilderEntryPoint,",
                 "      GeneratedComponent,",

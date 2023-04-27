@@ -17,17 +17,15 @@
 package dagger.internal.codegen;
 
 import static com.google.testing.compile.CompilationSubject.assertThat;
+import static dagger.internal.codegen.CompilerMode.DEFAULT_MODE;
+import static dagger.internal.codegen.CompilerMode.FAST_INIT_MODE;
 import static dagger.internal.codegen.Compilers.compilerWithOptions;
 import static dagger.internal.codegen.Compilers.daggerCompiler;
 
-import androidx.room.compiler.processing.util.Source;
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
-import dagger.testing.compile.CompilerTests;
-import dagger.testing.golden.GoldenFileRule;
 import java.util.Collection;
 import javax.tools.JavaFileObject;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -40,8 +38,6 @@ public class MapBindingComponentProcessorTest {
     return CompilerMode.TEST_PARAMETERS;
   }
 
-  @Rule public GoldenFileRule goldenFileRule = new GoldenFileRule();
-
   private final CompilerMode compilerMode;
 
   public MapBindingComponentProcessorTest(CompilerMode compilerMode) {
@@ -49,115 +45,173 @@ public class MapBindingComponentProcessorTest {
   }
 
   @Test
-  public void mapBindingsWithEnumKey() throws Exception {
-    Source mapModuleOneFile =
-        CompilerTests.javaSource(
-            "test.MapModuleOne",
-            "package test;",
-            "",
-            "import dagger.Module;",
-            "import dagger.Provides;",
-            "import dagger.multibindings.IntoMap;",
-            "",
-            "@Module",
-            "final class MapModuleOne {",
-            "  @Provides @IntoMap @PathKey(PathEnum.ADMIN) Handler provideAdminHandler() {",
-            "    return new AdminHandler();",
-            "  }",
-            "}");
-    Source mapModuleTwoFile =
-        CompilerTests.javaSource(
-            "test.MapModuleTwo",
-            "package test;",
-            "",
-            "import dagger.Module;",
-            "import dagger.Provides;",
-            "import dagger.multibindings.IntoMap;",
-            "",
-            "@Module",
-            "final class MapModuleTwo {",
-            "  @Provides @IntoMap @PathKey(PathEnum.LOGIN) Handler provideLoginHandler() {",
-            "    return new LoginHandler();",
-            "  }",
-            "}");
-    Source enumKeyFile =
-        CompilerTests.javaSource(
-            "test.PathKey",
-            "package test;",
-            "import dagger.MapKey;",
-            "import java.lang.annotation.Retention;",
-            "import static java.lang.annotation.RetentionPolicy.RUNTIME;",
-            "",
-            "@MapKey(unwrapValue = true)",
-            "@Retention(RUNTIME)",
-            "public @interface PathKey {",
-            "  PathEnum value();",
-            "}");
-    Source pathEnumFile =
-        CompilerTests.javaSource(
-            "test.PathEnum",
-            "package test;",
-            "",
-            "public enum PathEnum {",
-            "    ADMIN,",
-            "    LOGIN;",
-            "}");
+  public void mapBindingsWithEnumKey() {
+    JavaFileObject mapModuleOneFile =
+        JavaFileObjects
+            .forSourceLines("test.MapModuleOne",
+                "package test;",
+                "",
+                "import dagger.Module;",
+                "import dagger.Provides;",
+                "import dagger.multibindings.IntoMap;",
+                "",
+                "@Module",
+                "final class MapModuleOne {",
+                "  @Provides @IntoMap @PathKey(PathEnum.ADMIN) Handler provideAdminHandler() {",
+                "    return new AdminHandler();",
+                "  }",
+                "}");
+    JavaFileObject mapModuleTwoFile =
+        JavaFileObjects
+            .forSourceLines("test.MapModuleTwo",
+                "package test;",
+                "",
+                "import dagger.Module;",
+                "import dagger.Provides;",
+                "import dagger.multibindings.IntoMap;",
+                "",
+                "@Module",
+                "final class MapModuleTwo {",
+                "  @Provides @IntoMap @PathKey(PathEnum.LOGIN) Handler provideLoginHandler() {",
+                "    return new LoginHandler();",
+                "  }",
+                "}");
+    JavaFileObject enumKeyFile = JavaFileObjects.forSourceLines("test.PathKey",
+        "package test;",
+        "import dagger.MapKey;",
+        "import java.lang.annotation.Retention;",
+        "import static java.lang.annotation.RetentionPolicy.RUNTIME;",
+        "",
+        "@MapKey(unwrapValue = true)",
+        "@Retention(RUNTIME)",
+        "public @interface PathKey {",
+        "  PathEnum value();",
+        "}");
+    JavaFileObject pathEnumFile = JavaFileObjects.forSourceLines("test.PathEnum",
+        "package test;",
+        "",
+        "public enum PathEnum {",
+        "    ADMIN,",
+        "    LOGIN;",
+        "}");
 
-    Source handlerFile =
-        CompilerTests.javaSource(
-            "test.Handler",
-            "package test;",
-            "",
-            "interface Handler {}");
-    Source loginHandlerFile =
-        CompilerTests.javaSource(
+    JavaFileObject handlerFile =
+        JavaFileObjects.forSourceLines("test.Handler", "package test;", "", "interface Handler {}");
+    JavaFileObject loginHandlerFile =
+        JavaFileObjects.forSourceLines(
             "test.LoginHandler",
             "package test;",
             "",
             "class LoginHandler implements Handler {",
             "  public LoginHandler() {}",
             "}");
-    Source adminHandlerFile =
-        CompilerTests.javaSource(
+    JavaFileObject adminHandlerFile =
+        JavaFileObjects.forSourceLines(
             "test.AdminHandler",
             "package test;",
             "",
             "class AdminHandler implements Handler {",
             "  public AdminHandler() {}",
             "}");
-    Source componentFile =
-        CompilerTests.javaSource(
-            "test.TestComponent",
-            "package test;",
-            "",
-            "import dagger.Component;",
-            "import java.util.Map;",
-            "import javax.inject.Provider;",
-            "",
-            "@Component(modules = {MapModuleOne.class, MapModuleTwo.class})",
-            "interface TestComponent {",
-            "  Provider<Map<PathEnum, Provider<Handler>>> dispatcher();",
-            "}");
+    JavaFileObject componentFile = JavaFileObjects.forSourceLines("test.TestComponent",
+        "package test;",
+        "",
+        "import dagger.Component;",
+        "import java.util.Map;",
+        "import javax.inject.Provider;",
+        "",
+        "@Component(modules = {MapModuleOne.class, MapModuleTwo.class})",
+        "interface TestComponent {",
+        "  Provider<Map<PathEnum, Provider<Handler>>> dispatcher();",
+        "}");
 
-    CompilerTests.daggerCompiler(
-            mapModuleOneFile,
-            mapModuleTwoFile,
-            enumKeyFile,
-            pathEnumFile,
-            handlerFile,
-            loginHandlerFile,
-            adminHandlerFile,
-            componentFile)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
-            });
+    Compilation compilation =
+        compilerWithOptions(compilerMode.javacopts())
+            .compile(
+                mapModuleOneFile,
+                mapModuleTwoFile,
+                enumKeyFile,
+                pathEnumFile,
+                handlerFile,
+                loginHandlerFile,
+                adminHandlerFile,
+                componentFile);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .generatedSourceFile("test.DaggerTestComponent")
+        .containsElementsIn(
+            compilerMode
+                .javaFileBuilder("test.DaggerTestComponent")
+                .addLines(
+                    "package test;",
+                    "",
+                    GeneratedLines.generatedAnnotations(),
+                    "final class DaggerTestComponent implements TestComponent {",
+                    "  private final DaggerTestComponent testComponent = this;",
+                    "  private Provider<Handler> provideAdminHandlerProvider;",
+                    "  private Provider<Handler> provideLoginHandlerProvider;",
+                    "  private Provider<Map<PathEnum, Provider<Handler>>>",
+                    "      mapOfPathEnumAndProviderOfHandlerProvider;")
+                .addLinesIn(
+                    DEFAULT_MODE,
+                    "  @SuppressWarnings(\"unchecked\")",
+                    "  private void initialize(",
+                    "      final MapModuleOne mapModuleOneParam,",
+                    "      final MapModuleTwo mapModuleTwoParam) {",
+                    "    this.provideAdminHandlerProvider =",
+                    "        MapModuleOne_ProvideAdminHandlerFactory.create(mapModuleOneParam);",
+                    "    this.provideLoginHandlerProvider =",
+                    "        MapModuleTwo_ProvideLoginHandlerFactory.create(mapModuleTwoParam);",
+                    "    this.mapOfPathEnumAndProviderOfHandlerProvider =",
+                    "        MapProviderFactory.<PathEnum, Handler>builder(2)",
+                    "            .put(PathEnum.ADMIN, provideAdminHandlerProvider)",
+                    "            .put(PathEnum.LOGIN, provideLoginHandlerProvider)",
+                    "            .build();",
+                    "  }")
+                .addLinesIn(
+                    FAST_INIT_MODE,
+                    "  @SuppressWarnings(\"unchecked\")",
+                    "  private void initialize(final MapModuleOne mapModuleOneParam,",
+                    "      final MapModuleTwo mapModuleTwoParam) {",
+                    "    this.provideAdminHandlerProvider =",
+                    "        new SwitchingProvider<>(testComponent, 1);",
+                    "    this.provideLoginHandlerProvider =",
+                    "       new SwitchingProvider<>(testComponent, 2);",
+                    "    this.mapOfPathEnumAndProviderOfHandlerProvider =",
+                    "        new SwitchingProvider<>(testComponent, 0);",
+                    "  }")
+                .addLines(
+                    "  @Override",
+                    "  public Provider<Map<PathEnum, Provider<Handler>>> dispatcher() {",
+                    "    return mapOfPathEnumAndProviderOfHandlerProvider;",
+                    "  }")
+                .addLinesIn(
+                    FAST_INIT_MODE,
+                    "",
+                    "  private static final class SwitchingProvider<T> implements Provider<T> {",
+                    "    @SuppressWarnings(\"unchecked\")",
+                    "    @Override",
+                    "    public T get() {",
+                    "      switch (id) {",
+                    "        case 0: return (T) ImmutableMap.<PathEnum, Provider<Handler>>of(",
+                    "          PathEnum.ADMIN,",
+                    "          testComponent.provideAdminHandlerProvider,",
+                    "          PathEnum.LOGIN,",
+                    "          testComponent.provideLoginHandlerProvider);",
+                    "        case 1: return (T) MapModuleOne_ProvideAdminHandlerFactory",
+                    "            .provideAdminHandler(testComponent.mapModuleOne);",
+                    "        case 2: return (T) MapModuleTwo_ProvideLoginHandlerFactory",
+                    "            .provideLoginHandler(testComponent.mapModuleTwo);",
+                    "        default: throw new AssertionError(id);",
+                    "      }",
+                    "    }",
+                    "  }",
+                    "}")
+                .build());
   }
 
   @Test
-  public void mapBindingsWithInaccessibleKeys() throws Exception {
+  public void mapBindingsWithInaccessibleKeys() {
     JavaFileObject mapKeys =
         JavaFileObjects.forSourceLines(
             "mapkeys.MapKeys",
@@ -257,105 +311,270 @@ public class MapBindingComponentProcessorTest {
     assertThat(compilation).succeeded();
     assertThat(compilation)
         .generatedSourceFile("test.DaggerTestComponent")
-        .hasSourceEquivalentTo(goldenFileRule.goldenFile("test.DaggerTestComponent"));
+        .containsElementsIn(
+            JavaFileObjects.forSourceLines(
+                "test.DaggerTestComponent",
+                "package test;",
+                "",
+                GeneratedLines.generatedAnnotations(),
+                "final class DaggerTestComponent implements TestComponent {",
+                "  private Provider<Map<Class<?>, Integer>> mapOfClassOfAndIntegerProvider;",
+                "",
+                "  @SuppressWarnings(\"rawtypes\")",
+                "  private Provider mapOfPackagePrivateEnumAndIntegerProvider;",
+                "",
+                "  private Provider<Map<MapKeys.ComplexKey, Integer>>",
+                "      mapOfComplexKeyAndIntegerProvider;",
+                "",
+                "  private Map mapOfPackagePrivateEnumAndInteger() {",
+                "    return ImmutableMap.of(",
+                "        MapModule_EnumKeyMapKey.create(), MapModule.enumKey());",
+                "  }",
+                "",
+                "  @SuppressWarnings(\"unchecked\")",
+                "  private void initialize() {",
+                "    this.mapOfClassOfAndIntegerProvider =",
+                "        MapFactory.<Class<?>, Integer>builder(1)",
+                "            .put(MapModule_ClassKeyMapKey.create(),",
+                "                 MapModule_ClassKeyFactory.create())",
+                "            .build();",
+                "    this.mapOfPackagePrivateEnumAndIntegerProvider =",
+                "        MapFactory.builder(1)",
+                "            .put(MapModule_EnumKeyMapKey.create(), ",
+                "                 (Provider) MapModule_EnumKeyFactory.create())",
+                "            .build();",
+                "    this.mapOfComplexKeyAndIntegerProvider =",
+                "       MapFactory.<MapKeys.ComplexKey, Integer>builder(3)",
+                "          .put(",
+                "             MapModule_ComplexKeyWithInaccessibleValueMapKey.create(),",
+                "             MapModule_ComplexKeyWithInaccessibleValueFactory.create())",
+                "          .put(",
+                "             MapModule_ComplexKeyWithInaccessibleArrayValueMapKey.create(),",
+                "             MapModule_ComplexKeyWithInaccessibleArrayValueFactory.create())",
+                "          .put(",
+                "             MapModule_ComplexKeyWithInaccessibleAnnotationValueMapKey.create(),",
+                "             MapModule_ComplexKeyWithInaccessibleAnnotationValueFactory.create())",
+                "          .build();",
+                "  }",
+                "",
+                "  @Override",
+                "  public Map<Class<?>, Integer> classKey() {",
+                "    return ImmutableMap.<Class<?>, Integer>of(",
+                "        MapModule_ClassKeyMapKey.create(), MapModule.classKey());",
+                "  }",
+                "",
+                "  @Override",
+                "  public Provider<Map<Class<?>, Integer>> classKeyProvider() {",
+                "    return mapOfClassOfAndIntegerProvider;",
+                "  }",
+                "",
+                "  @Override",
+                "  public Object inaccessibleEnum() {",
+                "    return mapOfPackagePrivateEnumAndInteger();",
+                "  }",
+                "",
+                "  @Override",
+                "  public Provider<Object> inaccessibleEnumProvider() {",
+                "    return mapOfPackagePrivateEnumAndIntegerProvider;",
+                "  }",
+                "",
+                "  @Override",
+                "  public Map<MapKeys.ComplexKey, Integer> complexKey() {",
+                "    return ImmutableMap.<MapKeys.ComplexKey, Integer>of(",
+                "        MapModule_ComplexKeyWithInaccessibleValueMapKey.create(),",
+                "        MapModule.complexKeyWithInaccessibleValue(),",
+                "        MapModule_ComplexKeyWithInaccessibleArrayValueMapKey.create(),",
+                "        MapModule.complexKeyWithInaccessibleArrayValue(),",
+                "        MapModule_ComplexKeyWithInaccessibleAnnotationValueMapKey.create(),",
+                "        MapModule.complexKeyWithInaccessibleAnnotationValue());",
+                "  }",
+                "",
+                "  @Override",
+                "  public Provider<Map<MapKeys.ComplexKey, Integer>> complexKeyProvider() {",
+                "    return mapOfComplexKeyAndIntegerProvider;",
+                "  }",
+                "}"));
     assertThat(compilation)
         .generatedSourceFile(
             "mapkeys.MapModule_ComplexKeyWithInaccessibleAnnotationValueMapKey")
-        .hasSourceEquivalentTo(
-            goldenFileRule.goldenFile(
-                "mapkeys.MapModule_ComplexKeyWithInaccessibleAnnotationValueMapKey"));
+        .containsElementsIn(
+            JavaFileObjects.forSourceLines(
+                "mapkeys.MapModule_ComplexKeyWithInaccessibleAnnotationValueMapKey",
+                "package mapkeys;",
+                "",
+                GeneratedLines.generatedAnnotations(),
+                "public final class MapModule_ComplexKeyWithInaccessibleAnnotationValueMapKey {",
+                "  public static MapKeys.ComplexKey create() {",
+                "    return MapKeys_ComplexKeyCreator.createComplexKey(",
+                "        new Class[] {String.class},",
+                "        String.class,",
+                "        MapKeys_ComplexKeyCreator.createClassKey(MapKeys.Inaccessible.class));",
+                "  }",
+                "}"));
     assertThat(compilation)
         .generatedSourceFile("mapkeys.MapModule_ClassKeyMapKey")
-        .hasSourceEquivalentTo(goldenFileRule.goldenFile("mapkeys.MapModule_ClassKeyMapKey"));
+        .containsElementsIn(
+            JavaFileObjects.forSourceLines(
+                "mapkeys.MapModule_ClassKeyMapKey",
+                "package mapkeys;",
+                "",
+                GeneratedLines.generatedAnnotations(),
+                "public final class MapModule_ClassKeyMapKey {",
+                "  public static Class<?> create() {",
+                "    return MapKeys.Inaccessible.class;",
+                "  }",
+                "}"));
   }
 
   @Test
-  public void mapBindingsWithStringKey() throws Exception {
-    Source mapModuleOneFile =
-        CompilerTests.javaSource(
-            "test.MapModuleOne",
-            "package test;",
-            "",
-            "import dagger.Module;",
-            "import dagger.Provides;",
-            "import dagger.multibindings.StringKey;",
-            "import dagger.multibindings.IntoMap;",
-            "",
-            "@Module",
-            "final class MapModuleOne {",
-            "  @Provides @IntoMap @StringKey(\"Admin\") Handler provideAdminHandler() {",
-            "    return new AdminHandler();",
-            "  }",
-            "}");
-    Source mapModuleTwoFile =
-        CompilerTests.javaSource(
-            "test.MapModuleTwo",
-            "package test;",
-            "",
-            "import dagger.Module;",
-            "import dagger.Provides;",
-            "import dagger.multibindings.IntoMap;",
-            "import dagger.multibindings.StringKey;",
-            "",
-            "@Module",
-            "final class MapModuleTwo {",
-            "  @Provides @IntoMap @StringKey(\"Login\") Handler provideLoginHandler() {",
-            "    return new LoginHandler();",
-            "  }",
-            "}");
-    Source handlerFile =
-        CompilerTests.javaSource(
-            "test.Handler",
-            "package test;",
-            "",
-            "interface Handler {}");
-    Source loginHandlerFile =
-        CompilerTests.javaSource(
+  public void mapBindingsWithStringKey() {
+    JavaFileObject mapModuleOneFile =
+        JavaFileObjects
+            .forSourceLines("test.MapModuleOne",
+                "package test;",
+                "",
+                "import dagger.Module;",
+                "import dagger.Provides;",
+                "import dagger.multibindings.StringKey;",
+                "import dagger.multibindings.IntoMap;",
+                "",
+                "@Module",
+                "final class MapModuleOne {",
+                "  @Provides @IntoMap @StringKey(\"Admin\") Handler provideAdminHandler() {",
+                "    return new AdminHandler();",
+                "  }",
+                "}");
+    JavaFileObject mapModuleTwoFile =
+        JavaFileObjects
+            .forSourceLines("test.MapModuleTwo",
+                "package test;",
+                "",
+                "import dagger.Module;",
+                "import dagger.Provides;",
+                "import dagger.multibindings.IntoMap;",
+                "import dagger.multibindings.StringKey;",
+                "",
+                "@Module",
+                "final class MapModuleTwo {",
+                "  @Provides @IntoMap @StringKey(\"Login\") Handler provideLoginHandler() {",
+                "    return new LoginHandler();",
+                "  }",
+                "}");
+    JavaFileObject handlerFile =
+        JavaFileObjects.forSourceLines("test.Handler", "package test;", "", "interface Handler {}");
+    JavaFileObject loginHandlerFile =
+        JavaFileObjects.forSourceLines(
             "test.LoginHandler",
             "package test;",
             "",
             "class LoginHandler implements Handler {",
             "  public LoginHandler() {}",
             "}");
-    Source adminHandlerFile =
-        CompilerTests.javaSource(
+    JavaFileObject adminHandlerFile =
+        JavaFileObjects.forSourceLines(
             "test.AdminHandler",
             "package test;",
             "",
             "class AdminHandler implements Handler {",
             "  public AdminHandler() {}",
             "}");
-    Source componentFile =
-        CompilerTests.javaSource(
-            "test.TestComponent",
-            "package test;",
-            "",
-            "import dagger.Component;",
-            "import java.util.Map;",
-            "import javax.inject.Provider;",
-            "",
-            "@Component(modules = {MapModuleOne.class, MapModuleTwo.class})",
-            "interface TestComponent {",
-            "  Provider<Map<String, Provider<Handler>>> dispatcher();",
-            "}");
+    JavaFileObject componentFile = JavaFileObjects.forSourceLines("test.TestComponent",
+        "package test;",
+        "",
+        "import dagger.Component;",
+        "import java.util.Map;",
+        "import javax.inject.Provider;",
+        "",
+        "@Component(modules = {MapModuleOne.class, MapModuleTwo.class})",
+        "interface TestComponent {",
+        "  Provider<Map<String, Provider<Handler>>> dispatcher();",
+        "}");
 
-    CompilerTests.daggerCompiler(
-            mapModuleOneFile,
-            mapModuleTwoFile,
-            handlerFile,
-            loginHandlerFile,
-            adminHandlerFile,
-            componentFile)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
-            });
+    Compilation compilation =
+        compilerWithOptions(compilerMode.javacopts())
+            .compile(
+                mapModuleOneFile,
+                mapModuleTwoFile,
+                handlerFile,
+                loginHandlerFile,
+                adminHandlerFile,
+                componentFile);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .generatedSourceFile("test.DaggerTestComponent")
+        .containsElementsIn(
+            compilerMode
+                .javaFileBuilder("test.DaggerTestComponent")
+                .addLines(
+                    "package test;",
+                    "",
+                    GeneratedLines.generatedAnnotations(),
+                    "final class DaggerTestComponent implements TestComponent {",
+                    "  private final DaggerTestComponent testComponent = this;",
+                    "  private Provider<Handler> provideAdminHandlerProvider;",
+                    "  private Provider<Handler> provideLoginHandlerProvider;",
+                    "  private Provider<Map<String, Provider<Handler>>>",
+                    "      mapOfStringAndProviderOfHandlerProvider;")
+                .addLinesIn(
+                    DEFAULT_MODE,
+                    "  @SuppressWarnings(\"unchecked\")",
+                    "  private void initialize(",
+                    "      final MapModuleOne mapModuleOneParam,",
+                    "      final MapModuleTwo mapModuleTwoParam) {",
+                    "    this.provideAdminHandlerProvider =",
+                    "        MapModuleOne_ProvideAdminHandlerFactory.create(mapModuleOneParam);",
+                    "    this.provideLoginHandlerProvider =",
+                    "        MapModuleTwo_ProvideLoginHandlerFactory.create(mapModuleTwoParam);",
+                    "    this.mapOfStringAndProviderOfHandlerProvider =",
+                    "        MapProviderFactory.<String, Handler>builder(2)",
+                    "            .put(\"Admin\", provideAdminHandlerProvider)",
+                    "            .put(\"Login\", provideLoginHandlerProvider)",
+                    "            .build();",
+                    "  }")
+                .addLinesIn(
+                    FAST_INIT_MODE,
+                    "  @SuppressWarnings(\"unchecked\")",
+                    "  private void initialize(",
+                    "      final MapModuleOne mapModuleOneParam,",
+                    "      final MapModuleTwo mapModuleTwoParam) {",
+                    "    this.provideAdminHandlerProvider =",
+                    "        new SwitchingProvider<>(testComponent, 1);",
+                    "    this.provideLoginHandlerProvider =",
+                    "        new SwitchingProvider<>(testComponent, 2);",
+                    "    this.mapOfStringAndProviderOfHandlerProvider =",
+                    "        new SwitchingProvider<>(testComponent, 0);",
+                    "  }")
+                .addLines(
+                    "  @Override",
+                    "  public Provider<Map<String, Provider<Handler>>> dispatcher() {",
+                    "    return mapOfStringAndProviderOfHandlerProvider;",
+                    "  }")
+                .addLinesIn(
+                    FAST_INIT_MODE,
+                    "  private static final class SwitchingProvider<T> implements Provider<T> {",
+                    "    @SuppressWarnings(\"unchecked\")",
+                    "    @Override",
+                    "    public T get() {",
+                    "      switch (id) {",
+                    "        case 0: return (T) ImmutableMap.<String, Provider<Handler>>of(",
+                    "          \"Admin\",",
+                    "          testComponent.provideAdminHandlerProvider,",
+                    "          \"Login\",",
+                    "          testComponent.provideLoginHandlerProvider);",
+                    "        case 1: return (T) MapModuleOne_ProvideAdminHandlerFactory",
+                    "            .provideAdminHandler(testComponent.mapModuleOne);",
+                    "        case 2: return (T) MapModuleTwo_ProvideLoginHandlerFactory",
+                    "            .provideLoginHandler(testComponent.mapModuleTwo);",
+                    "        default: throw new AssertionError(id);",
+                    "      }",
+                    "    }",
+                    "  }",
+                    "}")
+                .build());
   }
 
   @Test
-  public void mapBindingsWithWrappedKey() throws Exception {
+  public void mapBindingsWithWrappedKey() {
     JavaFileObject mapModuleOneFile =
         JavaFileObjects
             .forSourceLines("test.MapModuleOne",
@@ -442,155 +661,282 @@ public class MapBindingComponentProcessorTest {
     assertThat(compilation).succeeded();
     assertThat(compilation)
         .generatedSourceFile("test.DaggerTestComponent")
-        .hasSourceEquivalentTo(goldenFileRule.goldenFile("test.DaggerTestComponent"));
+        .containsElementsIn(
+            compilerMode
+                .javaFileBuilder("test.DaggerTestComponent")
+                .addLines(
+                    "package test;",
+                    "",
+                    GeneratedLines.generatedAnnotations(),
+                    "final class DaggerTestComponent implements TestComponent {",
+                    "  private final DaggerTestComponent testComponent = this;",
+                    "  private Provider<Handler> provideAdminHandlerProvider;",
+                    "  private Provider<Handler> provideLoginHandlerProvider;",
+                    "  private Provider<Map<WrappedClassKey, Provider<Handler>>>",
+                    "      mapOfWrappedClassKeyAndProviderOfHandlerProvider;")
+                .addLinesIn(
+                    DEFAULT_MODE,
+                    "  @SuppressWarnings(\"unchecked\")",
+                    "  private void initialize(",
+                    "      final MapModuleOne mapModuleOneParam,",
+                    "      final MapModuleTwo mapModuleTwoParam) {",
+                    "    this.provideAdminHandlerProvider =",
+                    "        MapModuleOne_ProvideAdminHandlerFactory.create(mapModuleOneParam);",
+                    "    this.provideLoginHandlerProvider =",
+                    "        MapModuleTwo_ProvideLoginHandlerFactory.create(mapModuleTwoParam);",
+                    "    this.mapOfWrappedClassKeyAndProviderOfHandlerProvider =",
+                    "        MapProviderFactory.<WrappedClassKey, Handler>builder(2)",
+                    "            .put(WrappedClassKeyCreator.createWrappedClassKey(Integer.class),",
+                    "                provideAdminHandlerProvider)",
+                    "            .put(WrappedClassKeyCreator.createWrappedClassKey(Long.class),",
+                    "                provideLoginHandlerProvider)",
+                    "            .build();",
+                    "  }")
+                .addLinesIn(
+                    FAST_INIT_MODE,
+                    "  @SuppressWarnings(\"unchecked\")",
+                    "  private void initialize(final MapModuleOne mapModuleOneParam,",
+                    "      final MapModuleTwo mapModuleTwoParam) {",
+                    "    this.provideAdminHandlerProvider =",
+                    "        new SwitchingProvider<>(testComponent, 1);",
+                    "    this.provideLoginHandlerProvider =",
+                    "        new SwitchingProvider<>(testComponent, 2);",
+                    "    this.mapOfWrappedClassKeyAndProviderOfHandlerProvider =",
+                    "        new SwitchingProvider<>(testComponent, 0);",
+                    "  }")
+                .addLines(
+                    "  @Override",
+                    "  public Provider<Map<WrappedClassKey, Provider<Handler>>> dispatcher() {",
+                    "    return mapOfWrappedClassKeyAndProviderOfHandlerProvider;",
+                    "  }")
+                .addLinesIn(
+                    FAST_INIT_MODE,
+                    "  private static final class SwitchingProvider<T> implements Provider<T> {",
+                    "    @SuppressWarnings(\"unchecked\")",
+                    "    @Override",
+                    "    public T get() {",
+                    "      switch (id) {",
+                    "        case 0:",
+                    "        return (T) ImmutableMap.<WrappedClassKey, Provider<Handler>>of(",
+                    "          WrappedClassKeyCreator.createWrappedClassKey(Integer.class),",
+                    "          testComponent.provideAdminHandlerProvider,",
+                    "          WrappedClassKeyCreator.createWrappedClassKey(Long.class),",
+                    "          testComponent.provideLoginHandlerProvider);",
+                    "        case 1: return (T) MapModuleOne_ProvideAdminHandlerFactory",
+                    "            .provideAdminHandler(testComponent.mapModuleOne);",
+                    "        case 2: return (T) MapModuleTwo_ProvideLoginHandlerFactory",
+                    "            .provideLoginHandler(testComponent.mapModuleTwo);",
+                    "        default: throw new AssertionError(id);",
+                    "      }",
+                    "    }",
+                    "  }",
+                    "}")
+                .build());
   }
 
   @Test
-  public void mapBindingsWithNonProviderValue() throws Exception {
-    Source mapModuleOneFile =
-        CompilerTests.javaSource(
-            "test.MapModuleOne",
-            "package test;",
-            "",
-            "import dagger.Module;",
-            "import dagger.Provides;",
-            "import dagger.multibindings.IntoMap;",
-            "",
-            "@Module",
-            "final class MapModuleOne {",
-            "  @Provides @IntoMap @PathKey(PathEnum.ADMIN) Handler provideAdminHandler() {",
-            "    return new AdminHandler();",
-            "  }",
-            "}");
-    Source mapModuleTwoFile =
-        CompilerTests.javaSource(
-            "test.MapModuleTwo",
-            "package test;",
-            "",
-            "import dagger.Module;",
-            "import dagger.Provides;",
-            "import dagger.multibindings.IntoMap;",
-            "",
-            "@Module",
-            "final class MapModuleTwo {",
-            "  @Provides @IntoMap @PathKey(PathEnum.LOGIN) Handler provideLoginHandler() {",
-            "    return new LoginHandler();",
-            "  }",
-            "}");
-    Source enumKeyFile =
-        CompilerTests.javaSource(
-            "test.PathKey",
-            "package test;",
-            "import dagger.MapKey;",
-            "import java.lang.annotation.Retention;",
-            "import static java.lang.annotation.RetentionPolicy.RUNTIME;",
-            "",
-            "@MapKey(unwrapValue = true)",
-            "@Retention(RUNTIME)",
-            "public @interface PathKey {",
-            "  PathEnum value();",
-            "}");
-    Source pathEnumFile =
-        CompilerTests.javaSource(
-            "test.PathEnum",
-            "package test;",
-            "",
-            "public enum PathEnum {",
-            "    ADMIN,",
-            "    LOGIN;",
-            "}");
-    Source handlerFile =
-        CompilerTests.javaSource(
-            "test.Handler",
-            "package test;",
-            "",
-            "interface Handler {}");
-    Source loginHandlerFile =
-        CompilerTests.javaSource(
+  public void mapBindingsWithNonProviderValue() {
+    JavaFileObject mapModuleOneFile = JavaFileObjects.forSourceLines("test.MapModuleOne",
+        "package test;",
+        "",
+        "import dagger.Module;",
+        "import dagger.Provides;",
+        "import dagger.multibindings.IntoMap;",
+        "",
+        "@Module",
+        "final class MapModuleOne {",
+        "  @Provides @IntoMap @PathKey(PathEnum.ADMIN) Handler provideAdminHandler() {",
+        "    return new AdminHandler();",
+        "  }",
+        "}");
+    JavaFileObject mapModuleTwoFile = JavaFileObjects.forSourceLines("test.MapModuleTwo",
+        "package test;",
+        "",
+        "import dagger.Module;",
+        "import dagger.Provides;",
+        "import dagger.multibindings.IntoMap;",
+        "",
+        "@Module",
+        "final class MapModuleTwo {",
+        "  @Provides @IntoMap @PathKey(PathEnum.LOGIN) Handler provideLoginHandler() {",
+        "    return new LoginHandler();",
+        "  }",
+        "}");
+    JavaFileObject enumKeyFile = JavaFileObjects.forSourceLines("test.PathKey",
+        "package test;",
+        "import dagger.MapKey;",
+        "import java.lang.annotation.Retention;",
+        "import static java.lang.annotation.RetentionPolicy.RUNTIME;",
+        "",
+        "@MapKey(unwrapValue = true)",
+        "@Retention(RUNTIME)",
+        "public @interface PathKey {",
+        "  PathEnum value();",
+        "}");
+    JavaFileObject pathEnumFile = JavaFileObjects.forSourceLines("test.PathEnum",
+        "package test;",
+        "",
+        "public enum PathEnum {",
+        "    ADMIN,",
+        "    LOGIN;",
+        "}");
+    JavaFileObject handlerFile =
+        JavaFileObjects.forSourceLines("test.Handler", "package test;", "", "interface Handler {}");
+    JavaFileObject loginHandlerFile =
+        JavaFileObjects.forSourceLines(
             "test.LoginHandler",
             "package test;",
             "",
             "class LoginHandler implements Handler {",
             "  public LoginHandler() {}",
             "}");
-    Source adminHandlerFile =
-        CompilerTests.javaSource(
+    JavaFileObject adminHandlerFile =
+        JavaFileObjects.forSourceLines(
             "test.AdminHandler",
             "package test;",
             "",
             "class AdminHandler implements Handler {",
             "  public AdminHandler() {}",
             "}");
-    Source componentFile =
-        CompilerTests.javaSource(
-            "test.TestComponent",
-            "package test;",
-            "",
-            "import dagger.Component;",
-            "import java.util.Map;",
-            "import javax.inject.Provider;",
-            "",
-            "@Component(modules = {MapModuleOne.class, MapModuleTwo.class})",
-            "interface TestComponent {",
-            "  Provider<Map<PathEnum, Handler>> dispatcher();",
-            "}");
+    JavaFileObject componentFile = JavaFileObjects.forSourceLines("test.TestComponent",
+        "package test;",
+        "",
+        "import dagger.Component;",
+        "import java.util.Map;",
+        "import javax.inject.Provider;",
+        "",
+        "@Component(modules = {MapModuleOne.class, MapModuleTwo.class})",
+        "interface TestComponent {",
+        "  Provider<Map<PathEnum, Handler>> dispatcher();",
+        "}");
 
-    CompilerTests.daggerCompiler(
-            mapModuleOneFile,
-            mapModuleTwoFile,
-            enumKeyFile,
-            pathEnumFile,
-            handlerFile,
-            loginHandlerFile,
-            adminHandlerFile,
-            componentFile)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
-            });
+    Compilation compilation =
+        compilerWithOptions(compilerMode.javacopts())
+            .compile(
+                mapModuleOneFile,
+                mapModuleTwoFile,
+                enumKeyFile,
+                pathEnumFile,
+                handlerFile,
+                loginHandlerFile,
+                adminHandlerFile,
+                componentFile);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .generatedSourceFile("test.DaggerTestComponent")
+        .containsElementsIn(
+            compilerMode
+                .javaFileBuilder("test.DaggerTestComponent")
+                .addLines(
+                    "package test;",
+                    "",
+                    GeneratedLines.generatedAnnotations(),
+                    "final class DaggerTestComponent implements TestComponent {")
+                .addLinesIn(
+                    DEFAULT_MODE,
+                    "  private Provider<Handler> provideAdminHandlerProvider;",
+                    "  private Provider<Handler> provideLoginHandlerProvider;",
+                    "  private Provider<Map<PathEnum, Handler>> mapOfPathEnumAndHandlerProvider;",
+                    "",
+                    "  @SuppressWarnings(\"unchecked\")",
+                    "  private void initialize(",
+                    "        final MapModuleOne mapModuleOneParam,",
+                    "        final MapModuleTwo mapModuleTwoParam) {",
+                    "    this.provideAdminHandlerProvider =",
+                    "        MapModuleOne_ProvideAdminHandlerFactory.create(mapModuleOneParam);",
+                    "    this.provideLoginHandlerProvider =",
+                    "        MapModuleTwo_ProvideLoginHandlerFactory.create(mapModuleTwoParam);",
+                    "    this.mapOfPathEnumAndHandlerProvider =",
+                    "        MapFactory.<PathEnum, Handler>builder(2)",
+                    "            .put(PathEnum.ADMIN, provideAdminHandlerProvider)",
+                    "            .put(PathEnum.LOGIN, provideLoginHandlerProvider)",
+                    "            .build();",
+                    "  }")
+                .addLinesIn(
+                    FAST_INIT_MODE,
+                    "  private Provider<Map<PathEnum, Handler>> mapOfPathEnumAndHandlerProvider;",
+                    "",
+                    "  @SuppressWarnings(\"unchecked\")",
+                    "  private void initialize(final MapModuleOne mapModuleOneParam,",
+                    "      final MapModuleTwo mapModuleTwoParam) {",
+                    "    this.mapOfPathEnumAndHandlerProvider =",
+                    "        new SwitchingProvider<>(testComponent, 0);",
+                    "  }")
+                .addLines(
+                    "  @Override",
+                    "  public Provider<Map<PathEnum, Handler>> dispatcher() {",
+                    "    return mapOfPathEnumAndHandlerProvider;",
+                    "  }")
+                .addLinesIn(
+                    FAST_INIT_MODE,
+                    "  private static final class SwitchingProvider<T> implements Provider<T> {",
+                    "    @SuppressWarnings(\"unchecked\")",
+                    "    @Override",
+                    "    public T get() {",
+                    "      switch (id) {",
+                    "        case 0: return (T) ImmutableMap.<PathEnum, Handler>of(",
+                    "          PathEnum.ADMIN,",
+                    "          MapModuleOne_ProvideAdminHandlerFactory.provideAdminHandler(",
+                    "          testComponent.mapModuleOne),",
+                    "          PathEnum.LOGIN,",
+                    "          MapModuleTwo_ProvideLoginHandlerFactory.provideLoginHandler(",
+                    "          testComponent.mapModuleTwo));",
+                    "        default: throw new AssertionError(id);",
+                    "      }",
+                    "    }",
+                    "  }",
+                    "}")
+                .build());
   }
 
   @Test
-  public void injectMapWithoutMapBinding() throws Exception {
-    Source mapModuleFile =
-        CompilerTests.javaSource(
-            "test.MapModule",
+  public void injectMapWithoutMapBinding() {
+    JavaFileObject mapModuleFile = JavaFileObjects.forSourceLines("test.MapModule",
+        "package test;",
+        "",
+        "import dagger.Module;",
+        "import dagger.Provides;",
+        "import java.util.HashMap;",
+        "import java.util.Map;",
+        "",
+        "@Module",
+        "final class MapModule {",
+        "  @Provides Map<String, String> provideAMap() {",
+        "    Map<String, String> map = new HashMap<String, String>();",
+        "    map.put(\"Hello\", \"World\");",
+        "    return map;",
+        "  }",
+        "}");
+    JavaFileObject componentFile = JavaFileObjects.forSourceLines("test.TestComponent",
+        "package test;",
+        "",
+        "import dagger.Component;",
+        "import java.util.Map;",
+        "",
+        "@Component(modules = {MapModule.class})",
+        "interface TestComponent {",
+        "  Map<String, String> dispatcher();",
+        "}");
+    JavaFileObject generatedComponent =
+        JavaFileObjects.forSourceLines(
+            "test.DaggerTestComponent",
             "package test;",
             "",
-            "import dagger.Module;",
-            "import dagger.Provides;",
-            "import java.util.HashMap;",
-            "import java.util.Map;",
+            GeneratedLines.generatedAnnotations(),
+            "final class DaggerTestComponent implements TestComponent {",
+            "  private final MapModule mapModule;",
             "",
-            "@Module",
-            "final class MapModule {",
-            "  @Provides Map<String, String> provideAMap() {",
-            "    Map<String, String> map = new HashMap<String, String>();",
-            "    map.put(\"Hello\", \"World\");",
-            "    return map;",
+            "  @Override",
+            "  public Map<String, String> dispatcher() {",
+            "    return MapModule_ProvideAMapFactory.provideAMap(mapModule);",
             "  }",
             "}");
-    Source componentFile =
-        CompilerTests.javaSource(
-            "test.TestComponent",
-            "package test;",
-            "",
-            "import dagger.Component;",
-            "import java.util.Map;",
-            "",
-            "@Component(modules = {MapModule.class})",
-            "interface TestComponent {",
-            "  Map<String, String> dispatcher();",
-            "}");
-
-    CompilerTests.daggerCompiler(mapModuleFile, componentFile)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
-            });
+    Compilation compilation =
+        compilerWithOptions(compilerMode.javacopts())
+            .compile(mapModuleFile, componentFile);
+    assertThat(compilation).succeeded();
+    assertThat(compilation)
+        .generatedSourceFile("test.DaggerTestComponent")
+        .containsElementsIn(generatedComponent);
   }
 }

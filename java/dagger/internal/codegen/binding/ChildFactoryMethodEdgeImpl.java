@@ -37,6 +37,6 @@ public final class ChildFactoryMethodEdgeImpl implements ChildFactoryMethodEdge 
 
   @Override
   public String toString() {
-    return elementToString(factoryMethod.xprocessing());
+    return elementToString(factoryMethod.java());
   }
 }

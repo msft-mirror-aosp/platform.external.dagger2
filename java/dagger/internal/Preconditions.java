@@ -16,7 +16,6 @@
 
 package dagger.internal;
 
-
 /**
  * An adaptation of Guava's {@code com.google.common.base.Preconditions} that is specially tailored
  * to support checks applied in Dagger's generated code.
