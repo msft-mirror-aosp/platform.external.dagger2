@@ -17,6 +17,8 @@
 package dagger.internal.codegen.validation;
 
 import static androidx.room.compiler.processing.XElementKt.isTypeElement;
+import static androidx.room.compiler.processing.compat.XConverters.toXProcessing;
+import static com.google.auto.common.MoreTypes.asTypeElement;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -26,11 +28,9 @@ import static dagger.internal.codegen.binding.AssistedInjectionAnnotations.assis
 import static dagger.internal.codegen.binding.InjectionAnnotations.injectedConstructors;
 import static dagger.internal.codegen.binding.SourceFiles.generatedClassNameForBinding;
 import static dagger.internal.codegen.extension.DaggerCollectors.toOptional;
+import static dagger.internal.codegen.langmodel.DaggerTypes.unwrapType;
 import static dagger.internal.codegen.xprocessing.XElements.asTypeElement;
-import static dagger.internal.codegen.xprocessing.XTypes.erasedTypeName;
-import static dagger.internal.codegen.xprocessing.XTypes.isDeclared;
-import static dagger.internal.codegen.xprocessing.XTypes.nonObjectSuperclass;
-import static dagger.internal.codegen.xprocessing.XTypes.unwrapType;
+import static javax.lang.model.type.TypeKind.DECLARED;
 
 import androidx.room.compiler.processing.XConstructorElement;
 import androidx.room.compiler.processing.XFieldElement;
@@ -55,6 +55,8 @@ import dagger.internal.codegen.binding.MembersInjectionBinding;
 import dagger.internal.codegen.binding.ProvisionBinding;
 import dagger.internal.codegen.compileroption.CompilerOptions;
 import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.langmodel.DaggerElements;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.spi.model.Key;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -64,17 +66,21 @@ import java.util.Set;
 import java.util.stream.Stream;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic.Kind;
 
 /**
  * Maintains the collection of provision bindings from {@link Inject} constructors and members
- * injection bindings from {@link Inject} fields and methods known to the annotation processor. Note
- * that this registry <b>does not</b> handle any explicit bindings (those from {@link Provides}
+ * injection bindings from {@link Inject} fields and methods known to the annotation processor.
+ * Note that this registry <b>does not</b> handle any explicit bindings (those from {@link Provides}
  * methods, {@link Component} dependencies, etc.).
  */
 @Singleton
 final class InjectBindingRegistryImpl implements InjectBindingRegistry {
   private final XProcessingEnv processingEnv;
+  private final DaggerElements elements;
+  private final DaggerTypes types;
   private final XMessager messager;
   private final InjectValidator injectValidator;
   private final InjectValidator injectValidatorWhenGeneratingCode;
@@ -97,9 +103,11 @@ final class InjectBindingRegistryImpl implements InjectBindingRegistry {
           binding != null;
           binding = bindingsRequiringGeneration.poll()) {
         checkState(!binding.unresolved().isPresent());
-        XType type = binding.key().type().xprocessing();
-        if (!isDeclared(type)
-            || injectValidatorWhenGeneratingCode.validate(type.getTypeElement()).isClean()) {
+        TypeMirror type = binding.key().type().java();
+        if (!type.getKind().equals(DECLARED)
+            || injectValidatorWhenGeneratingCode
+                .validate(toXProcessing(asTypeElement(type), processingEnv))
+                .isClean()) {
           generator.generate(binding);
         }
         materializedBindingKeys.add(binding.key());
@@ -139,8 +147,7 @@ final class InjectBindingRegistryImpl implements InjectBindingRegistry {
                   "Generating a %s for %s. "
                       + "Prefer to run the dagger processor over that class instead.",
                   factoryClass.simpleName(),
-                  // erasure to strip <T> from msgs.
-                  erasedTypeName(binding.key().type().xprocessing())));
+                  types.erasure(binding.key().type().java()))); // erasure to strip <T> from msgs.
         }
       }
     }
@@ -150,7 +157,7 @@ final class InjectBindingRegistryImpl implements InjectBindingRegistry {
       return !binding.unresolved().isPresent()
           && !materializedBindingKeys.contains(binding.key())
           && !bindingsRequiringGeneration.contains(binding)
-          && processingEnv.findTypeElement(generatedClassNameForBinding(binding)) == null;
+          && elements.getTypeElement(generatedClassNameForBinding(binding)) == null;
     }
 
     /** Caches the binding for future lookups by key. */
@@ -176,12 +183,16 @@ final class InjectBindingRegistryImpl implements InjectBindingRegistry {
   @Inject
   InjectBindingRegistryImpl(
       XProcessingEnv processingEnv,
+      DaggerElements elements,
+      DaggerTypes types,
       XMessager messager,
       InjectValidator injectValidator,
       KeyFactory keyFactory,
       BindingFactory bindingFactory,
       CompilerOptions compilerOptions) {
     this.processingEnv = processingEnv;
+    this.elements = elements;
+    this.types = types;
     this.messager = messager;
     this.injectValidator = injectValidator;
     this.injectValidatorWhenGeneratingCode = injectValidator.whenGeneratingCode();
@@ -317,9 +328,9 @@ final class InjectBindingRegistryImpl implements InjectBindingRegistry {
 
     MembersInjectionBinding binding = bindingFactory.membersInjectionBinding(type, resolvedType);
     registerBinding(binding, warnIfNotAlreadyGenerated);
-    for (Optional<XType> supertype = nonObjectSuperclass(type);
-        supertype.isPresent();
-        supertype = nonObjectSuperclass(supertype.get())) {
+    for (Optional<DeclaredType> supertype = types.nonObjectSuperclass(type);
+         supertype.isPresent();
+         supertype = types.nonObjectSuperclass(supertype.get())) {
       getOrFindMembersInjectionBinding(keyFactory.forMembersInjectedType(supertype.get()));
     }
     return Optional.of(binding);
@@ -373,8 +384,7 @@ final class InjectBindingRegistryImpl implements InjectBindingRegistry {
     if (!isValidMembersInjectionKey(key)) {
       return Optional.empty();
     }
-    Key membersInjectionKey =
-        keyFactory.forMembersInjectedType(unwrapType(key.type().xprocessing()));
+    Key membersInjectionKey = keyFactory.forMembersInjectedType(unwrapType(key.type().java()));
     return getOrFindMembersInjectionBinding(membersInjectionKey)
         .map(binding -> bindingFactory.membersInjectorBinding(key, binding));
   }

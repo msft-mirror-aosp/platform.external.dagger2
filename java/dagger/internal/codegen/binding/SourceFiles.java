@@ -16,12 +16,14 @@
 
 package dagger.internal.codegen.binding;
 
-import static androidx.room.compiler.processing.XElementKt.isConstructor;
+import static androidx.room.compiler.processing.compat.XConverters.toJavac;
+import static com.google.auto.common.MoreElements.asType;
 import static com.google.common.base.CaseFormat.LOWER_CAMEL;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
+import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
 import static dagger.internal.codegen.javapoet.TypeNames.DOUBLE_CHECK;
 import static dagger.internal.codegen.javapoet.TypeNames.MAP_FACTORY;
 import static dagger.internal.codegen.javapoet.TypeNames.MAP_OF_PRODUCED_PRODUCER;
@@ -35,9 +37,6 @@ import static dagger.internal.codegen.javapoet.TypeNames.SET_FACTORY;
 import static dagger.internal.codegen.javapoet.TypeNames.SET_OF_PRODUCED_PRODUCER;
 import static dagger.internal.codegen.javapoet.TypeNames.SET_PRODUCER;
 import static dagger.internal.codegen.xprocessing.XElements.asExecutable;
-import static dagger.internal.codegen.xprocessing.XElements.asTypeElement;
-import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
-import static dagger.internal.codegen.xprocessing.XTypeElements.typeVariableNames;
 import static dagger.spi.model.BindingKind.ASSISTED_INJECTION;
 import static dagger.spi.model.BindingKind.INJECTION;
 import static dagger.spi.model.BindingKind.MULTIBOUND_MAP;
@@ -45,8 +44,8 @@ import static dagger.spi.model.BindingKind.MULTIBOUND_SET;
 import static javax.lang.model.SourceVersion.isName;
 
 import androidx.room.compiler.processing.XExecutableElement;
-import androidx.room.compiler.processing.XFieldElement;
 import androidx.room.compiler.processing.XTypeElement;
+import com.google.auto.common.MoreElements;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -64,15 +63,18 @@ import dagger.internal.codegen.base.SetType;
 import dagger.internal.codegen.javapoet.TypeNames;
 import dagger.spi.model.DependencyRequest;
 import dagger.spi.model.RequestKind;
-import javax.inject.Inject;
+import java.util.List;
 import javax.lang.model.SourceVersion;
+import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.TypeParameterElement;
+import javax.lang.model.element.VariableElement;
 
 /** Utilities for generating files. */
-public final class SourceFiles {
+public class SourceFiles {
 
   private static final Joiner CLASS_FILE_NAME_JOINER = Joiner.on('_');
-
-  @Inject SourceFiles() {}
 
   /**
    * Generates names and keys for the factory class fields needed to hold the framework classes for
@@ -98,18 +100,15 @@ public final class SourceFiles {
         dependency ->
             FrameworkField.create(
                 frameworkTypeMapper.getFrameworkType(dependency.kind()).frameworkClassName(),
-                dependency.key().type().xprocessing().getTypeName(),
+                TypeName.get(dependency.key().type().java()),
                 DependencyVariableNamer.name(dependency)));
   }
 
-  public CodeBlock frameworkTypeUsageStatement(
+  public static CodeBlock frameworkTypeUsageStatement(
       CodeBlock frameworkTypeMemberSelect, RequestKind dependencyKind) {
     switch (dependencyKind) {
       case LAZY:
-        return CodeBlock.of(
-            "$T.lazy($L)",
-            DOUBLE_CHECK,
-            frameworkTypeMemberSelect);
+        return CodeBlock.of("$T.lazy($L)", DOUBLE_CHECK, frameworkTypeMemberSelect);
       case INSTANCE:
       case FUTURE:
         return CodeBlock.of("$L.get()", frameworkTypeMemberSelect);
@@ -127,7 +126,7 @@ public final class SourceFiles {
    * Returns a mapping of {@link DependencyRequest}s to {@link CodeBlock}s that {@linkplain
    * #frameworkTypeUsageStatement(CodeBlock, RequestKind) use them}.
    */
-  public ImmutableMap<DependencyRequest, CodeBlock> frameworkFieldUsages(
+  public static ImmutableMap<DependencyRequest, CodeBlock> frameworkFieldUsages(
       ImmutableSet<DependencyRequest> dependencies,
       ImmutableMap<DependencyRequest, FieldSpec> fields) {
     return Maps.toMap(
@@ -149,7 +148,7 @@ public final class SourceFiles {
             return factoryNameForElement(asExecutable(binding.bindingElement().get()));
 
           case ASSISTED_FACTORY:
-            return siblingClassName(asTypeElement(binding.bindingElement().get()), "_Impl");
+            return siblingClassName(asType(toJavac(binding.bindingElement().get())), "_Impl");
 
           default:
             throw new AssertionError();
@@ -171,7 +170,7 @@ public final class SourceFiles {
    * given element is actually a binding element or not.
    */
   public static ClassName factoryNameForElement(XExecutableElement element) {
-    return elementBasedClassName(element, "Factory");
+    return elementBasedClassName(toJavac(element), "Factory");
   }
 
   /**
@@ -181,10 +180,13 @@ public final class SourceFiles {
    * <p>This will always return a {@linkplain ClassName#topLevelClassName() top level class name},
    * even if {@code element}'s enclosing class is a nested type.
    */
-  public static ClassName elementBasedClassName(XExecutableElement element, String suffix) {
-    ClassName enclosingClassName = element.getEnclosingElement().getClassName();
+  public static ClassName elementBasedClassName(ExecutableElement element, String suffix) {
+    ClassName enclosingClassName =
+        ClassName.get(MoreElements.asType(element.getEnclosingElement()));
     String methodName =
-        isConstructor(element) ? "" : LOWER_CAMEL.to(UPPER_CAMEL, getSimpleName(element));
+        element.getKind().equals(ElementKind.CONSTRUCTOR)
+            ? ""
+            : LOWER_CAMEL.to(UPPER_CAMEL, element.getSimpleName().toString());
     return ClassName.get(
         enclosingClassName.packageName(),
         classFileName(enclosingClassName) + "_" + methodName + suffix);
@@ -199,11 +201,17 @@ public final class SourceFiles {
   }
 
   public static ClassName membersInjectorNameForType(XTypeElement typeElement) {
+    return membersInjectorNameForType(toJavac(typeElement));
+  }
+
+  public static ClassName membersInjectorNameForType(TypeElement typeElement) {
     return siblingClassName(typeElement, "_MembersInjector");
   }
 
-  public static String memberInjectedFieldSignatureForVariable(XFieldElement field) {
-    return field.getEnclosingElement().getClassName().canonicalName() + "." + getSimpleName(field);
+  public static String memberInjectedFieldSignatureForVariable(VariableElement variableElement) {
+    return MoreElements.asType(variableElement.getEnclosingElement()).getQualifiedName()
+        + "."
+        + variableElement.getSimpleName();
   }
 
   public static String classFileName(ClassName className) {
@@ -211,13 +219,13 @@ public final class SourceFiles {
   }
 
   public static ClassName generatedMonitoringModuleName(XTypeElement componentElement) {
-    return siblingClassName(componentElement, "_MonitoringModule");
+    return siblingClassName(toJavac(componentElement), "_MonitoringModule");
   }
 
   // TODO(ronshapiro): when JavaPoet migration is complete, replace the duplicated code
   // which could use this.
-  private static ClassName siblingClassName(XTypeElement typeElement, String suffix) {
-    ClassName className = typeElement.getClassName();
+  private static ClassName siblingClassName(TypeElement typeElement, String suffix) {
+    ClassName className = ClassName.get(typeElement);
     return className.topLevelClassName().peerClass(classFileName(className) + suffix);
   }
 
@@ -271,17 +279,19 @@ public final class SourceFiles {
         return ImmutableList.of();
       }
     }
-    return typeVariableNames(binding.bindingTypeElement().get());
+    List<? extends TypeParameterElement> typeParameters =
+        toJavac(binding.bindingTypeElement().get()).getTypeParameters();
+    return typeParameters.stream().map(TypeVariableName::get).collect(toImmutableList());
   }
 
   /**
-   * Returns a name to be used for variables of the given {@linkplain XTypeElement type}. Prefer
+   * Returns a name to be used for variables of the given {@linkplain TypeElement type}. Prefer
    * semantically meaningful variable names, but if none can be derived, this will produce something
    * readable.
    */
   // TODO(gak): maybe this should be a function of TypeMirrors instead of Elements?
-  public static String simpleVariableName(XTypeElement typeElement) {
-    return simpleVariableName(typeElement.getClassName());
+  public static String simpleVariableName(TypeElement typeElement) {
+    return simpleVariableName(ClassName.get(typeElement));
   }
 
   /**
@@ -292,7 +302,7 @@ public final class SourceFiles {
   public static String simpleVariableName(ClassName className) {
     String candidateName = UPPER_CAMEL.to(LOWER_CAMEL, className.simpleName());
     String variableName = protectAgainstKeywords(candidateName);
-    verify(isName(variableName), "'%s' was expected to be a valid variable name", variableName);
+    verify(isName(variableName), "'%s' was expected to be a valid variable name");
     return variableName;
   }
 
@@ -324,4 +334,6 @@ public final class SourceFiles {
         return SourceVersion.isKeyword(candidateName) ? candidateName + '_' : candidateName;
     }
   }
+
+  private SourceFiles() {}
 }

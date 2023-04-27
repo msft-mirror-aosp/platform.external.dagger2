@@ -17,6 +17,7 @@
 package dagger.functional.producers.subcomponent;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import dagger.functional.producers.ExecutorModule;
 import dagger.multibindings.IntoSet;
 import dagger.producers.ProducerModule;
 import dagger.producers.Produces;

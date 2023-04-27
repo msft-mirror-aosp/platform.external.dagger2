@@ -22,16 +22,16 @@ import static dagger.internal.codegen.binding.SourceFiles.membersInjectorNameFor
 import static dagger.internal.codegen.javapoet.TypeNames.INSTANCE_FACTORY;
 import static dagger.internal.codegen.javapoet.TypeNames.MEMBERS_INJECTORS;
 
-import androidx.room.compiler.processing.XType;
-import androidx.room.compiler.processing.XTypeElement;
+import com.google.auto.common.MoreTypes;
 import com.squareup.javapoet.CodeBlock;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
 import dagger.assisted.AssistedInject;
-import dagger.internal.codegen.binding.MembersInjectionBinding.InjectionSite;
 import dagger.internal.codegen.binding.ProvisionBinding;
 import dagger.internal.codegen.writing.ComponentImplementation.ShardImplementation;
 import dagger.internal.codegen.writing.FrameworkFieldInitializer.FrameworkInstanceCreationExpression;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.TypeMirror;
 
 /** A {@code Provider<MembersInjector<Foo>>} creation expression. */
 final class MembersInjectorProviderCreationExpression
@@ -53,21 +53,20 @@ final class MembersInjectorProviderCreationExpression
 
   @Override
   public CodeBlock creationExpression() {
-    XType membersInjectedType =
-        getOnlyElement(binding.key().type().xprocessing().getTypeArguments());
+    TypeMirror membersInjectedType =
+        getOnlyElement(MoreTypes.asDeclared(binding.key().type().java()).getTypeArguments());
 
     boolean castThroughRawType = false;
     CodeBlock membersInjector;
     if (binding.injectionSites().isEmpty()) {
-      membersInjector =
-          CodeBlock.of("$T.<$T>noOp()", MEMBERS_INJECTORS, membersInjectedType.getTypeName());
+      membersInjector = CodeBlock.of("$T.<$T>noOp()", MEMBERS_INJECTORS, membersInjectedType);
     } else {
-      XTypeElement injectedTypeElement = membersInjectedType.getTypeElement();
+      TypeElement injectedTypeElement = MoreTypes.asTypeElement(membersInjectedType);
       while (!hasLocalInjectionSites(injectedTypeElement)) {
         // Cast through a raw type since we're going to be using the MembersInjector for the
         // parent type.
         castThroughRawType = true;
-        injectedTypeElement = injectedTypeElement.getSuperType().getTypeElement();
+        injectedTypeElement = MoreTypes.asTypeElement(injectedTypeElement.getSuperclass());
       }
 
       membersInjector =
@@ -92,10 +91,11 @@ final class MembersInjectorProviderCreationExpression
         : providerExpression;
   }
 
-  private boolean hasLocalInjectionSites(XTypeElement injectedTypeElement) {
+  private boolean hasLocalInjectionSites(TypeElement injectedTypeElement) {
     return binding.injectionSites().stream()
-        .map(InjectionSite::enclosingTypeElement)
-        .anyMatch(injectedTypeElement::equals);
+        .anyMatch(
+            injectionSite ->
+                injectionSite.element().getEnclosingElement().equals(injectedTypeElement));
   }
 
   @AssistedFactory

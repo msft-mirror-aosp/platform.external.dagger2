@@ -28,7 +28,6 @@ import javax.lang.model.element.Modifier;
 
 /** Generates an entry point that allows for injection of the given activity */
 public final class InjectorEntryPointGenerator {
-
   private final ProcessingEnvironment env;
   private final AndroidEntryPointMetadata metadata;
 
@@ -63,6 +62,7 @@ public final class InjectorEntryPointGenerator {
     Processors.addGeneratedAnnotation(builder, env, getClass());
     Generators.copyLintAnnotations(metadata.element(), builder);
     Generators.copySuppressAnnotations(metadata.element(), builder);
+
     JavaFile.builder(name.packageName(), builder.build()).build().writeTo(env.getFiler());
   }
 }

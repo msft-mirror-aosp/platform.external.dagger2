@@ -18,17 +18,20 @@ package dagger.internal.codegen.binding;
 
 import static androidx.room.compiler.processing.XElementKt.isMethod;
 import static androidx.room.compiler.processing.XTypeKt.isVoid;
+import static androidx.room.compiler.processing.compat.XConverters.toJavac;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableMap;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
-import static dagger.internal.codegen.javapoet.TypeNames.isFutureType;
-import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
+import static dagger.internal.codegen.langmodel.DaggerTypes.isFutureType;
+import static dagger.internal.codegen.langmodel.DaggerTypes.isTypeOf;
+import static dagger.internal.codegen.xprocessing.XTypes.isPrimitive;
+import static javax.lang.model.type.TypeKind.VOID;
 
-import androidx.room.compiler.processing.XAnnotation;
 import androidx.room.compiler.processing.XElement;
 import androidx.room.compiler.processing.XMethodElement;
+import androidx.room.compiler.processing.XType;
 import androidx.room.compiler.processing.XTypeElement;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
@@ -45,8 +48,8 @@ import dagger.Component;
 import dagger.Module;
 import dagger.Subcomponent;
 import dagger.internal.codegen.base.ComponentAnnotation;
-import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.internal.codegen.xprocessing.XAnnotations;
+import dagger.internal.codegen.langmodel.DaggerTypes;
+import dagger.producers.CancellationPolicy;
 import dagger.spi.model.DependencyRequest;
 import dagger.spi.model.Scope;
 import java.util.HashMap;
@@ -54,6 +57,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.type.TypeMirror;
 
 /**
  * A component declaration.
@@ -65,24 +70,8 @@ import java.util.stream.Stream;
  * represent a synthetic component for the module, where there is an entry point for each binding in
  * the module.
  */
-@CheckReturnValue
 @AutoValue
 public abstract class ComponentDescriptor {
-  /**
-   * The cancellation policy for a {@link dagger.producers.ProductionComponent}.
-   *
-   * <p>@see dagger.producers.CancellationPolicy
-   */
-  public enum CancellationPolicy {
-    PROPAGATE,
-    IGNORE;
-
-    private static CancellationPolicy from(XAnnotation annotation) {
-      checkArgument(XAnnotations.getClassName(annotation).equals(TypeNames.CANCELLATION_POLICY));
-      return valueOf(getSimpleName(annotation.getAsEnum("fromSubcomponents")));
-    }
-  }
-
   /** Creates a {@link ComponentDescriptor}. */
   static ComponentDescriptor create(
       ComponentAnnotation componentAnnotation,
@@ -293,7 +282,8 @@ public abstract class ComponentDescriptor {
   }
 
   @Memoized
-  ImmutableMap<BindingRequest, ComponentMethodDescriptor> firstMatchingComponentMethods() {
+  ImmutableMap<BindingRequest, ComponentMethodDescriptor>
+      firstMatchingComponentMethods() {
     Map<BindingRequest, ComponentMethodDescriptor> methods = new HashMap<>();
     for (ComponentMethodDescriptor method : entryPointMethods()) {
       methods.putIfAbsent(BindingRequest.bindingRequest(method.dependencyRequest().get()), method);
@@ -303,7 +293,8 @@ public abstract class ComponentDescriptor {
 
   /** The entry point methods on the component type. Each has a {@link DependencyRequest}. */
   public final ImmutableSet<ComponentMethodDescriptor> entryPointMethods() {
-    return componentMethods().stream()
+    return componentMethods()
+        .stream()
         .filter(method -> method.dependencyRequest().isPresent())
         .collect(toImmutableSet());
   }
@@ -329,8 +320,7 @@ public abstract class ComponentDescriptor {
   public final Optional<CancellationPolicy> cancellationPolicy() {
     return isProduction()
         // TODO(bcorso): Get values from XAnnotation instead of using CancellationPolicy directly.
-        ? Optional.ofNullable(typeElement().getAnnotation(TypeNames.CANCELLATION_POLICY))
-            .map(CancellationPolicy::from)
+        ? Optional.ofNullable(toJavac(typeElement()).getAnnotation(CancellationPolicy.class))
         : Optional.empty();
   }
 
@@ -360,6 +350,22 @@ public abstract class ComponentDescriptor {
     /** The subcomponent for subcomponent factory methods and subcomponent creator methods. */
     public abstract Optional<ComponentDescriptor> subcomponent();
 
+    /**
+     * Returns the return type of {@link #methodElement()} as resolved in the {@link
+     * ComponentDescriptor#typeElement() component type}. If there are no type variables in the
+     * return type, this is the equivalent of {@code methodElement().getReturnType()}.
+     */
+    public TypeMirror resolvedReturnType(DaggerTypes types) {
+      checkState(dependencyRequest().isPresent());
+
+      XType returnType = methodElement().getReturnType();
+      if (isPrimitive(returnType) || isVoid(returnType)) {
+        return toJavac(returnType);
+      }
+      return BindingRequest.bindingRequest(dependencyRequest().get())
+          .requestedType(dependencyRequest().get().key().type().java(), types);
+    }
+
     /** A {@link ComponentMethodDescriptor}builder for a method. */
     public static Builder builder(XMethodElement method) {
       return new AutoValue_ComponentDescriptor_ComponentMethodDescriptor.Builder()
@@ -368,23 +374,19 @@ public abstract class ComponentDescriptor {
 
     /** A builder of {@link ComponentMethodDescriptor}s. */
     @AutoValue.Builder
+    @CanIgnoreReturnValue
     public interface Builder {
       /** @see ComponentMethodDescriptor#methodElement() */
       Builder methodElement(XMethodElement methodElement);
 
-      /**
-       * @see ComponentMethodDescriptor#dependencyRequest()
-       */
-      @CanIgnoreReturnValue // TODO(kak): remove this once open-source checkers understand AutoValue
+      /** @see ComponentMethodDescriptor#dependencyRequest() */
       Builder dependencyRequest(DependencyRequest dependencyRequest);
 
-      /**
-       * @see ComponentMethodDescriptor#subcomponent()
-       */
-      @CanIgnoreReturnValue // TODO(kak): remove this once open-source checkers understand AutoValue
+      /** @see ComponentMethodDescriptor#subcomponent() */
       Builder subcomponent(ComponentDescriptor subcomponent);
 
       /** Builds the descriptor. */
+      @CheckReturnValue
       ComponentMethodDescriptor build();
     }
   }
@@ -398,10 +400,18 @@ public abstract class ComponentDescriptor {
    * method.
    */
   static boolean isComponentContributionMethod(XMethodElement method) {
+    return isComponentContributionMethod(toJavac(method));
+  }
+
+  /**
+   * Returns {@code true} if a method could be a component entry point but not a members-injection
+   * method.
+   */
+  static boolean isComponentContributionMethod(ExecutableElement method) {
     return method.getParameters().isEmpty()
-        && !isVoid(method.getReturnType())
-        && !method.getEnclosingElement().getClassName().equals(TypeName.OBJECT)
-        && !NON_CONTRIBUTING_OBJECT_METHOD_NAMES.contains(getSimpleName(method));
+        && !method.getReturnType().getKind().equals(VOID)
+        && !isTypeOf(TypeName.OBJECT, method.getEnclosingElement().asType())
+        && !NON_CONTRIBUTING_OBJECT_METHOD_NAMES.contains(method.getSimpleName().toString());
   }
 
   /** Returns {@code true} if a method could be a component production entry point. */

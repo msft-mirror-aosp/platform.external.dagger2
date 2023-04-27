@@ -17,6 +17,8 @@
 package dagger.internal.codegen.validation;
 
 import static androidx.room.compiler.processing.XTypeKt.isVoid;
+import static androidx.room.compiler.processing.compat.XConverters.toJavac;
+import static androidx.room.compiler.processing.compat.XConverters.toXProcessing;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.Iterables.consumingIterable;
 import static com.google.common.collect.Iterables.getOnlyElement;
@@ -35,18 +37,20 @@ import static dagger.internal.codegen.binding.ConfigurationAnnotations.enclosedA
 import static dagger.internal.codegen.binding.ErrorMessages.ComponentCreatorMessages.builderMethodRequiresNoArgs;
 import static dagger.internal.codegen.binding.ErrorMessages.ComponentCreatorMessages.moreThanOneRefToSubcomponent;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
+import static dagger.internal.codegen.xprocessing.XElements.asMethod;
 import static dagger.internal.codegen.xprocessing.XElements.asTypeElement;
 import static dagger.internal.codegen.xprocessing.XElements.getAnyAnnotation;
 import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
-import static dagger.internal.codegen.xprocessing.XProcessingEnvs.javacOverrides;
 import static dagger.internal.codegen.xprocessing.XTypeElements.getAllUnimplementedMethods;
 import static dagger.internal.codegen.xprocessing.XTypes.isDeclared;
 import static java.util.Comparator.comparing;
+import static javax.lang.model.util.ElementFilter.methodsIn;
 
 import androidx.room.compiler.processing.XAnnotation;
 import androidx.room.compiler.processing.XExecutableParameterElement;
 import androidx.room.compiler.processing.XMethodElement;
 import androidx.room.compiler.processing.XMethodType;
+import androidx.room.compiler.processing.XProcessingEnv;
 import androidx.room.compiler.processing.XType;
 import androidx.room.compiler.processing.XTypeElement;
 import com.google.common.collect.HashMultimap;
@@ -69,8 +73,7 @@ import dagger.internal.codegen.binding.ErrorMessages;
 import dagger.internal.codegen.binding.MethodSignatureFormatter;
 import dagger.internal.codegen.javapoet.TypeNames;
 import dagger.internal.codegen.kotlin.KotlinMetadataUtil;
-import dagger.internal.codegen.xprocessing.XTypeElements;
-import dagger.internal.codegen.xprocessing.XTypes;
+import dagger.internal.codegen.langmodel.DaggerElements;
 import dagger.spi.model.DependencyRequest;
 import dagger.spi.model.Key;
 import java.util.ArrayDeque;
@@ -92,6 +95,8 @@ import javax.lang.model.SourceVersion;
  */
 @Singleton
 public final class ComponentValidator implements ClearableCache {
+  private final XProcessingEnv processingEnv;
+  private final DaggerElements elements;
   private final ModuleValidator moduleValidator;
   private final ComponentCreatorValidator creatorValidator;
   private final DependencyRequestValidator dependencyRequestValidator;
@@ -104,6 +109,8 @@ public final class ComponentValidator implements ClearableCache {
 
   @Inject
   ComponentValidator(
+      XProcessingEnv processingEnv,
+      DaggerElements elements,
       ModuleValidator moduleValidator,
       ComponentCreatorValidator creatorValidator,
       DependencyRequestValidator dependencyRequestValidator,
@@ -112,6 +119,8 @@ public final class ComponentValidator implements ClearableCache {
       DependencyRequestFactory dependencyRequestFactory,
       DaggerSuperficialValidation superficialValidation,
       KotlinMetadataUtil metadataUtil) {
+    this.processingEnv = processingEnv;
+    this.elements = elements;
     this.moduleValidator = moduleValidator;
     this.creatorValidator = creatorValidator;
     this.dependencyRequestValidator = dependencyRequestValidator;
@@ -161,13 +170,9 @@ public final class ComponentValidator implements ClearableCache {
 
     ValidationReport validateElement() {
       if (componentKinds.size() > 1) {
-        return report.addError(moreThanOneComponentAnnotationError(), component).build();
+        return moreThanOneComponentAnnotation();
       }
-      if (!(component.isInterface() || component.isClass())) {
-        // If the annotated element is not a class or interface skip the rest of the checks since
-        // the remaining checks will likely just output unhelpful noise in such cases.
-        return report.addError(invalidTypeError(), component).build();
-      }
+
       validateUseOfCancellationPolicy();
       validateIsAbstractType();
       validateCreators();
@@ -182,10 +187,12 @@ public final class ComponentValidator implements ClearableCache {
       return report.build();
     }
 
-    private String moreThanOneComponentAnnotationError() {
-      return String.format(
-          "Components may not be annotated with more than one component annotation: found %s",
-          annotationsFor(componentKinds));
+    private ValidationReport moreThanOneComponentAnnotation() {
+      String error =
+          "Components may not be annotated with more than one component annotation: found "
+              + annotationsFor(componentKinds);
+      report.addError(error, component);
+      return report.build();
     }
 
     private void validateUseOfCancellationPolicy() {
@@ -197,15 +204,13 @@ public final class ComponentValidator implements ClearableCache {
     }
 
     private void validateIsAbstractType() {
-      if (!component.isAbstract()) {
-        report.addError(invalidTypeError(), component);
+      if (!component.isInterface() && !(component.isClass() && component.isAbstract())) {
+        report.addError(
+            String.format(
+                "@%s may only be applied to an interface or abstract class",
+                componentKind().annotation().simpleName()),
+            component);
       }
-    }
-
-    private String invalidTypeError() {
-      return String.format(
-          "@%s may only be applied to an interface or abstract class",
-          componentKind().annotation().simpleName());
     }
 
     private void validateCreators() {
@@ -215,8 +220,7 @@ public final class ComponentValidator implements ClearableCache {
       if (creators.size() > 1) {
         report.addError(
             String.format(
-                ErrorMessages.componentMessagesFor(componentKind()).moreThanOne(),
-                creators.stream().map(XTypeElement::getQualifiedName).collect(toImmutableSet())),
+                ErrorMessages.componentMessagesFor(componentKind()).moreThanOne(), creators),
             component);
       }
     }
@@ -238,9 +242,9 @@ public final class ComponentValidator implements ClearableCache {
     }
 
     private void validateClassMethodName() {
-      if (metadataUtil.hasMetadata(component)) {
+      if (metadataUtil.hasMetadata(toJavac(component))) {
         metadataUtil
-            .getAllMethodNamesBySignature(component)
+            .getAllMethodNamesBySignature(toJavac(component))
             .forEach(
                 (signature, name) -> {
                   if (SourceVersion.isKeyword(name)) {
@@ -363,7 +367,7 @@ public final class ComponentValidator implements ClearableCache {
             report.addError(
                 String.format(
                     "Subcomponent factory methods may only accept modules, but %s is not.",
-                    XTypes.toStableString(parameterType)),
+                    parameterType),
                 parameter);
           }
         }
@@ -447,7 +451,17 @@ public final class ComponentValidator implements ClearableCache {
       // Collect entry point methods that are not overridden by others. If the "same" method is
       // inherited from more than one supertype, each will be in the multimap.
       SetMultimap<String, XMethodElement> entryPoints = HashMultimap.create();
-      XTypeElements.getAllMethods(component).stream()
+
+      // TODO(b/201729320): There's a bug in auto-common's MoreElements#overrides(), b/201729320,
+      // which prevents us from using XTypeElement#getAllMethods() here (since that method relies on
+      // MoreElements#overrides() under the hood).
+      //
+      // There's two options here.
+      //    1. Fix the bug in auto-common and update XProcessing's auto-common dependency
+      //    2. Add a new method in XProcessing which relies on Elements#overrides(), which does not
+      //       have this issue. However, this approach risks causing issues for EJC (Eclipse) users.
+      methodsIn(elements.getAllMembers(toJavac(component))).stream()
+          .map(method -> asMethod(toXProcessing(method, processingEnv)))
           .filter(method -> isEntryPoint(method, method.asMemberOf(component.getType())))
           .forEach(
               method -> addMethodUnlessOverridden(method, entryPoints.get(getSimpleName(method))));
@@ -463,10 +477,7 @@ public final class ComponentValidator implements ClearableCache {
               == methods.size(),
           "expected each method to be declared on a different type: %s",
           methods);
-      StringBuilder message = new StringBuilder("Found conflicting entry point declarations. "
-          + "Getter methods on the component with the same name and signature must be for the "
-          + "same binding key since the generated component can only implement the method once. "
-          + "Found:");
+      StringBuilder message = new StringBuilder("conflicting entry point declarations:");
       methodSignatureFormatter
           .typedFormatter(component.getType())
           .formatIndentedList(
@@ -483,23 +494,16 @@ public final class ComponentValidator implements ClearableCache {
           .forEach(
               (subcomponent, methods) ->
                   report.addError(
-                      String.format(
-                          moreThanOneRefToSubcomponent(),
-                          subcomponent.getQualifiedName(),
-                          methods.stream()
-                              .map(methodSignatureFormatter::formatWithoutReturnType)
-                              .collect(toImmutableSet())),
+                      String.format(moreThanOneRefToSubcomponent(), subcomponent, methods),
                       component));
     }
 
     private void validateComponentDependencies() {
       for (XType type : componentAnnotation().dependencyTypes()) {
         if (!isDeclared(type)) {
-          report.addError(
-              XTypes.toStableString(type) + " is not a valid component dependency type");
+          report.addError(type + " is not a valid component dependency type");
         } else if (type.getTypeElement().hasAnyAnnotation(moduleAnnotations())) {
-          report.addError(
-              XTypes.toStableString(type) + " is a module, which cannot be a component dependency");
+          report.addError(type + " is a module, which cannot be a component dependency");
         }
       }
     }
@@ -555,7 +559,10 @@ public final class ComponentValidator implements ClearableCache {
    */
   // TODO(dpb): Does this break for ECJ?
   private boolean overridesAsDeclared(XMethodElement overrider, XMethodElement overridden) {
-    return javacOverrides(overrider, overridden, asTypeElement(overrider.getEnclosingElement()));
+    return elements.overrides(
+        toJavac(overrider),
+        toJavac(overridden),
+        toJavac(asTypeElement(overrider.getEnclosingElement())));
   }
 
   private static Optional<XAnnotation> checkForAnnotations(XType type, Set<ClassName> annotations) {

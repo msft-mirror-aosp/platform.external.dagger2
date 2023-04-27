@@ -16,92 +16,103 @@
 
 package dagger.internal.codegen.binding;
 
-import static androidx.room.compiler.processing.XElementKt.isField;
-import static androidx.room.compiler.processing.XElementKt.isMethod;
+import static androidx.room.compiler.processing.compat.XConverters.toJavac;
+import static com.google.auto.common.MoreTypes.asDeclared;
 import static com.google.common.base.Preconditions.checkArgument;
-import static dagger.internal.codegen.xprocessing.XElements.asField;
-import static dagger.internal.codegen.xprocessing.XElements.asMethod;
-import static dagger.internal.codegen.xprocessing.XElements.closestEnclosingTypeElement;
-import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
-import static dagger.internal.codegen.xprocessing.XProcessingEnvs.javacOverrides;
+import static dagger.internal.codegen.langmodel.DaggerElements.DECLARATION_ORDER;
 import static dagger.internal.codegen.xprocessing.XTypes.isDeclared;
-import static dagger.internal.codegen.xprocessing.XTypes.nonObjectSuperclass;
-import static java.util.Comparator.comparing;
+import static javax.lang.model.element.Modifier.PRIVATE;
+import static javax.lang.model.element.Modifier.STATIC;
 
-import androidx.room.compiler.processing.XElement;
-import androidx.room.compiler.processing.XFieldElement;
-import androidx.room.compiler.processing.XMethodElement;
-import androidx.room.compiler.processing.XMethodType;
 import androidx.room.compiler.processing.XType;
-import androidx.room.compiler.processing.XTypeElement;
+import com.google.auto.common.MoreElements;
+import com.google.auto.common.MoreTypes;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.SetMultimap;
 import dagger.internal.codegen.binding.MembersInjectionBinding.InjectionSite;
-import dagger.internal.codegen.xprocessing.XElements;
-import java.util.HashMap;
+import dagger.internal.codegen.langmodel.DaggerElements;
+import dagger.internal.codegen.langmodel.DaggerTypes;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
-import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import javax.inject.Inject;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.ExecutableType;
+import javax.lang.model.type.TypeMirror;
+import javax.lang.model.util.ElementKindVisitor8;
 
 /** A factory for {@link Binding} objects. */
 final class InjectionSiteFactory {
+
+  private final DaggerTypes types;
+  private final DaggerElements elements;
   private final DependencyRequestFactory dependencyRequestFactory;
 
   @Inject
-  InjectionSiteFactory(DependencyRequestFactory dependencyRequestFactory) {
+  InjectionSiteFactory(
+      DaggerTypes types,
+      DaggerElements elements,
+      DependencyRequestFactory dependencyRequestFactory) {
+    this.types = types;
+    this.elements = elements;
     this.dependencyRequestFactory = dependencyRequestFactory;
   }
 
   /** Returns the injection sites for a type. */
   ImmutableSortedSet<InjectionSite> getInjectionSites(XType type) {
     checkArgument(isDeclared(type));
+    return getInjectionSites(asDeclared(toJavac(type)));
+  }
+
+  /** Returns the injection sites for a type. */
+  ImmutableSortedSet<InjectionSite> getInjectionSites(DeclaredType declaredType) {
     Set<InjectionSite> injectionSites = new HashSet<>();
+    List<TypeElement> ancestors = new ArrayList<>();
     InjectionSiteVisitor injectionSiteVisitor = new InjectionSiteVisitor();
-    Map<XTypeElement, Integer> enclosingTypeElementOrder = new HashMap<>();
-    Map<XElement, Integer> enclosedElementOrder = new HashMap<>();
-    for (Optional<XType> currentType = Optional.of(type);
+    for (Optional<DeclaredType> currentType = Optional.of(declaredType);
         currentType.isPresent();
-        currentType = nonObjectSuperclass(currentType.get())) {
-      XTypeElement typeElement = currentType.get().getTypeElement();
-      enclosingTypeElementOrder.put(typeElement, enclosingTypeElementOrder.size());
-      for (XElement enclosedElement : typeElement.getEnclosedElements()) {
-        enclosedElementOrder.put(enclosedElement, enclosedElementOrder.size());
-        injectionSiteVisitor
-            .visit(enclosedElement, currentType.get())
-            .ifPresent(injectionSites::add);
+        currentType = types.nonObjectSuperclass(currentType.get())) {
+      DeclaredType type = currentType.get();
+      ancestors.add(MoreElements.asType(type.asElement()));
+      for (Element enclosedElement : type.asElement().getEnclosedElements()) {
+        injectionSiteVisitor.visit(enclosedElement, type).ifPresent(injectionSites::add);
       }
     }
     return ImmutableSortedSet.copyOf(
         // supertypes before subtypes
-        comparing(
-                InjectionSite::enclosingTypeElement,
-                comparing(enclosingTypeElementOrder::get).reversed())
+        Comparator.comparing(
+                (InjectionSite injectionSite) ->
+                    ancestors.indexOf(injectionSite.element().getEnclosingElement()))
+            .reversed()
             // fields before methods
-            .thenComparing(InjectionSite::kind)
+            .thenComparing(injectionSite -> injectionSite.element().getKind())
             // then sort by whichever element comes first in the parent
             // this isn't necessary, but makes the processor nice and predictable
-            .thenComparing(InjectionSite::element, comparing(enclosedElementOrder::get)),
+            .thenComparing(InjectionSite::element, DECLARATION_ORDER),
         injectionSites);
   }
 
-  private final class InjectionSiteVisitor {
-    private final SetMultimap<String, XMethodElement> subclassMethodMap =
+  private final class InjectionSiteVisitor
+      extends ElementKindVisitor8<Optional<InjectionSite>, DeclaredType> {
+    private final SetMultimap<String, ExecutableElement> subclassMethodMap =
         LinkedHashMultimap.create();
 
-    public Optional<InjectionSite> visit(XElement element, XType container) {
-      if (isMethod(element)) {
-        return visitMethod(asMethod(element), container);
-      } else if (isField(element)) {
-        return visitField(asField(element), container);
-      }
-      return Optional.empty();
+    InjectionSiteVisitor() {
+      super(Optional.empty());
     }
 
-    public Optional<InjectionSite> visitMethod(XMethodElement method, XType container) {
-      subclassMethodMap.put(getSimpleName(method), method);
+    @Override
+    public Optional<InjectionSite> visitExecutableAsMethod(
+        ExecutableElement method, DeclaredType type) {
+      subclassMethodMap.put(method.getSimpleName().toString(), method);
       if (!shouldBeInjected(method)) {
         return Optional.empty();
       }
@@ -109,13 +120,14 @@ final class InjectionSiteFactory {
       // skip any overridden method that has already been visited. To decrease the number of methods
       // that are checked, we store the already injected methods in a SetMultimap and only check the
       // methods with the same name.
-      XTypeElement enclosingType = closestEnclosingTypeElement(method);
-      for (XMethodElement subclassMethod : subclassMethodMap.get(getSimpleName(method))) {
-        if (method != subclassMethod && javacOverrides(subclassMethod, method, enclosingType)) {
+      String methodName = method.getSimpleName().toString();
+      TypeElement enclosingType = MoreElements.asType(method.getEnclosingElement());
+      for (ExecutableElement subclassMethod : subclassMethodMap.get(methodName)) {
+        if (method != subclassMethod && elements.overrides(subclassMethod, method, enclosingType)) {
           return Optional.empty();
         }
       }
-      XMethodType resolved = method.asMemberOf(container);
+      ExecutableType resolved = MoreTypes.asExecutable(types.asMemberOf(type, method));
       return Optional.of(
           InjectionSite.method(
               method,
@@ -123,20 +135,22 @@ final class InjectionSiteFactory {
                   method.getParameters(), resolved.getParameterTypes())));
     }
 
-    public Optional<InjectionSite> visitField(XFieldElement field, XType container) {
+    @Override
+    public Optional<InjectionSite> visitVariableAsField(
+        VariableElement field, DeclaredType type) {
       if (!shouldBeInjected(field)) {
         return Optional.empty();
       }
-      XType resolved = field.asMemberOf(container);
+      TypeMirror resolved = types.asMemberOf(type, field);
       return Optional.of(
           InjectionSite.field(
               field, dependencyRequestFactory.forRequiredResolvedVariable(field, resolved)));
     }
 
-    private boolean shouldBeInjected(XElement injectionSite) {
+    private boolean shouldBeInjected(Element injectionSite) {
       return InjectionAnnotations.hasInjectAnnotation(injectionSite)
-          && !XElements.isPrivate(injectionSite)
-          && !XElements.isStatic(injectionSite);
+          && !injectionSite.getModifiers().contains(PRIVATE)
+          && !injectionSite.getModifiers().contains(STATIC);
     }
   }
 }

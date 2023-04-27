@@ -84,8 +84,7 @@ public class TransitiveSubcomponentQualifierTest {
                     + "\n  Dependency trace:"
                     + "\n      => element (CLASS): library1.MySubcomponent"
                     + "\n      => element (METHOD): getQualifiedInt()"
-                    + "\n      => annotation: @MyQualifier"
-                    + "\n      => type (ERROR annotation type): library2.MyQualifier");
+                    + "\n      => annotation: @library2.MyQualifier");
         break;
       case "api":
         result = runner.build();
@@ -141,8 +140,7 @@ public class TransitiveSubcomponentQualifierTest {
                     + "\n  Dependency trace:"
                     + "\n      => element (CLASS): library1.MyBaseSubcomponent"
                     + "\n      => element (METHOD): getQualifiedInt()"
-                    + "\n      => annotation: @MyQualifier"
-                    + "\n      => type (ERROR annotation type): library2.MyQualifier");
+                    + "\n      => annotation: @library2.MyQualifier");
         break;
       case "api":
         result = runner.build();
@@ -190,8 +188,7 @@ public class TransitiveSubcomponentQualifierTest {
                     + "\n  Dependency trace:"
                     + "\n      => element (CLASS): library1.MySubcomponent"
                     + "\n      => element (METHOD): getQualifiedInt()"
-                    + "\n      => annotation: @MyQualifier"
-                    + "\n      => type (ERROR annotation type): library2.MyQualifier");
+                    + "\n      => annotation: @library2.MyQualifier");
         break;
       case "api":
         result = runner.build();
@@ -250,8 +247,7 @@ public class TransitiveSubcomponentQualifierTest {
                     + "\n  Dependency trace:"
                     + "\n      => element (CLASS): library1.MyBaseSubcomponent"
                     + "\n      => element (METHOD): getQualifiedInt()"
-                    + "\n      => annotation: @MyQualifier"
-                    + "\n      => type (ERROR annotation type): library2.MyQualifier");
+                    + "\n      => annotation: @library2.MyQualifier");
         break;
       case "api":
         result = runner.build();

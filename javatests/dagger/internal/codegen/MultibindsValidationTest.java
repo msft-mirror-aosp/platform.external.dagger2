@@ -54,112 +54,84 @@ public class MultibindsValidationTest {
   public void voidMethod() {
     assertThatModuleMethod("@Multibinds abstract void voidMethod();")
         .withDeclaration(moduleDeclaration)
-        .hasError("@Multibinds methods return type must be either a Set or Map type.");
+        .hasError("@Multibinds methods must return Map<K, V> or Set<T>");
   }
 
   @Test
   public void primitiveMethod() {
     assertThatModuleMethod("@Multibinds abstract int primitive();")
         .withDeclaration(moduleDeclaration)
-        .hasError("@Multibinds methods return type must be either a Set or Map type.");
+        .hasError("@Multibinds methods must return Map<K, V> or Set<T>");
   }
 
   @Test
   public void rawMap() {
     assertThatModuleMethod("@Multibinds abstract Map rawMap();")
         .withDeclaration(moduleDeclaration)
-        .hasError("return type cannot be a raw Map type");
+        .hasError("@Multibinds methods must return Map<K, V> or Set<T>");
   }
 
   @Test
-  public void wildcardMapValue() {
-    assertThatModuleMethod("@Multibinds abstract Map<String, ?> wildcardMap();")
+  public void wildcardMap() {
+    assertThatModuleMethod("@Multibinds abstract Map<?, ?> wildcardMap();")
         .withDeclaration(moduleDeclaration)
-        .hasError("return type cannot use a wildcard as the Map value type.");
-  }
-
-  @Test
-  public void wildcardMapValueWithBounds() {
-    assertThatModuleMethod("@Multibinds abstract Map<String, ? extends Number> wildcardMap();")
-        .withDeclaration(moduleDeclaration)
-        .hasError("return type cannot use a wildcard as the Map value type.");
-  }
-
-  @Test
-  public void wildcardMapKey() {
-    assertThatModuleMethod("@Multibinds abstract Map<?, String> wildcardMap();")
-        .withDeclaration(moduleDeclaration)
-        .hasError("return type cannot use a wildcard as the Map key type.");
-  }
-
-  @Test
-  public void wildcardMapKeyWithBounds() {
-    assertThatModuleMethod("@Multibinds abstract Map<? extends Number, String> wildcardMap();")
-        .withDeclaration(moduleDeclaration)
-        .hasError("return type cannot use a wildcard as the Map key type.");
+        .hasError("@Multibinds methods must return Map<K, V> or Set<T>");
   }
 
   @Test
   public void providerMap() {
     assertThatModuleMethod("@Multibinds abstract Map<String, Provider<Object>> providerMap();")
         .withDeclaration(moduleDeclaration)
-        .hasError("return type cannot use 'Provider' in the Map value type.");
+        .hasError("@Multibinds methods must return Map<K, V> or Set<T>");
   }
 
   @Test
   public void producerMap() {
     assertThatModuleMethod("@Multibinds abstract Map<String, Producer<Object>> producerMap();")
         .withDeclaration(moduleDeclaration)
-        .hasError("return type cannot use 'Producer' in the Map value type.");
+        .hasError("@Multibinds methods must return Map<K, V> or Set<T>");
   }
 
   @Test
   public void producedMap() {
     assertThatModuleMethod("@Multibinds abstract Map<String, Produced<Object>> producedMap();")
         .withDeclaration(moduleDeclaration)
-        .hasError("return type cannot use 'Produced' in the Map value type.");
+        .hasError("@Multibinds methods must return Map<K, V> or Set<T>");
   }
 
   @Test
   public void rawSet() {
     assertThatModuleMethod("@Multibinds abstract Set rawSet();")
         .withDeclaration(moduleDeclaration)
-        .hasError("return type cannot be a raw Set type");
+        .hasError("@Multibinds methods must return Map<K, V> or Set<T>");
   }
 
   @Test
   public void wildcardSet() {
     assertThatModuleMethod("@Multibinds abstract Set<?> wildcardSet();")
         .withDeclaration(moduleDeclaration)
-        .hasError("return type cannot use a wildcard as the Set value type.");
-  }
-
-  @Test
-  public void wildcardSetWithBounds() {
-    assertThatModuleMethod("@Multibinds abstract Set<? extends Number> wildcardSet();")
-        .withDeclaration(moduleDeclaration)
-        .hasError("return type cannot use a wildcard as the Set value type.");
+        .hasError("@Multibinds methods must return Map<K, V> or Set<T>");
   }
 
   @Test
   public void providerSet() {
     assertThatModuleMethod("@Multibinds abstract Set<Provider<Object>> providerSet();")
         .withDeclaration(moduleDeclaration)
-        .hasError("return type cannot use 'Provider' in the Set value type.");
+        .hasError("@Multibinds methods must return Map<K, V> or Set<T>");
   }
 
   @Test
   public void producerSet() {
     assertThatModuleMethod("@Multibinds abstract Set<Producer<Object>> producerSet();")
         .withDeclaration(moduleDeclaration)
-        .hasError("return type cannot use 'Producer' in the Set value type.");
+        .hasError("@Multibinds methods must return Map<K, V> or Set<T>");
   }
 
   @Test
   public void producedSet() {
     assertThatModuleMethod("@Multibinds abstract Set<Produced<Object>> producedSet();")
         .withDeclaration(moduleDeclaration)
-        .hasError("return type cannot use 'Produced' in the Set value type.");
+        .hasError("@Multibinds methods must return Map<K, V> or Set<T>");
   }
 
   @Test

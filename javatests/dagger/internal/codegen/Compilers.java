@@ -40,9 +40,6 @@ public final class Compilers {
           // Remove Bazel's runner deploy jar which leaks Guava classes into the classpath and
           // the compile testing tests.
           .filter(jar -> !jar.contains("Runner_deploy.jar"))
-          // Remove the kotlin-compiler jar which leaks Guava classes into the classpath and
-          // the compile testing tests.
-          .filter(jar -> !jar.contains("kotlin-compiler.jar"))
           .map(File::new)
           .collect(collectingAndThen(toList(), ImmutableList::copyOf));
 

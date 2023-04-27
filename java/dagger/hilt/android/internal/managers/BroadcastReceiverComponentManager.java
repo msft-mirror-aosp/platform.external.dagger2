@@ -34,7 +34,8 @@ public final class BroadcastReceiverComponentManager {
 
     Preconditions.checkArgument(
         application instanceof GeneratedComponentManager,
-        "Hilt BroadcastReceiver must be attached to an @HiltAndroidApp Application. Found: %s",
+        "Hilt BroadcastReceiver must be attached to an @AndroidEntryPoint Application. "
+            + "Found: %s",
         application.getClass());
 
     return ((GeneratedComponentManager<?>) application).generatedComponent();

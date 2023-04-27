@@ -16,19 +16,21 @@
 
 package dagger.internal.codegen.base;
 
+import static com.google.auto.common.MoreTypes.isType;
 import static com.google.common.base.Preconditions.checkArgument;
+import static dagger.internal.codegen.langmodel.DaggerTypes.isTypeOf;
+import static dagger.internal.codegen.langmodel.DaggerTypes.unwrapType;
 import static dagger.internal.codegen.xprocessing.XTypes.isTypeOf;
-import static dagger.internal.codegen.xprocessing.XTypes.unwrapType;
 
 import androidx.room.compiler.processing.XType;
 import com.google.auto.value.AutoValue;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.TypeName;
 import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.internal.codegen.xprocessing.XTypes;
 import dagger.spi.model.Key;
+import javax.lang.model.type.TypeMirror;
 
-/** Information about a {@link java.util.Set} type. */
+/** Information about a {@link java.util.Set} {@link TypeMirror}. */
 @AutoValue
 public abstract class SetType {
   private XType type;
@@ -43,7 +45,7 @@ public abstract class SetType {
 
   /** {@code true} if the set type is the raw {@link java.util.Set} type. */
   public boolean isRawType() {
-    return XTypes.isRawParameterizedType(type());
+    return type().getTypeArguments().isEmpty();
   }
 
   /** Returns the element type. */
@@ -74,6 +76,11 @@ public abstract class SetType {
   /** {@code true} if {@code type} is a {@link java.util.Set} type. */
   public static boolean isSet(XType type) {
     return isTypeOf(type, TypeNames.SET);
+  }
+
+  /** {@code true} if {@code type} is a {@link java.util.Set} type. */
+  public static boolean isSet(TypeMirror type) {
+    return isType(type) && isTypeOf(TypeNames.SET, type);
   }
 
   /** {@code true} if {@code key.type()} is a {@link java.util.Set} type. */

@@ -225,7 +225,6 @@ gen_maven_artifact(
         "androidx.lifecycle:lifecycle-viewmodel",
         "androidx.lifecycle:lifecycle-viewmodel-savedstate",
         "androidx.multidex:multidex",
-        "androidx.savedstate:savedstate",
         "androidx.test:core",
         "com.google.code.findbugs:jsr305",
         "com.google.dagger:dagger",
@@ -236,9 +235,9 @@ gen_maven_artifact(
     ],
     artifact_target_maven_deps_banned = [
         "com.google.guava:guava",
-        "javax.annotation:javax.annotation-api",
+        "javax.annotation:jsr250-api",
     ],
-    javadoc_android_api_level = 32,
+    javadoc_android_api_level = 30,
     javadoc_exclude_packages = [
         "dagger.hilt.internal",
         "dagger.hilt.android.internal",

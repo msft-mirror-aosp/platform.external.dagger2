@@ -17,6 +17,8 @@
 package dagger.internal.codegen.binding;
 
 import static androidx.room.compiler.processing.XTypeKt.isVoid;
+import static androidx.room.compiler.processing.compat.XConverters.toJavac;
+import static androidx.room.compiler.processing.compat.XConverters.toXProcessing;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static dagger.internal.codegen.base.ComponentAnnotation.rootComponentAnnotation;
@@ -25,11 +27,13 @@ import static dagger.internal.codegen.base.ComponentAnnotation.subcomponentAnnot
 import static dagger.internal.codegen.base.ComponentCreatorAnnotation.creatorAnnotationsFor;
 import static dagger.internal.codegen.base.ModuleAnnotation.moduleAnnotation;
 import static dagger.internal.codegen.base.Scopes.productionScope;
+import static dagger.internal.codegen.binding.ComponentDescriptor.isComponentContributionMethod;
 import static dagger.internal.codegen.binding.ConfigurationAnnotations.enclosedAnnotatedTypes;
 import static dagger.internal.codegen.binding.ConfigurationAnnotations.isSubcomponentCreator;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
 import static dagger.internal.codegen.xprocessing.XTypeElements.getAllUnimplementedMethods;
 import static dagger.internal.codegen.xprocessing.XTypes.isDeclared;
+import static javax.lang.model.util.ElementFilter.methodsIn;
 
 import androidx.room.compiler.processing.XMethodElement;
 import androidx.room.compiler.processing.XMethodType;
@@ -43,14 +47,18 @@ import dagger.internal.codegen.base.ComponentAnnotation;
 import dagger.internal.codegen.base.DaggerSuperficialValidation;
 import dagger.internal.codegen.base.ModuleAnnotation;
 import dagger.internal.codegen.binding.ComponentDescriptor.ComponentMethodDescriptor;
-import dagger.internal.codegen.xprocessing.XTypeElements;
+import dagger.internal.codegen.langmodel.DaggerElements;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.spi.model.Scope;
 import java.util.Optional;
 import javax.inject.Inject;
+import javax.lang.model.element.ExecutableElement;
 
 /** A factory for {@link ComponentDescriptor}s. */
 public final class ComponentDescriptorFactory {
   private final XProcessingEnv processingEnv;
+  private final DaggerElements elements;
+  private final DaggerTypes types;
   private final DependencyRequestFactory dependencyRequestFactory;
   private final ModuleDescriptor.Factory moduleDescriptorFactory;
   private final InjectionAnnotations injectionAnnotations;
@@ -59,11 +67,15 @@ public final class ComponentDescriptorFactory {
   @Inject
   ComponentDescriptorFactory(
       XProcessingEnv processingEnv,
+      DaggerElements elements,
+      DaggerTypes types,
       DependencyRequestFactory dependencyRequestFactory,
       ModuleDescriptor.Factory moduleDescriptorFactory,
       InjectionAnnotations injectionAnnotations,
       DaggerSuperficialValidation superficialValidation) {
     this.processingEnv = processingEnv;
+    this.elements = elements;
+    this.types = types;
     this.dependencyRequestFactory = dependencyRequestFactory;
     this.moduleDescriptorFactory = moduleDescriptorFactory;
     this.injectionAnnotations = injectionAnnotations;
@@ -106,9 +118,13 @@ public final class ComponentDescriptorFactory {
     ImmutableMap.Builder<XMethodElement, ComponentRequirement> dependenciesByDependencyMethod =
         ImmutableMap.builder();
     for (ComponentRequirement componentDependency : componentDependencies) {
-      XTypeElements.getAllMethods(componentDependency.typeElement()).stream()
-          .filter(ComponentDescriptor::isComponentContributionMethod)
-          .forEach(method -> dependenciesByDependencyMethod.put(method, componentDependency));
+      for (ExecutableElement dependencyMethod :
+          methodsIn(elements.getAllMembers(toJavac(componentDependency.typeElement())))) {
+        if (isComponentContributionMethod(dependencyMethod)) {
+          dependenciesByDependencyMethod.put(
+              (XMethodElement) toXProcessing(dependencyMethod, processingEnv), componentDependency);
+        }
+      }
     }
 
     // Start with the component's modules. For fictional components built from a module, start with
@@ -162,7 +178,7 @@ public final class ComponentDescriptorFactory {
             ? Optional.empty()
             : Optional.of(
                 ComponentCreatorDescriptor.create(
-                    getOnlyElement(enclosedCreators), dependencyRequestFactory));
+                    getOnlyElement(enclosedCreators), types, dependencyRequestFactory));
 
     ImmutableSet<Scope> scopes = injectionAnnotations.getScopes(typeElement);
     if (componentAnnotation.isProduction()) {

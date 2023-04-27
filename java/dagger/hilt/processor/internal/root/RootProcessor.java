@@ -98,7 +98,6 @@ public final class RootProcessor extends BaseProcessor {
               getProcessingEnv(), TestRootMetadata.of(getProcessingEnv(), rootElement))
           .generate();
     }
-
     TypeElement originatingRootElement =
         Root.create(rootElement, getProcessingEnv()).originatingRootElement();
     new AggregatedRootGenerator(rootElement, originatingRootElement, annotation, getProcessingEnv())
@@ -110,7 +109,7 @@ public final class RootProcessor extends BaseProcessor {
     if (!useAggregatingRootProcessor(getProcessingEnv())) {
       return;
     }
-    ImmutableSet<Element> newElements = generatesRootInputs.getElementsToWaitFor(roundEnv);
+    Set<Element> newElements = generatesRootInputs.getElementsToWaitFor(roundEnv);
     if (processed) {
       checkState(
           newElements.isEmpty(),
@@ -125,6 +124,7 @@ public final class RootProcessor extends BaseProcessor {
       if (rootsToProcess.isEmpty()) {
         return;
       }
+
       // Generate an @ComponentTreeDeps for each unique component tree.
       ComponentTreeDepsGenerator componentTreeDepsGenerator =
           new ComponentTreeDepsGenerator(getProcessingEnv());

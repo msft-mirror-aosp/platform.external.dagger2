@@ -16,17 +16,16 @@
 
 package dagger.internal.codegen.validation;
 
+import static androidx.room.compiler.processing.compat.XConverters.toXProcessing;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static dagger.internal.codegen.base.Util.reentrantComputeIfAbsent;
 import static dagger.internal.codegen.binding.AssistedInjectionAnnotations.assistedInjectedConstructors;
 import static dagger.internal.codegen.binding.InjectionAnnotations.injectedConstructors;
 import static dagger.internal.codegen.binding.SourceFiles.factoryNameForElement;
 import static dagger.internal.codegen.binding.SourceFiles.membersInjectorNameForType;
-import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
 import static dagger.internal.codegen.xprocessing.XElements.closestEnclosingTypeElement;
 import static dagger.internal.codegen.xprocessing.XElements.getAnyAnnotation;
 import static dagger.internal.codegen.xprocessing.XMethodElements.hasTypeParameters;
-import static dagger.internal.codegen.xprocessing.XTypes.isSubtype;
 
 import androidx.room.compiler.processing.XAnnotation;
 import androidx.room.compiler.processing.XConstructorElement;
@@ -40,14 +39,13 @@ import androidx.room.compiler.processing.XTypeElement;
 import androidx.room.compiler.processing.XVariableElement;
 import com.google.common.collect.ImmutableSet;
 import com.squareup.javapoet.ClassName;
-import com.squareup.javapoet.TypeName;
 import dagger.internal.codegen.base.ClearableCache;
 import dagger.internal.codegen.base.DaggerSuperficialValidation;
 import dagger.internal.codegen.binding.InjectionAnnotations;
-import dagger.internal.codegen.binding.MethodSignatureFormatter;
 import dagger.internal.codegen.compileroption.CompilerOptions;
 import dagger.internal.codegen.javapoet.TypeNames;
 import dagger.internal.codegen.langmodel.Accessibility;
+import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.internal.codegen.xprocessing.XAnnotations;
 import dagger.spi.model.Scope;
 import java.util.HashMap;
@@ -65,6 +63,7 @@ import javax.tools.Diagnostic.Kind;
 @Singleton
 public final class InjectValidator implements ClearableCache {
   private final XProcessingEnv processingEnv;
+  private final DaggerTypes types;
   private final CompilerOptions compilerOptions;
   private final DependencyRequestValidator dependencyRequestValidator;
   private final Optional<Diagnostic.Kind> privateAndStaticInjectionDiagnosticKind;
@@ -72,41 +71,40 @@ public final class InjectValidator implements ClearableCache {
   private final DaggerSuperficialValidation superficialValidation;
   private final Map<XTypeElement, ValidationReport> provisionReports = new HashMap<>();
   private final Map<XTypeElement, ValidationReport> membersInjectionReports = new HashMap<>();
-  private final MethodSignatureFormatter methodSignatureFormatter;
 
   @Inject
   InjectValidator(
       XProcessingEnv processingEnv,
+      DaggerTypes types,
       DependencyRequestValidator dependencyRequestValidator,
       CompilerOptions compilerOptions,
       InjectionAnnotations injectionAnnotations,
-      DaggerSuperficialValidation superficialValidation,
-      MethodSignatureFormatter methodSignatureFormatter) {
+      DaggerSuperficialValidation superficialValidation) {
     this(
         processingEnv,
+        types,
         compilerOptions,
         dependencyRequestValidator,
         Optional.empty(),
         injectionAnnotations,
-        superficialValidation,
-        methodSignatureFormatter);
+        superficialValidation);
   }
 
   private InjectValidator(
       XProcessingEnv processingEnv,
+      DaggerTypes types,
       CompilerOptions compilerOptions,
       DependencyRequestValidator dependencyRequestValidator,
       Optional<Kind> privateAndStaticInjectionDiagnosticKind,
       InjectionAnnotations injectionAnnotations,
-      DaggerSuperficialValidation superficialValidation,
-      MethodSignatureFormatter methodSignatureFormatter) {
+      DaggerSuperficialValidation superficialValidation) {
     this.processingEnv = processingEnv;
+    this.types = types;
     this.compilerOptions = compilerOptions;
     this.dependencyRequestValidator = dependencyRequestValidator;
     this.privateAndStaticInjectionDiagnosticKind = privateAndStaticInjectionDiagnosticKind;
     this.injectionAnnotations = injectionAnnotations;
     this.superficialValidation = superficialValidation;
-    this.methodSignatureFormatter = methodSignatureFormatter;
   }
 
   @Override
@@ -125,12 +123,12 @@ public final class InjectValidator implements ClearableCache {
         ? this
         : new InjectValidator(
             processingEnv,
+            types,
             compilerOptions,
             dependencyRequestValidator,
             Optional.of(Diagnostic.Kind.ERROR),
             injectionAnnotations,
-            superficialValidation,
-            methodSignatureFormatter);
+            superficialValidation);
   }
 
   public ValidationReport validate(XTypeElement typeElement) {
@@ -157,10 +155,8 @@ public final class InjectValidator implements ClearableCache {
         builder.addError(
             String.format(
                 "Type %s may only contain one injected constructor. Found: %s",
-                typeElement.getQualifiedName(),
-                injectConstructors.stream()
-                    .map(methodSignatureFormatter::format)
-                    .collect(toImmutableList())),
+                typeElement,
+                injectConstructors),
             typeElement);
     }
 
@@ -179,12 +175,10 @@ public final class InjectValidator implements ClearableCache {
 
     ClassName injectAnnotation =
         getAnyAnnotation(
-                constructorElement,
-                TypeNames.INJECT,
-                TypeNames.INJECT_JAVAX,
-                TypeNames.ASSISTED_INJECT)
-            .map(XAnnotations::getClassName)
-            .get();
+            constructorElement,
+            TypeNames.INJECT,
+            TypeNames.INJECT_JAVAX,
+            TypeNames.ASSISTED_INJECT).map(XAnnotations::getClassName).get();
 
     if (constructorElement.isPrivate()) {
       builder.addError(
@@ -217,7 +211,10 @@ public final class InjectValidator implements ClearableCache {
       }
 
       for (Scope scope : injectionAnnotations.getScopes(constructorElement)) {
-        builder.addError(scopeErrorMsg, constructorElement, scope.scopeAnnotation().xprocessing());
+        builder.addError(
+            scopeErrorMsg,
+            constructorElement,
+            toXProcessing(scope.scopeAnnotation().java(), processingEnv));
       }
     }
 
@@ -263,14 +260,14 @@ public final class InjectValidator implements ClearableCache {
         builder.addError(
             "A type with an @AssistedInject-annotated constructor cannot be scoped",
             enclosingElement,
-            scope.scopeAnnotation().xprocessing());
+            toXProcessing(scope.scopeAnnotation().java(), processingEnv));
       }
     } else if (scopes.size() > 1) {
       for (Scope scope : scopes) {
         builder.addError(
             "A single binding may not declare more than one @Scope",
             enclosingElement,
-            scope.scopeAnnotation().xprocessing());
+            toXProcessing(scope.scopeAnnotation().java(), processingEnv));
       }
     }
 
@@ -331,10 +328,8 @@ public final class InjectValidator implements ClearableCache {
 
     // No need to resolve thrown types since we're only checking existence.
     if (!methodElement.getThrownTypes().isEmpty()) {
-      builder.addError(
-          "Methods with @Inject may not throw checked exceptions. "
-              + "Please wrap your exceptions in a RuntimeException instead.",
-          methodElement);
+      builder.addError("Methods with @Inject may not throw checked exceptions. "
+          + "Please wrap your exceptions in a RuntimeException instead.", methodElement);
     }
 
     for (XExecutableParameterElement parameter : methodElement.getParameters()) {
@@ -391,18 +386,14 @@ public final class InjectValidator implements ClearableCache {
       checkInjectIntoPrivateClass(typeElement, builder);
       checkInjectIntoKotlinObject(typeElement, builder);
     }
-
-    Optional.ofNullable(typeElement.getSuperType())
-        .filter(supertype -> !supertype.getTypeName().equals(TypeName.OBJECT))
-        .ifPresent(
-            supertype -> {
-              superficialValidation.validateSuperTypeOf(typeElement);
-              ValidationReport report = validateForMembersInjection(supertype.getTypeElement());
-              if (!report.isClean()) {
-                builder.addSubreport(report);
-              }
-            });
-
+    if (typeElement.getSuperType() != null) {
+      superficialValidation.validateSuperTypeOf(typeElement);
+      ValidationReport report =
+          validateForMembersInjection(typeElement.getSuperType().getTypeElement());
+      if (!report.isClean()) {
+        builder.addSubreport(report);
+      }
+    }
     return builder.build();
   }
 
@@ -412,7 +403,7 @@ public final class InjectValidator implements ClearableCache {
     XType error = processingEnv.findType(TypeNames.ERROR);
     superficialValidation.validateThrownTypesOf(constructorElement);
     return !constructorElement.getThrownTypes().stream()
-        .allMatch(type -> isSubtype(type, runtimeException) || isSubtype(type, error));
+        .allMatch(type -> types.isSubtype(type, runtimeException) || types.isSubtype(type, error));
   }
 
   private void checkInjectIntoPrivateClass(XElement element, ValidationReport.Builder builder) {

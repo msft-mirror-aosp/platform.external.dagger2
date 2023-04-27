@@ -35,8 +35,7 @@ public final class MethodSpecs {
   public static MethodSpec.Builder overriding(XMethodElement method, XType owner) {
     XMethodType methodType = method.asMemberOf(owner);
     MethodSpec.Builder builder =
-        // We're overriding the method so we have to use the jvm name here.
-        MethodSpec.methodBuilder(method.getJvmName())
+        MethodSpec.methodBuilder(getSimpleName(method))
             .addAnnotation(Override.class)
             .addTypeVariables(methodType.getTypeVariableNames())
             .varargs(method.isVarArgs())

@@ -16,6 +16,7 @@
 
 package dagger.spi.model;
 
+import static com.google.auto.common.MoreElements.isAnnotationPresent;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.auto.value.AutoValue;
@@ -43,8 +44,8 @@ public abstract class Scope {
    * Returns {@code true} if {@code scopeAnnotationType} is a {@link javax.inject.Scope} annotation.
    */
   public static boolean isScope(DaggerTypeElement scopeAnnotationType) {
-    return scopeAnnotationType.xprocessing().hasAnnotation(SCOPE)
-        || scopeAnnotationType.xprocessing().hasAnnotation(SCOPE_JAVAX);
+    return isAnnotationPresent(scopeAnnotationType.java(), SCOPE.canonicalName())
+        || isAnnotationPresent(scopeAnnotationType.java(), SCOPE_JAVAX.canonicalName());
   }
 
   private static final ClassName PRODUCTION_SCOPE =

@@ -17,6 +17,8 @@
 package dagger.spi.model;
 
 import com.google.auto.value.AutoValue;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
+import com.google.errorprone.annotations.CheckReturnValue;
 import dagger.Provides;
 import java.util.Optional;
 import javax.inject.Inject;
@@ -57,6 +59,7 @@ public abstract class DependencyRequest {
   }
 
   /** A builder of {@link DependencyRequest}s. */
+  @CanIgnoreReturnValue
   @AutoValue.Builder
   public abstract static class Builder {
     public abstract Builder kind(RequestKind kind);
@@ -67,6 +70,7 @@ public abstract class DependencyRequest {
 
     public abstract Builder isNullable(boolean isNullable);
 
+    @CheckReturnValue
     public abstract DependencyRequest build();
   }
 }

@@ -18,15 +18,15 @@ package dagger.internal.codegen;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-import androidx.room.compiler.processing.util.Source;
 import com.google.common.collect.ImmutableList;
-import dagger.testing.compile.CompilerTests;
+import com.google.testing.compile.JavaFileObjects;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import javax.tools.JavaFileObject;
 
 /**
- * A fluent API to build a {@link Source} appropriate for a current set of settings, such as
+ * A fluent API to build a {@link JavaFileObject} appropriate for a current set of settings, such as
  * compiler mode.
  *
  * <p>After creating a builder, you can add lines to the file. Call {@link #addLines(String...)} to
@@ -87,8 +87,8 @@ final class JavaFileBuilder {
     return this;
   }
 
-  /** Builds the {@link Source}. */
-  Source buildSource() {
-    return CompilerTests.javaSource(qualifiedName, sourceLines.build().toArray(new String[] {}));
+  /** Builds the {@link JavaFileObject}. */
+  JavaFileObject build() {
+    return JavaFileObjects.forSourceLines(qualifiedName, sourceLines.build());
   }
 }

@@ -39,7 +39,7 @@ final class ComponentInstanceRequestRepresentation extends RequestRepresentation
   @Override
   Expression getDependencyExpression(ClassName requestingClass) {
     return Expression.create(
-        binding.key().type().xprocessing(),
+        binding.key().type().java(),
         componentImplementation.name().equals(requestingClass)
             ? CodeBlock.of("this")
             : componentImplementation.componentFieldReference());
