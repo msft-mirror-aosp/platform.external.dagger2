@@ -24,7 +24,7 @@ import static com.squareup.javapoet.MethodSpec.constructorBuilder;
 import static dagger.internal.codegen.base.ComponentCreatorKind.BUILDER;
 import static dagger.internal.codegen.javapoet.TypeSpecs.addSupertype;
 import static dagger.internal.codegen.langmodel.Accessibility.isElementAccessibleFrom;
-import static dagger.internal.codegen.writing.ComponentNames.getRootComponentClassName;
+import static dagger.internal.codegen.writing.ComponentNames.getTopLevelClassName;
 import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
 import static dagger.internal.codegen.xprocessing.XTypeElements.getAllUnimplementedMethods;
 import static javax.lang.model.element.Modifier.FINAL;
@@ -35,6 +35,7 @@ import static javax.lang.model.element.Modifier.STATIC;
 import androidx.room.compiler.processing.XElement;
 import androidx.room.compiler.processing.XFiler;
 import androidx.room.compiler.processing.XMethodElement;
+import androidx.room.compiler.processing.XProcessingEnv;
 import androidx.room.compiler.processing.XType;
 import androidx.room.compiler.processing.XTypeElement;
 import com.google.common.base.Ascii;
@@ -50,13 +51,12 @@ import dagger.internal.codegen.binding.ComponentCreatorDescriptor;
 import dagger.internal.codegen.binding.ComponentDescriptor;
 import dagger.internal.codegen.binding.ComponentRequirement;
 import dagger.internal.codegen.binding.MethodSignature;
+import dagger.internal.codegen.compileroption.CompilerOptions;
 import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.internal.codegen.langmodel.DaggerElements;
 import dagger.internal.codegen.xprocessing.MethodSpecs;
 import java.util.Set;
 import java.util.stream.Stream;
 import javax.inject.Inject;
-import javax.lang.model.SourceVersion;
 
 /**
  * A component generator that emits only API, without any actual implementation.
@@ -72,9 +72,15 @@ import javax.lang.model.SourceVersion;
  * normal step. Method bodies are omitted as Turbine ignores them entirely.
  */
 final class ComponentHjarGenerator extends SourceFileGenerator<ComponentDescriptor> {
+  private final XProcessingEnv processingEnv;
+  private final CompilerOptions compilerOptions;
+
   @Inject
-  ComponentHjarGenerator(XFiler filer, DaggerElements elements, SourceVersion sourceVersion) {
-    super(filer, elements, sourceVersion);
+  ComponentHjarGenerator(
+      XFiler filer, XProcessingEnv processingEnv, CompilerOptions compilerOptions) {
+    super(filer, processingEnv);
+    this.processingEnv = processingEnv;
+    this.compilerOptions = compilerOptions;
   }
 
   @Override
@@ -84,7 +90,7 @@ final class ComponentHjarGenerator extends SourceFileGenerator<ComponentDescript
 
   @Override
   public ImmutableList<TypeSpec.Builder> topLevelTypes(ComponentDescriptor componentDescriptor) {
-    ClassName generatedTypeName = getRootComponentClassName(componentDescriptor);
+    ClassName generatedTypeName = getTopLevelClassName(componentDescriptor);
     TypeSpec.Builder generatedComponent =
         TypeSpec.classBuilder(generatedTypeName)
             .addModifiers(FINAL)
@@ -94,7 +100,9 @@ final class ComponentHjarGenerator extends SourceFileGenerator<ComponentDescript
     }
 
     XTypeElement componentElement = componentDescriptor.typeElement();
-    addSupertype(generatedComponent, componentElement);
+    if (compilerOptions.generatedClassExtendsComponent()) {
+      addSupertype(generatedComponent, componentElement);
+    }
 
     TypeName builderMethodReturnType;
     ComponentCreatorKind creatorKind;
@@ -133,23 +141,26 @@ final class ComponentHjarGenerator extends SourceFileGenerator<ComponentDescript
       generatedComponent.addMethod(createMethod(componentDescriptor));
     }
 
-    XType componentType = componentElement.getType();
-    // TODO(ronshapiro): unify with ComponentImplementationBuilder
-    Set<MethodSignature> methodSignatures =
-        Sets.newHashSetWithExpectedSize(componentDescriptor.componentMethods().size());
-    componentDescriptor.componentMethods().stream()
-        .filter(
-            method ->
-                methodSignatures.add(MethodSignature.forComponentMethod(method, componentType)))
-        .forEach(
-            method ->
-                generatedComponent.addMethod(
-                    emptyComponentMethod(componentElement, method.methodElement())));
+    if (compilerOptions.generatedClassExtendsComponent()) {
+      XType componentType = componentElement.getType();
+      // TODO(ronshapiro): unify with ComponentImplementationBuilder
+      Set<MethodSignature> methodSignatures =
+          Sets.newHashSetWithExpectedSize(componentDescriptor.componentMethods().size());
+      componentDescriptor.componentMethods().stream()
+          .filter(
+              method ->
+                  methodSignatures.add(
+                      MethodSignature.forComponentMethod(method, componentType, processingEnv)))
+          .forEach(
+              method ->
+                  generatedComponent.addMethod(
+                      emptyComponentMethod(componentElement, method.methodElement())));
 
-    if (componentDescriptor.isProduction()) {
-      generatedComponent
-          .addSuperinterface(TypeNames.CANCELLATION_LISTENER)
-          .addMethod(onProducerFutureCancelledMethod());
+      if (componentDescriptor.isProduction()) {
+        generatedComponent
+            .addSuperinterface(TypeNames.CANCELLATION_LISTENER)
+            .addMethod(onProducerFutureCancelledMethod());
+      }
     }
 
     return ImmutableList.of(generatedComponent);
