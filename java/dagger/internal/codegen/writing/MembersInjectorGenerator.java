@@ -16,7 +16,6 @@
 
 package dagger.internal.codegen.writing;
 
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
 import static com.google.common.base.Preconditions.checkState;
 import static com.squareup.javapoet.MethodSpec.constructorBuilder;
 import static com.squareup.javapoet.MethodSpec.methodBuilder;
@@ -24,7 +23,6 @@ import static com.squareup.javapoet.TypeSpec.classBuilder;
 import static dagger.internal.codegen.binding.AssistedInjectionAnnotations.assistedInjectedConstructors;
 import static dagger.internal.codegen.binding.InjectionAnnotations.injectedConstructors;
 import static dagger.internal.codegen.binding.SourceFiles.bindingTypeElementTypeVariableNames;
-import static dagger.internal.codegen.binding.SourceFiles.frameworkFieldUsages;
 import static dagger.internal.codegen.binding.SourceFiles.generateBindingFieldsForDependencies;
 import static dagger.internal.codegen.binding.SourceFiles.membersInjectorNameForType;
 import static dagger.internal.codegen.binding.SourceFiles.parameterizedGeneratedTypeNameForBinding;
@@ -43,6 +41,7 @@ import static javax.lang.model.element.Modifier.STATIC;
 
 import androidx.room.compiler.processing.XElement;
 import androidx.room.compiler.processing.XFiler;
+import androidx.room.compiler.processing.XProcessingEnv;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.squareup.javapoet.AnnotationSpec;
@@ -60,35 +59,28 @@ import dagger.internal.codegen.base.UniqueNameSet;
 import dagger.internal.codegen.binding.FrameworkField;
 import dagger.internal.codegen.binding.MembersInjectionBinding;
 import dagger.internal.codegen.binding.MembersInjectionBinding.InjectionSite;
+import dagger.internal.codegen.binding.SourceFiles;
 import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.internal.codegen.kotlin.KotlinMetadataUtil;
-import dagger.internal.codegen.langmodel.DaggerElements;
-import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.internal.codegen.writing.InjectionMethods.InjectionSiteMethod;
 import dagger.spi.model.DaggerAnnotation;
 import dagger.spi.model.DependencyRequest;
 import dagger.spi.model.Key;
 import java.util.Map.Entry;
 import javax.inject.Inject;
-import javax.lang.model.SourceVersion;
 
 /**
  * Generates {@link MembersInjector} implementations from {@link MembersInjectionBinding} instances.
  */
 public final class MembersInjectorGenerator extends SourceFileGenerator<MembersInjectionBinding> {
-  private final DaggerTypes types;
-  private final KotlinMetadataUtil metadataUtil;
+  private final SourceFiles sourceFiles;
 
   @Inject
   MembersInjectorGenerator(
       XFiler filer,
-      DaggerElements elements,
-      DaggerTypes types,
-      SourceVersion sourceVersion,
-      KotlinMetadataUtil metadataUtil) {
-    super(filer, elements, sourceVersion);
-    this.types = types;
-    this.metadataUtil = metadataUtil;
+      SourceFiles sourceFiles,
+      XProcessingEnv processingEnv) {
+    super(filer, processingEnv);
+    this.sourceFiles = sourceFiles;
   }
 
   @Override
@@ -126,7 +118,7 @@ public final class MembersInjectorGenerator extends SourceFileGenerator<MembersI
             .addTypeVariables(typeParameters)
             .addAnnotation(qualifierMetadataAnnotation(binding));
 
-    TypeName injectedTypeName = TypeName.get(binding.key().type().java());
+    TypeName injectedTypeName = binding.key().type().xprocessing().getTypeName();
     TypeName implementedType = membersInjectorOf(injectedTypeName);
     injectorTypeBuilder.addSuperinterface(implementedType);
 
@@ -166,7 +158,8 @@ public final class MembersInjectorGenerator extends SourceFileGenerator<MembersI
       // If the dependency type is not visible to this members injector, then use the raw framework
       // type for the field.
       boolean useRawFrameworkType =
-          !isTypeAccessibleFrom(dependency.key().type().java(), generatedTypeName.packageName());
+          !isTypeAccessibleFrom(
+              dependency.key().type().xprocessing(), generatedTypeName.packageName());
 
       String fieldName = fieldNames.getUniqueName(bindingField.name());
       TypeName fieldType = useRawFrameworkType ? bindingField.type().rawType : bindingField.type();
@@ -205,10 +198,8 @@ public final class MembersInjectorGenerator extends SourceFileGenerator<MembersI
             binding.injectionSites(),
             generatedTypeName,
             CodeBlock.of("instance"),
-            binding.key().type().java(),
-            frameworkFieldUsages(binding.dependencies(), dependencyFields)::get,
-            types,
-            metadataUtil));
+            binding.key().type().xprocessing(),
+            sourceFiles.frameworkFieldUsages(binding.dependencies(), dependencyFields)::get));
 
     if (usesRawFrameworkTypes) {
       injectMembersBuilder.addAnnotation(suppressWarnings(UNCHECKED));
@@ -216,11 +207,8 @@ public final class MembersInjectorGenerator extends SourceFileGenerator<MembersI
     injectorTypeBuilder.addMethod(injectMembersBuilder.build());
 
     for (InjectionSite injectionSite : binding.injectionSites()) {
-      if (injectionSite
-          .element()
-          .getEnclosingElement()
-          .equals(toJavac(binding.membersInjectedType()))) {
-        injectorTypeBuilder.addMethod(InjectionSiteMethod.create(injectionSite, metadataUtil));
+      if (injectionSite.enclosingTypeElement().equals(binding.membersInjectedType())) {
+        injectorTypeBuilder.addMethod(InjectionSiteMethod.create(injectionSite));
       }
     }
 
@@ -236,10 +224,7 @@ public final class MembersInjectorGenerator extends SourceFileGenerator<MembersI
         // own generated _MembersInjector class.
         .filter(
             injectionSite ->
-                injectionSite
-                    .element()
-                    .getEnclosingElement()
-                    .equals(toJavac(binding.membersInjectedType())))
+                injectionSite.enclosingTypeElement().equals(binding.membersInjectedType()))
         .flatMap(injectionSite -> injectionSite.dependencies().stream())
         .map(DependencyRequest::key)
         .map(Key::qualifier)

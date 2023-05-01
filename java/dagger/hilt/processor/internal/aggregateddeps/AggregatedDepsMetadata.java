@@ -60,7 +60,7 @@ public abstract class AggregatedDepsMetadata {
 
   abstract DependencyType dependencyType();
 
-  abstract TypeElement dependency();
+  public abstract TypeElement dependency();
 
   public abstract ImmutableSet<TypeElement> replacedDependencies();
 
@@ -88,21 +88,24 @@ public abstract class AggregatedDepsMetadata {
         ClassName.get(metadata.aggregatingElement()),
         metadata.componentElements().stream()
             .map(ClassName::get)
+            .map(ClassName::canonicalName)
             .collect(Collectors.toList()),
         metadata.testElement()
             .map(ClassName::get)
+            .map(ClassName::canonicalName)
             .orElse(null),
         metadata.replacedDependencies().stream()
             .map(ClassName::get)
+            .map(ClassName::canonicalName)
             .collect(Collectors.toList()),
         metadata.dependencyType() == DependencyType.MODULE
-            ? ClassName.get(metadata.dependency())
+            ? ClassName.get(metadata.dependency()).canonicalName()
             : null,
         metadata.dependencyType() == DependencyType.ENTRY_POINT
-            ? ClassName.get(metadata.dependency())
+            ? ClassName.get(metadata.dependency()).canonicalName()
             : null,
         metadata.dependencyType() == DependencyType.COMPONENT_ENTRY_POINT
-            ? ClassName.get(metadata.dependency())
+            ? ClassName.get(metadata.dependency()).canonicalName()
             : null);
   }
 
@@ -186,14 +189,17 @@ public abstract class AggregatedDepsMetadata {
     checkNotNull(entryPointsValue);
     checkNotNull(componentEntryPointsValue);
 
-    return elements.getTypeElement(
+    String dependencyName =
         AnnotationValues.getString(
             getOnlyElement(
                 ImmutableSet.<AnnotationValue>builder()
                     .addAll(AnnotationValues.getAnnotationValues(modulesValue))
                     .addAll(AnnotationValues.getAnnotationValues(entryPointsValue))
                     .addAll(AnnotationValues.getAnnotationValues(componentEntryPointsValue))
-                    .build())));
+                    .build()));
+    TypeElement dependency = elements.getTypeElement(dependencyName);
+    checkNotNull(dependency, "Could not get element for %s", dependencyName);
+    return dependency;
   }
 
   private static ImmutableSet<TypeElement> getReplacedDependencies(
