@@ -16,13 +16,11 @@
 
 package dagger.internal.codegen;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static dagger.internal.codegen.Compilers.compilerWithOptions;
-
+import androidx.room.compiler.processing.util.Source;
 import com.google.common.collect.ImmutableList;
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
-import javax.tools.JavaFileObject;
+import dagger.testing.compile.CompilerTests;
+import dagger.testing.golden.GoldenFileRule;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -35,6 +33,8 @@ public final class ComponentProtectedTypeTest {
     return CompilerMode.TEST_PARAMETERS;
   }
 
+  @Rule public GoldenFileRule goldenFileRule = new GoldenFileRule();
+
   private final CompilerMode compilerMode;
 
   public ComponentProtectedTypeTest(CompilerMode compilerMode) {
@@ -42,9 +42,9 @@ public final class ComponentProtectedTypeTest {
   }
 
   @Test
-  public void componentAccessesProtectedType_succeeds() {
-    JavaFileObject baseSrc =
-        JavaFileObjects.forSourceLines(
+  public void componentAccessesProtectedType_succeeds() throws Exception {
+    Source baseSrc =
+        CompilerTests.javaSource(
             "test.sub.TestComponentBase",
             "package test.sub;",
             "",
@@ -63,8 +63,8 @@ public final class ComponentProtectedTypeTest {
             "    ProtectedType(Dep dep) {}",
             "  }",
             "}");
-    JavaFileObject componentSrc =
-        JavaFileObjects.forSourceLines(
+    Source componentSrc =
+        CompilerTests.javaSource(
             "test.TestComponent",
             "package test;",
             "",
@@ -85,27 +85,13 @@ public final class ComponentProtectedTypeTest {
             // a type.
             "  abstract TestComponentBase.ProtectedType provideProtectedType();",
             "}");
-    JavaFileObject generatedComponent =
-        JavaFileObjects.forSourceLines(
-            "test.DaggerTestComponent",
-            "package test;",
-            "",
-            GeneratedLines.generatedAnnotations(),
-            "public final class DaggerTestComponent extends TestComponent {",
-            "  private Provider<test.sub.TestComponentBase.ProtectedType> protectedTypeProvider;",
-            "",
-            "  @Override",
-            "  test.sub.TestComponentBase.ProtectedType provideProtectedType() {",
-            "    return protectedTypeProvider.get();",
-            "  }",
-            "}");
 
-    Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts()).compile(baseSrc, componentSrc);
-
-    assertThat(compilation).succeeded();
-    assertThat(compilation)
-        .generatedSourceFile("test.DaggerTestComponent")
-        .containsElementsIn(generatedComponent);
+    CompilerTests.daggerCompiler(baseSrc, componentSrc)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(0);
+              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
+            });
   }
 }
