@@ -44,8 +44,8 @@ import dagger.internal.codegen.base.RequestKinds;
 import dagger.internal.codegen.binding.InjectionAnnotations;
 import dagger.internal.codegen.javapoet.TypeNames;
 import dagger.internal.codegen.kotlin.KotlinMetadataUtil;
+import dagger.internal.codegen.model.RequestKind;
 import dagger.internal.codegen.xprocessing.XTypes;
-import dagger.spi.model.RequestKind;
 import java.util.Optional;
 import javax.inject.Inject;
 
@@ -92,7 +92,11 @@ final class DependencyRequestValidator {
     new Validator(report, requestElement, requestType).validate();
   }
 
-  /** Returns {@code true} if a kotlin inject field is missing metadata about its qualifiers. */
+  /**
+   * Returns {@code true} if a kotlin inject field is missing metadata about its qualifiers.
+   *
+   * <p>See https://youtrack.jetbrains.com/issue/KT-34684.
+   */
   private boolean missingQualifierMetadata(XElement requestElement) {
     if (isField(requestElement)) {
       XFieldElement fieldElement = asField(requestElement);
