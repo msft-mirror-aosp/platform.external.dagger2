@@ -16,49 +16,18 @@
 
 package dagger.hilt.android.processor.internal.viewmodel
 
-import com.google.auto.common.MoreElements
+import androidx.room.compiler.processing.ExperimentalProcessingApi
 import com.google.auto.service.AutoService
-import dagger.hilt.android.processor.internal.AndroidClassNames
-import dagger.hilt.processor.internal.BaseProcessor
+import dagger.hilt.processor.internal.BaseProcessingStep
+import dagger.hilt.processor.internal.JavacBaseProcessingStepProcessor
 import javax.annotation.processing.Processor
-import javax.annotation.processing.RoundEnvironment
-import javax.lang.model.SourceVersion
-import javax.lang.model.element.Element
-import javax.lang.model.element.TypeElement
 import net.ltgt.gradle.incap.IncrementalAnnotationProcessor
 import net.ltgt.gradle.incap.IncrementalAnnotationProcessorType
 
-/**
- * Annotation processor for @ViewModelInject.
- */
+/** Annotation processor for @ViewModelInject. */
 @AutoService(Processor::class)
 @IncrementalAnnotationProcessor(IncrementalAnnotationProcessorType.ISOLATING)
-class ViewModelProcessor : BaseProcessor() {
-
-  private val parsedElements = mutableSetOf<TypeElement>()
-
-  override fun getSupportedAnnotationTypes() = setOf(
-    AndroidClassNames.HILT_VIEW_MODEL.toString()
-  )
-
-  override fun getSupportedSourceVersion() = SourceVersion.latest()
-
-  override fun processEach(annotation: TypeElement, element: Element) {
-    val typeElement = MoreElements.asType(element)
-    if (parsedElements.add(typeElement)) {
-      ViewModelMetadata.create(
-        processingEnv,
-        typeElement,
-      )?.let { viewModelMetadata ->
-        ViewModelModuleGenerator(
-          processingEnv,
-          viewModelMetadata
-        ).generate()
-      }
-    }
-  }
-
-  override fun postRoundProcess(roundEnv: RoundEnvironment?) {
-    parsedElements.clear()
-  }
+class ViewModelProcessor : JavacBaseProcessingStepProcessor() {
+  @OptIn(ExperimentalProcessingApi::class)
+  override fun processingStep(): BaseProcessingStep = ViewModelProcessingStep(xProcessingEnv)
 }

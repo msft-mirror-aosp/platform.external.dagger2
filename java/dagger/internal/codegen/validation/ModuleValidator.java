@@ -62,10 +62,10 @@ import dagger.internal.codegen.binding.ComponentDescriptorFactory;
 import dagger.internal.codegen.binding.InjectionAnnotations;
 import dagger.internal.codegen.binding.MethodSignatureFormatter;
 import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.model.BindingGraph;
+import dagger.internal.codegen.model.Scope;
 import dagger.internal.codegen.xprocessing.XElements;
 import dagger.internal.codegen.xprocessing.XTypeElements;
-import dagger.spi.model.BindingGraph;
-import dagger.spi.model.Scope;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
@@ -537,7 +537,7 @@ public final class ModuleValidator {
 
   private void validateModuleVisibility(
       XTypeElement moduleElement, ModuleKind moduleKind, ValidationReport.Builder reportBuilder) {
-    if (moduleElement.isPrivate()) {
+    if (moduleElement.isPrivate() || moduleElement.isKtPrivate()) {
       reportBuilder.addError("Modules cannot be private.", moduleElement);
     } else if (isEffectivelyPrivate(moduleElement)) {
       reportBuilder.addError("Modules cannot be enclosed in private types.", moduleElement);

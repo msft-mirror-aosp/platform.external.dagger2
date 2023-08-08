@@ -17,24 +17,22 @@
 package dagger.hilt.processor.internal.generatesrootinput;
 
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static com.google.testing.compile.Compiler.javac;
 
-import com.google.auto.common.MoreElements;
+import androidx.room.compiler.processing.XElement;
+import androidx.room.compiler.processing.XFiler.Mode;
+import androidx.room.compiler.processing.XProcessingEnv;
+import androidx.room.compiler.processing.XRoundEnv;
+import androidx.room.compiler.processing.util.Source;
 import com.google.common.truth.Correspondence;
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.TypeSpec;
-import dagger.hilt.processor.internal.BaseProcessor;
+import dagger.hilt.GeneratesRootInput;
+import dagger.hilt.android.testing.compile.HiltCompilerTests;
+import dagger.hilt.processor.internal.BaseProcessingStep;
+import dagger.internal.codegen.xprocessing.XElements;
 import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.processing.ProcessingEnvironment;
-import javax.annotation.processing.RoundEnvironment;
-import javax.annotation.processing.SupportedAnnotationTypes;
-import javax.lang.model.element.Element;
-import javax.tools.JavaFileObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -45,55 +43,55 @@ public final class GeneratesRootInputProcessorTest {
   private static final int GENERATED_CLASSES = 5;
   private static final ClassName TEST_ANNOTATION = ClassName.get("test", "TestAnnotation");
 
-  private final List<Element> elementsToWaitFor = new ArrayList<>();
+  private final List<XElement> elementsToWaitFor = new ArrayList<>();
   private int generatedClasses = 0;
 
-  @SupportedAnnotationTypes("*")
-  public final class TestAnnotationProcessor extends BaseProcessor {
+  public final class TestAnnotationStep extends BaseProcessingStep {
     private GeneratesRootInputs generatesRootInputs;
 
-    @Override
-    public synchronized void init(ProcessingEnvironment processingEnv) {
-      super.init(processingEnv);
-      generatesRootInputs = new GeneratesRootInputs(processingEnv);
+    public TestAnnotationStep(XProcessingEnv env) {
+      super(env);
+      generatesRootInputs = new GeneratesRootInputs(env);
     }
 
     @Override
-    protected void postRoundProcess(RoundEnvironment roundEnv) throws Exception {
+    public void postProcess(XProcessingEnv processingEnv, XRoundEnv round) {
       if (generatedClasses > 0) {
-        elementsToWaitFor.addAll(generatesRootInputs.getElementsToWaitFor(roundEnv));
+        elementsToWaitFor.addAll(generatesRootInputs.getElementsToWaitFor(round));
       }
       if (generatedClasses < GENERATED_CLASSES) {
         TypeSpec typeSpec =
             TypeSpec.classBuilder("Foo" + generatedClasses++)
                 .addAnnotation(TEST_ANNOTATION)
                 .build();
-        JavaFile.builder("foo", typeSpec).build().writeTo(processingEnv.getFiler());
+        processingEnv.getFiler().write(JavaFile.builder("foo", typeSpec).build(), Mode.Isolating);
       }
     }
   }
 
   @Test
   public void succeeds_ComponentProcessorWaitsForAnnotationsWithGeneratesRootInput() {
-    JavaFileObject testAnnotation =
-        JavaFileObjects.forSourceLines(
+    Source testAnnotation =
+        HiltCompilerTests.javaSource(
             "test.TestAnnotation",
             "package test;",
-            "@dagger.hilt.GeneratesRootInput",
+            "@" + GeneratesRootInput.class.getCanonicalName(),
             "public @interface TestAnnotation {}");
 
-    Compilation compilation =
-        javac()
-            .withProcessors(new TestAnnotationProcessor(), new GeneratesRootInputProcessor())
-            .compile(testAnnotation);
-
-    assertThat(compilation).succeeded();
-    assertThat(elementsToWaitFor)
-        .comparingElementsUsing(
-            Correspondence.<Element, String>transforming(
-                element -> MoreElements.asType(element).getQualifiedName().toString(),
-                "has qualified name of"))
-        .containsExactly("foo.Foo0", "foo.Foo1", "foo.Foo2", "foo.Foo3", "foo.Foo4")
-        .inOrder();
+    HiltCompilerTests.hiltCompiler(testAnnotation)
+        .withProcessingSteps(TestAnnotationStep::new)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(0);
+              assertThat(elementsToWaitFor)
+                  .comparingElementsUsing(
+                      Correspondence.<XElement, String>transforming(
+                          element -> XElements.asTypeElement(element).getQualifiedName(),
+                          "has qualified name of"))
+                  .containsExactly("foo.Foo0", "foo.Foo1", "foo.Foo2", "foo.Foo3", "foo.Foo4")
+                  .inOrder();
+              elementsToWaitFor.clear();
+              generatedClasses = 0;
+            });
   }
 }
