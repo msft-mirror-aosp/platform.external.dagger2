@@ -18,13 +18,17 @@ package dagger.internal.codegen.xprocessing;
 
 import static androidx.room.compiler.processing.compat.XConverters.getProcessingEnv;
 import static androidx.room.compiler.processing.compat.XConverters.toJavac;
+import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
 import static java.util.stream.Collectors.joining;
 
 import androidx.room.compiler.processing.JavaPoetExtKt;
 import androidx.room.compiler.processing.XAnnotation;
 import androidx.room.compiler.processing.XProcessingEnv;
+import androidx.room.compiler.processing.XType;
+import androidx.room.compiler.processing.XTypeElement;
 import com.google.auto.common.AnnotationMirrors;
 import com.google.common.base.Equivalence;
+import com.google.common.collect.ImmutableList;
 import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
 import java.util.Arrays;
@@ -35,7 +39,7 @@ public final class XAnnotations {
 
   /** Returns the {@link AnnotationSpec} for the given annotation */
   public static AnnotationSpec getAnnotationSpec(XAnnotation annotation) {
-    return JavaPoetExtKt.toAnnotationSpec(annotation);
+    return JavaPoetExtKt.toAnnotationSpec(annotation, false);
   }
 
   /** Returns the string representation of the given annotation. */
@@ -101,12 +105,6 @@ public final class XAnnotations {
       if (annotation.getType().isError()) {
         return "@" + annotation.getName(); // SUPPRESS_GET_NAME_CHECK
       }
-      // TODO(b/264089557): Non-annotation elements can be incorrectly treated as annotation in KSP,
-      // therefore calling getAnnotationValues() can cause confusing error.
-      if (getProcessingEnv(annotation).getBackend() == XProcessingEnv.Backend.KSP
-          && annotation.getTypeElement().getConstructors().size() != 1) {
-        return String.format("@%s", getClassName(annotation).canonicalName());
-      }
       return annotation.getAnnotationValues().isEmpty()
           // If the annotation doesn't have values then skip the empty parenthesis.
           ? String.format("@%s", getClassName(annotation).canonicalName())
@@ -130,6 +128,19 @@ public final class XAnnotations {
     } catch (TypeNotPresentException e) {
       return e.typeName();
     }
+  }
+
+  /** Returns the value of the given [key] as a type element. */
+  public static XTypeElement getAsTypeElement(XAnnotation annotation, String key) {
+    return annotation.getAsType(key).getTypeElement();
+  }
+
+  /** Returns the value of the given [key] as a list of type elements. */
+  public static ImmutableList<XTypeElement> getAsTypeElementList(
+      XAnnotation annotation, String key) {
+    return annotation.getAsTypeList(key).stream()
+        .map(XType::getTypeElement)
+        .collect(toImmutableList());
   }
 
   private XAnnotations() {}

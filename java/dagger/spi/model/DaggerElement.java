@@ -16,27 +16,49 @@
 
 package dagger.spi.model;
 
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
-
-import androidx.room.compiler.processing.XElement;
 import com.google.auto.value.AutoValue;
+import com.google.devtools.ksp.symbol.KSAnnotated;
+import javax.annotation.Nullable;
 import javax.lang.model.element.Element;
 
 /** Wrapper type for an element. */
 @AutoValue
 public abstract class DaggerElement {
-  public static DaggerElement from(XElement element) {
-    return new AutoValue_DaggerElement(element);
+  public static DaggerElement fromJavac(Element element) {
+    return new AutoValue_DaggerElement(element, null);
   }
 
-  public abstract XElement xprocessing();
+  public static DaggerElement fromKsp(KSAnnotated ksp) {
+    return new AutoValue_DaggerElement(null, ksp);
+  }
 
-  public Element java() {
-    return toJavac(xprocessing());
+  /**
+   * Java representation for the element, returns {@code null} not using java annotation processor.
+   */
+  @Nullable
+  public abstract Element java();
+
+  /** KSP declaration for the element, returns {@code null} not using KSP. */
+  @Nullable
+  public abstract KSAnnotated ksp();
+
+  public DaggerProcessingEnv.Backend backend() {
+    if (java() != null) {
+      return DaggerProcessingEnv.Backend.JAVAC;
+    } else if (ksp() != null) {
+      return DaggerProcessingEnv.Backend.KSP;
+    }
+    throw new AssertionError("Unexpected backend");
   }
 
   @Override
   public final String toString() {
-    return xprocessing().toString();
+    switch (backend()) {
+      case JAVAC:
+        return java().toString();
+      case KSP:
+        return ksp().toString();
+    }
+    throw new IllegalStateException(String.format("Backend %s not supported yet.", backend()));
   }
 }

@@ -22,30 +22,32 @@ import com.android.build.gradle.AppExtension
 import com.android.build.gradle.BaseExtension
 import com.android.build.gradle.LibraryExtension
 import com.android.build.gradle.TestExtension
-import com.android.build.gradle.TestedExtension
 import com.android.build.gradle.api.AndroidBasePlugin
 import com.android.build.gradle.tasks.JdkImageInput
 import dagger.hilt.android.plugin.task.AggregateDepsTask
-import dagger.hilt.android.plugin.task.HiltTransformTestClassesTask
 import dagger.hilt.android.plugin.util.AggregatedPackagesTransform
 import dagger.hilt.android.plugin.util.ComponentCompat
 import dagger.hilt.android.plugin.util.CopyTransform
 import dagger.hilt.android.plugin.util.SimpleAGPVersion
+import dagger.hilt.android.plugin.util.addJavaTaskProcessorOptions
+import dagger.hilt.android.plugin.util.addKaptTaskProcessorOptions
+import dagger.hilt.android.plugin.util.addKspTaskProcessorOptions
 import dagger.hilt.android.plugin.util.capitalize
 import dagger.hilt.android.plugin.util.getAndroidComponentsExtension
 import dagger.hilt.android.plugin.util.getKaptConfigName
-import dagger.hilt.android.plugin.util.getSdkPath
+import dagger.hilt.android.plugin.util.getKspConfigName
+import dagger.hilt.android.plugin.util.isKspTask
 import dagger.hilt.processor.internal.optionvalues.GradleProjectType
 import java.io.File
 import javax.inject.Inject
 import org.gradle.api.JavaVersion
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.Task
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 import org.gradle.api.attributes.Attribute
 import org.gradle.api.provider.ProviderFactory
-import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.process.CommandLineArgumentProvider
 import org.gradle.util.GradleVersion
@@ -60,7 +62,7 @@ import org.objectweb.asm.Opcodes
  * update the superclass.
  */
 class HiltGradlePlugin @Inject constructor(
-  val providers: ProviderFactory
+  private val providers: ProviderFactory
 ) : Plugin<Project> {
   override fun apply(project: Project) {
     var configured = false
@@ -82,15 +84,13 @@ class HiltGradlePlugin @Inject constructor(
     val hiltExtension = project.extensions.create(
       HiltExtension::class.java, "hilt", HiltExtensionImpl::class.java
     )
+    if (SimpleAGPVersion.ANDROID_GRADLE_PLUGIN_VERSION < SimpleAGPVersion(7, 0)) {
+      error("The Hilt Android Gradle plugin is only compatible with Android Gradle plugin (AGP) " +
+              "version 7.0 or higher (found ${SimpleAGPVersion.ANDROID_GRADLE_PLUGIN_VERSION}).")
+    }
     configureDependencyTransforms(project)
     configureCompileClasspath(project, hiltExtension)
-    if (SimpleAGPVersion.ANDROID_GRADLE_PLUGIN_VERSION < SimpleAGPVersion(4, 2)) {
-      // Configures bytecode transform using older APIs pre AGP 4.2
-      configureBytecodeTransform(project, hiltExtension)
-    } else {
-      // Configures bytecode transform using AGP 4.2 ASM pipeline.
-      configureBytecodeTransformASM(project, hiltExtension)
-    }
+    configureBytecodeTransformASM(project)
     configureAggregatingTask(project, hiltExtension)
     configureProcessorFlags(project, hiltExtension)
   }
@@ -242,17 +242,8 @@ class HiltGradlePlugin @Inject constructor(
     project.dependencies.add(compileOnlyConfigName, artifactView.files)
   }
 
-  @Suppress("UnstableApiUsage") // ASM Pipeline APIs
-  private fun configureBytecodeTransformASM(project: Project, hiltExtension: HiltExtension) {
-    var warnAboutLocalTestsFlag = false
+  private fun configureBytecodeTransformASM(project: Project) {
     fun registerTransform(androidComponent: ComponentCompat) {
-      if (hiltExtension.enableTransformForLocalTests && !warnAboutLocalTestsFlag) {
-        project.logger.warn(
-          "The Hilt configuration option 'enableTransformForLocalTests' is no longer necessary " +
-            "when com.android.tools.build:gradle:4.2.0+ is used."
-        )
-        warnAboutLocalTestsFlag = true
-      }
       androidComponent.transformClassesWith(
         classVisitorFactoryImplClass = AndroidEntryPointClassVisitor.Factory::class.java,
         scope = InstrumentationScope.PROJECT
@@ -266,24 +257,6 @@ class HiltGradlePlugin @Inject constructor(
       )
     }
     getAndroidComponentsExtension(project).onAllVariants { registerTransform(it) }
-  }
-
-  private fun configureBytecodeTransform(project: Project, hiltExtension: HiltExtension) {
-    val androidExtension = project.baseExtension() ?: error("Android BaseExtension not found.")
-    androidExtension::class.java.getMethod(
-      "registerTransform",
-      Class.forName("com.android.build.api.transform.Transform"),
-      Array<Any>::class.java
-    ).invoke(androidExtension, AndroidEntryPointTransform(), emptyArray<Any>())
-
-    // Create and configure a task for applying the transform for host-side unit tests. b/37076369
-    project.testedExtension()?.unitTestVariants?.all { unitTestVariant ->
-      HiltTransformTestClassesTask.create(
-        project = project,
-        unitTestVariant = unitTestVariant,
-        extension = hiltExtension
-      )
-    }
   }
 
   private fun configureAggregatingTask(project: Project, hiltExtension: HiltExtension) {
@@ -307,15 +280,18 @@ class HiltGradlePlugin @Inject constructor(
     val hiltCompileConfiguration = project.configurations.create(
       "hiltCompileOnly${variant.name.capitalize()}"
     ).apply {
+      description = "Hilt aggregated compile only dependencies for '${variant.name}'"
       isCanBeConsumed = false
       isCanBeResolved = true
+      isVisible = false
     }
     // Add the JavaCompile task classpath and output dir to the config, the task's classpath
     // will contain:
     //  * compileOnly dependencies
-    //  * KAPT and Kotlinc generated bytecode
+    //  * KAPT, KSP and Kotlinc generated bytecode
     //  * R.jar
     //  * Tested classes if the variant is androidTest
+    // TODO(danysantiago): Revisit to support K2 compiler
     project.dependencies.add(
       hiltCompileConfiguration.name,
       project.files(variant.javaCompileProvider.map { it.classpath })
@@ -325,8 +301,34 @@ class HiltGradlePlugin @Inject constructor(
       project.files(variant.javaCompileProvider.map {it.destinationDirectory.get() })
     )
 
+    val hiltAnnotationProcessorConfiguration = project.configurations.create(
+      "hiltAnnotationProcessor${variant.name.capitalize()}"
+    ).also { config ->
+      config.description = "Hilt annotation processor classpath for '${variant.name}'"
+      config.isCanBeConsumed = false
+      config.isCanBeResolved = true
+      config.isVisible = false
+      // Add user annotation processor configuration, so that SPI plugins and other processors
+      // are discoverable.
+      val apConfigurations: List<Configuration> = buildList {
+        add(variant.annotationProcessorConfiguration)
+        project.plugins.withId("kotlin-kapt") {
+          project.configurations.findByName(getKaptConfigName(variant))?.let { add(it) }
+        }
+        project.plugins.withId("com.google.devtools.ksp") {
+          // Add the main 'ksp' config since the variant aware config does not extend main.
+          // https://github.com/google/ksp/issues/1433
+          project.configurations.findByName("ksp")?.let { add(it) }
+          project.configurations.findByName(getKspConfigName(variant))?.let { add(it) }
+        }
+      }
+      config.extendsFrom(*apConfigurations.toTypedArray())
+      // Add hilt-compiler even though it might be in the AP configurations already.
+      project.dependencies.add(config.name, "com.google.dagger:hilt-compiler:$HILT_VERSION")
+    }
+
     fun getInputClasspath(artifactAttributeValue: String) =
-      mutableListOf<Configuration>().apply {
+      buildList<Configuration> {
         @Suppress("DEPRECATION") // Older variant API is deprecated
         if (variant is com.android.build.gradle.api.TestVariant) {
           add(variant.testedVariant.runtimeConfiguration)
@@ -399,21 +401,7 @@ class HiltGradlePlugin @Inject constructor(
       }
       compileTask.destinationDirectory.set(componentClasses.singleFile)
       compileTask.options.apply {
-        annotationProcessorPath = project.configurations.create(
-          "hiltAnnotationProcessor${variant.name.capitalize()}"
-        ).also { config ->
-          config.isCanBeConsumed = false
-          config.isCanBeResolved = true
-          // Add user annotation processor configuration, so that SPI plugins and other processors
-          // are discoverable.
-          val apConfigurations: List<Configuration> = mutableListOf<Configuration>().apply {
-            add(variant.annotationProcessorConfiguration)
-            project.configurations.findByName(getKaptConfigName(variant))?.let { add(it) }
-          }
-          config.extendsFrom(*apConfigurations.toTypedArray())
-          // Add hilt-compiler even though it might be in the AP configurations already.
-          project.dependencies.add(config.name, "com.google.dagger:hilt-compiler:$HILT_VERSION")
-        }
+        annotationProcessorPath = hiltAnnotationProcessorConfiguration
         generatedSourceOutputDirectory.set(
           project.file(
             project.buildDir.resolve("generated/hilt/component_sources/${variant.name}/")
@@ -440,12 +428,8 @@ class HiltGradlePlugin @Inject constructor(
     variant.registerPostJavacGeneratedBytecode(componentClasses)
   }
 
-  private fun getAndroidJar(project: Project, compileSdkVersion: String) =
-    project.files(File(project.getSdkPath(), "platforms/$compileSdkVersion/android.jar"))
-
   private fun configureProcessorFlags(project: Project, hiltExtension: HiltExtension) {
     val androidExtension = project.baseExtension() ?: error("Android BaseExtension not found.")
-
     val projectType = when (androidExtension) {
       is AppExtension -> GradleProjectType.APP
       is LibraryExtension -> GradleProjectType.LIBRARY
@@ -453,37 +437,23 @@ class HiltGradlePlugin @Inject constructor(
       else -> error("Hilt plugin does not know how to configure '$this'")
     }
 
-    // Pass annotation processor flags via a CommandLineArgumentProvider so that plugin
-    // options defined in the extension are populated from the user's build file. Checking the
-    // option too early would make it seem like it is never set.
-    androidExtension.defaultConfig.javaCompileOptions.annotationProcessorOptions
-        .compilerArgumentProvider(HiltCommandLineArgumentProvider(hiltExtension, projectType))
-  }
-
-  private class HiltCommandLineArgumentProvider(
-      private val hiltExtension: HiltExtension,
-      private val projectType: GradleProjectType
-  ): CommandLineArgumentProvider {
-    override fun asArguments() = mutableListOf<Pair<String, String>>().apply {
-      // Pass annotation processor flag to enable Dagger's fast-init, the best mode for Hilt.
-      add("dagger.fastInit" to "enabled")
-      // Pass annotation processor flag to disable @AndroidEntryPoint superclass validation.
-      add("dagger.hilt.android.internal.disableAndroidSuperclassValidation" to "true")
-
-      add("dagger.hilt.android.internal.projectType" to projectType.toString())
-
-      // Pass annotation processor flag to disable the aggregating processor if aggregating
-      // task is enabled.
-      if (hiltExtension.enableAggregatingTask) {
-        add("dagger.hilt.internal.useAggregatingRootProcessor" to "false")
+    getAndroidComponentsExtension(project).onAllVariants { component ->
+      // Pass annotation processor flags via a CommandLineArgumentProvider so that plugin
+      // options defined in the extension are populated from the user's build file.
+      val argsProducer: (Task) -> CommandLineArgumentProvider = { task ->
+        HiltCommandLineArgumentProvider(
+          forKsp = task.isKspTask(),
+          projectType = projectType,
+          enableAggregatingTask =
+            hiltExtension.enableAggregatingTask,
+          disableCrossCompilationRootValidation =
+            hiltExtension.disableCrossCompilationRootValidation
+        )
       }
-      // Pass annotation processor flag to disable cross compilation root validation.
-      // The plugin option duplicates the processor flag because it is an input of the
-      // aggregating task.
-      if (hiltExtension.disableCrossCompilationRootValidation) {
-        add("dagger.hilt.disableCrossCompilationRootValidation" to "true")
-      }
-    }.map { (key, value) -> "-A$key=$value" }
+      addJavaTaskProcessorOptions(project, component, argsProducer)
+      addKaptTaskProcessorOptions(project, component, argsProducer)
+      addKspTaskProcessorOptions(project, component, argsProducer)
+    }
   }
 
   private fun verifyDependencies(project: Project) {
@@ -491,35 +461,36 @@ class HiltGradlePlugin @Inject constructor(
     if (project.state.failure != null) {
       return
     }
-    val dependencies = project.configurations.flatMap { configuration ->
-      configuration.dependencies.map { dependency -> dependency.group to dependency.name }
-    }
+    val dependencies = project.configurations
+      .filterNot {
+        // Exclude plugin created config since plugin adds the deps to them.
+        it.name.startsWith("hiltAnnotationProcessor") ||
+          it.name.startsWith("hiltCompileOnly")
+      }
+      .flatMap { configuration ->
+        configuration.dependencies.map { dependency -> dependency.group to dependency.name }
+      }.toSet()
+    fun getMissingDepMsg(depCoordinate: String): String =
+      "The Hilt Android Gradle plugin is applied but no $depCoordinate dependency was found."
     if (!dependencies.contains(LIBRARY_GROUP to "hilt-android")) {
-      error(missingDepError("$LIBRARY_GROUP:hilt-android"))
+      error(getMissingDepMsg("$LIBRARY_GROUP:hilt-android"))
     }
     if (
       !dependencies.contains(LIBRARY_GROUP to "hilt-android-compiler") &&
       !dependencies.contains(LIBRARY_GROUP to "hilt-compiler")
     ) {
-      error(missingDepError("$LIBRARY_GROUP:hilt-compiler"))
+      error(getMissingDepMsg("$LIBRARY_GROUP:hilt-compiler"))
     }
   }
 
   private fun Project.baseExtension(): BaseExtension?
       = extensions.findByType(BaseExtension::class.java)
 
-  private fun Project.testedExtension(): TestedExtension?
-      = extensions.findByType(TestedExtension::class.java)
-
   companion object {
-    val ARTIFACT_TYPE_ATTRIBUTE = Attribute.of("artifactType", String::class.java)
+    private val ARTIFACT_TYPE_ATTRIBUTE = Attribute.of("artifactType", String::class.java)
     const val DAGGER_ARTIFACT_TYPE_VALUE = "jar-for-dagger"
     const val AGGREGATED_HILT_ARTIFACT_TYPE_VALUE = "aggregated-jar-for-hilt"
 
     const val LIBRARY_GROUP = "com.google.dagger"
-
-    val missingDepError: (String) -> String = { depCoordinate ->
-      "The Hilt Android Gradle plugin is applied but no $depCoordinate dependency was found."
-    }
   }
 }

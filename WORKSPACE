@@ -171,7 +171,7 @@ CHECKER_FRAMEWORK_VERSION = "2.5.3"
 
 ERROR_PRONE_VERSION = "2.14.0"
 
-KSP_VERSION = "1.8.0-1.0.9"
+KSP_VERSION = KOTLIN_VERSION + "-1.0.9"
 
 maven_install(
     artifacts = [
@@ -245,7 +245,7 @@ maven_install(
         "org.jetbrains.kotlin:kotlin-compiler-embeddable:%s" % KOTLIN_VERSION,
         "org.jetbrains.kotlin:kotlin-daemon-embeddable:%s" % KOTLIN_VERSION,
         "org.jetbrains.kotlin:kotlin-stdlib:%s" % KOTLIN_VERSION,
-        "org.jetbrains.kotlinx:kotlinx-metadata-jvm:0.6.0",
+        "org.jetbrains.kotlinx:kotlinx-metadata-jvm:0.6.2",
         "org.mockito:mockito-core:2.28.2",
         "org.objenesis:objenesis:1.0",
         "org.robolectric:robolectric:4.4",
