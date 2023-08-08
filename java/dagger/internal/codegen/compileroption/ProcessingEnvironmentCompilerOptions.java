@@ -31,6 +31,7 @@ import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompil
 import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.FORMAT_GENERATED_SOURCE;
 import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.GENERATED_CLASS_EXTENDS_COMPONENT;
 import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.IGNORE_PRIVATE_AND_STATIC_INJECTION_FOR_COMPONENT;
+import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.IGNORE_PROVISION_KEY_WILDCARDS;
 import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.INCLUDE_STACKTRACE_WITH_DEFERRED_ERROR_MESSAGES;
 import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.PLUGINS_VISIT_FULL_BINDING_GRAPHS;
 import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.STRICT_MULTIBINDING_VALIDATION;
@@ -213,6 +214,11 @@ public final class ProcessingEnvironmentCompilerOptions extends CompilerOptions 
   }
 
   @Override
+  public boolean ignoreProvisionKeyWildcards() {
+    return isEnabled(IGNORE_PROVISION_KEY_WILDCARDS);
+  }
+
+  @Override
   public boolean strictMultibindingValidation() {
     return isEnabled(STRICT_MULTIBINDING_VALIDATION);
   }
@@ -352,6 +358,8 @@ public final class ProcessingEnvironmentCompilerOptions extends CompilerOptions 
     STRICT_SUPERFICIAL_VALIDATION(ENABLED),
 
     GENERATED_CLASS_EXTENDS_COMPONENT,
+
+    IGNORE_PROVISION_KEY_WILDCARDS,
 
     VALIDATE_TRANSITIVE_COMPONENT_DEPENDENCIES(ENABLED)
     ;

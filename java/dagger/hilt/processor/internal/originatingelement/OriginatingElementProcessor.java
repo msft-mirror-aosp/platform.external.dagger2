@@ -18,16 +18,9 @@ package dagger.hilt.processor.internal.originatingelement;
 
 import static net.ltgt.gradle.incap.IncrementalAnnotationProcessorType.ISOLATING;
 
-import com.google.auto.common.MoreElements;
 import com.google.auto.service.AutoService;
-import com.google.common.collect.ImmutableSet;
-import dagger.hilt.processor.internal.BaseProcessor;
-import dagger.hilt.processor.internal.ClassNames;
-import dagger.hilt.processor.internal.ProcessorErrors;
-import dagger.hilt.processor.internal.Processors;
+import dagger.hilt.processor.internal.JavacBaseProcessingStepProcessor;
 import javax.annotation.processing.Processor;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.TypeElement;
 import net.ltgt.gradle.incap.IncrementalAnnotationProcessor;
 
 /**
@@ -36,34 +29,9 @@ import net.ltgt.gradle.incap.IncrementalAnnotationProcessor;
  */
 @IncrementalAnnotationProcessor(ISOLATING)
 @AutoService(Processor.class)
-public final class OriginatingElementProcessor extends BaseProcessor {
-
+public final class OriginatingElementProcessor extends JavacBaseProcessingStepProcessor {
   @Override
-  public ImmutableSet<String> getSupportedAnnotationTypes() {
-    return ImmutableSet.of(ClassNames.ORIGINATING_ELEMENT.toString());
-  }
-
-  @Override
-  public void processEach(TypeElement annotation, Element element) throws Exception {
-    ProcessorErrors.checkState(
-        MoreElements.isType(element) && Processors.isTopLevel(element),
-        element,
-        "@%s should only be used to annotate top-level types, but found: %s",
-        annotation.getSimpleName(),
-        element);
-
-    TypeElement originatingElementValue =
-        Processors.getAnnotationClassValue(
-            getElementUtils(),
-            Processors.getAnnotationMirror(element, ClassNames.ORIGINATING_ELEMENT),
-            "topLevelClass");
-
-    // TODO(bcorso): ProcessorErrors should allow us to point to the annotation too.
-    ProcessorErrors.checkState(
-        Processors.isTopLevel(originatingElementValue),
-        element,
-        "@%s.topLevelClass value should be a top-level class, but found: %s",
-        annotation.getSimpleName(),
-        originatingElementValue);
+  public OriginatingElementProcessingStep processingStep() {
+    return new OriginatingElementProcessingStep(getXProcessingEnv());
   }
 }

@@ -25,11 +25,14 @@ compiler_test(
         "//java/dagger/hilt/android:android_entry_point",
         "@androidsdk//:platforms/android-32/android.jar",
     ],
+    resources = glob([
+        "goldens/ActivityGeneratorTest_*",
+    ]),
     deps = [
         "//java/dagger/hilt/android/testing/compile",
-        "//third_party/java/compile_testing",
+        "//java/dagger/internal/codegen/xprocessing:xprocessing-testing",
+        "//java/dagger/testing/golden",
         "//third_party/java/junit",
-        "//third_party/java/truth",
     ],
 )
 
@@ -42,10 +45,12 @@ compiler_test(
         "@androidsdk//:platforms/android-32/android.jar",
     ],
     deps = [
+        "//java/dagger/hilt/android:android_entry_point",
         "//java/dagger/hilt/android/testing/compile",
+        "//java/dagger/internal/codegen/xprocessing",
+        "//java/dagger/internal/codegen/xprocessing:xprocessing-testing",
         "//third_party/java/compile_testing",
         "//third_party/java/junit",
-        "//third_party/java/truth",
     ],
 )
 

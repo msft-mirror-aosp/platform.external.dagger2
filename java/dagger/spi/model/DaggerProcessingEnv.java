@@ -16,10 +16,10 @@
 
 package dagger.spi.model;
 
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
-
-import androidx.room.compiler.processing.XProcessingEnv;
 import com.google.auto.value.AutoValue;
+import com.google.devtools.ksp.processing.Resolver;
+import com.google.devtools.ksp.processing.SymbolProcessorEnvironment;
+import javax.annotation.Nullable;
 import javax.annotation.processing.ProcessingEnvironment;
 
 /** Wrapper type for an element. */
@@ -28,18 +28,38 @@ public abstract class DaggerProcessingEnv {
   /** Represents a type of backend used for compilation. */
   public enum Backend { JAVAC, KSP }
 
-  public static DaggerProcessingEnv from(XProcessingEnv processingEnv) {
-    return new AutoValue_DaggerProcessingEnv(processingEnv);
+  public static boolean isJavac(Backend backend) {
+    return backend.equals(Backend.JAVAC);
   }
 
-  public abstract XProcessingEnv xprocessing();
+  public static DaggerProcessingEnv fromJavac(ProcessingEnvironment env) {
+    return new AutoValue_DaggerProcessingEnv(env, null, null);
+  }
+
+  public static DaggerProcessingEnv fromKsp(SymbolProcessorEnvironment env, Resolver resolver) {
+    return new AutoValue_DaggerProcessingEnv(null, env, resolver);
+  }
+
+  /**
+   * Java representation for the processing environment, returns {@code null} not using java
+   * annotation processor.
+   */
+  @Nullable
+  public abstract ProcessingEnvironment java();
+
+  @Nullable
+  public abstract SymbolProcessorEnvironment ksp();
+
+  @Nullable
+  public abstract Resolver resolver();
 
   /** Returns the backend used in this compilation. */
-  public Backend getBackend() {
-    return Backend.valueOf(xprocessing().getBackend().name());
-  }
-
-  public ProcessingEnvironment java() {
-    return toJavac(xprocessing());
+  public DaggerProcessingEnv.Backend backend() {
+    if (java() != null) {
+      return DaggerProcessingEnv.Backend.JAVAC;
+    } else if (ksp() != null) {
+      return DaggerProcessingEnv.Backend.KSP;
+    }
+    throw new AssertionError("Unexpected backend");
   }
 }

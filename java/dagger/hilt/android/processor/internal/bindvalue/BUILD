@@ -30,7 +30,9 @@ java_library(
     srcs = [
         "BindValueGenerator.java",
         "BindValueMetadata.java",
+        "BindValueProcessingStep.java",
         "BindValueProcessor.java",
+        "KspBindValueProcessor.java",
     ],
     deps = [
         "//:dagger_with_compiler",
@@ -41,14 +43,14 @@ java_library(
         "//java/dagger/hilt/processor/internal:processors",
         "//java/dagger/hilt/processor/internal/kotlin",
         "//java/dagger/internal/codegen/extension",
-        "//third_party/java/auto:common",
+        "//java/dagger/internal/codegen/xprocessing",
         "//third_party/java/auto:service",
         "//third_party/java/auto:value",
         "//third_party/java/guava/base",
         "//third_party/java/guava/collect",
         "//third_party/java/incap",
         "//third_party/java/javapoet",
-        "//third_party/java/jsr250_annotations",
+        "@maven//:com_google_devtools_ksp_symbol_processing_api",
     ],
 )
 

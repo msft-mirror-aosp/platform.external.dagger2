@@ -16,35 +16,29 @@
 
 package dagger.hilt.processor.internal.earlyentrypoint;
 
+import androidx.room.compiler.processing.XTypeElement;
 import com.squareup.javapoet.AnnotationSpec;
 import dagger.hilt.processor.internal.ClassNames;
 import dagger.hilt.processor.internal.Processors;
-import java.io.IOException;
-import javax.annotation.processing.ProcessingEnvironment;
-import javax.lang.model.element.TypeElement;
 
 /**
  * Generates an {@link dagger.hilt.android.internal.earlyentrypoint.AggregatedEarlyEntryPoint}
  * annotation.
  */
 final class AggregatedEarlyEntryPointGenerator {
+  private final XTypeElement earlyEntryPoint;
 
-  private final ProcessingEnvironment env;
-  private final TypeElement earlyEntryPoint;
-
-  AggregatedEarlyEntryPointGenerator(TypeElement earlyEntryPoint, ProcessingEnvironment env) {
+  AggregatedEarlyEntryPointGenerator(XTypeElement earlyEntryPoint) {
     this.earlyEntryPoint = earlyEntryPoint;
-    this.env = env;
   }
 
-  void generate() throws IOException {
+  void generate() {
     Processors.generateAggregatingClass(
         ClassNames.AGGREGATED_EARLY_ENTRY_POINT_PACKAGE,
         AnnotationSpec.builder(ClassNames.AGGREGATED_EARLY_ENTRY_POINT)
             .addMember("earlyEntryPoint", "$S", earlyEntryPoint.getQualifiedName())
             .build(),
         earlyEntryPoint,
-        getClass(),
-        env);
+        getClass());
   }
 }

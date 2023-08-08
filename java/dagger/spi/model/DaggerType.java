@@ -16,39 +16,47 @@
 
 package dagger.spi.model;
 
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
-
-import androidx.room.compiler.processing.XType;
 import com.google.auto.value.AutoValue;
-import com.google.common.base.Equivalence;
-import com.google.common.base.Preconditions;
-import dagger.internal.codegen.xprocessing.XTypes;
+import com.google.devtools.ksp.symbol.KSType;
+import javax.annotation.Nullable;
 import javax.lang.model.type.TypeMirror;
 
 /** Wrapper type for a type. */
 @AutoValue
 public abstract class DaggerType {
-  public static DaggerType from(XType type) {
-    Preconditions.checkNotNull(type);
-    return new AutoValue_DaggerType(XTypes.equivalence().wrap(type));
+  public static DaggerType fromJavac(TypeMirror type) {
+    return new AutoValue_DaggerType(type, null);
   }
 
-  abstract Equivalence.Wrapper<XType> equivalenceWrapper();
-
-  public XType xprocessing() {
-    return equivalenceWrapper().get();
+  public static DaggerType fromKsp(KSType type) {
+    return new AutoValue_DaggerType(null, type);
   }
 
-  public TypeMirror java() {
-    return toJavac(xprocessing());
+  /** Java representation for the type, returns {@code null} not using java annotation processor. */
+  @Nullable
+  public abstract TypeMirror java();
+
+  /** KSP declaration for the type, returns {@code null} not using KSP. */
+  @Nullable
+  public abstract KSType ksp();
+
+  public DaggerProcessingEnv.Backend backend() {
+    if (java() != null) {
+      return DaggerProcessingEnv.Backend.JAVAC;
+    } else if (ksp() != null) {
+      return DaggerProcessingEnv.Backend.KSP;
+    }
+    throw new AssertionError("Unexpected backend");
   }
 
   @Override
   public final String toString() {
-    // We define our own stable string rather than use XType#toString() here because
-    // XType#toString() is currently not stable across backends. In particular, in javac it returns
-    // the qualified type but in ksp it returns the simple name.
-    // TODO(bcorso): Consider changing XProcessing so that #toString() is stable across backends.
-    return XTypes.toStableString(xprocessing());
+    switch (backend()) {
+      case JAVAC:
+        return java().toString();
+      case KSP:
+        return ksp().toString();
+    }
+    throw new IllegalStateException(String.format("Backend %s not supported yet.", backend()));
   }
 }
