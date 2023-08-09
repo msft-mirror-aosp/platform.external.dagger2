@@ -16,8 +16,11 @@
 
 package dagger.hilt.processor.internal;
 
+import static androidx.room.compiler.processing.compat.XConverters.getProcessingEnv;
 import static com.google.common.base.Ascii.toUpperCase;
 
+import androidx.room.compiler.processing.XProcessingEnv;
+import androidx.room.compiler.processing.XTypeElement;
 import com.google.common.collect.ImmutableSet;
 import dagger.hilt.processor.internal.optionvalues.BooleanValue;
 import dagger.hilt.processor.internal.optionvalues.GradleProjectType;
@@ -26,8 +29,6 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
-import javax.annotation.processing.ProcessingEnvironment;
-import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic.Kind;
 
 /** Hilt annotation processor options. */
@@ -42,10 +43,10 @@ public final class HiltCompilerOptions {
    * a generated {@code Hilt_} class. This flag is disabled by the Hilt Gradle plugin to enable
    * bytecode transformation to change the superclass.
    */
-  public static boolean isAndroidSuperclassValidationDisabled(
-      TypeElement element, ProcessingEnvironment env) {
+  public static boolean isAndroidSuperClassValidationDisabled(XTypeElement element) {
     EnumOption<BooleanValue> option = DISABLE_ANDROID_SUPERCLASS_VALIDATION;
-    return option.get(env) == BooleanValue.TRUE;
+    XProcessingEnv processorEnv = getProcessingEnv(element);
+    return option.get(processorEnv) == BooleanValue.TRUE;
   }
 
   /**
@@ -60,13 +61,13 @@ public final class HiltCompilerOptions {
    * HiltAndroidApp} or {@code HiltAndroidTest} usages in the same compilation unit.
    */
   public static boolean isCrossCompilationRootValidationDisabled(
-      ImmutableSet<TypeElement> rootElements, ProcessingEnvironment env) {
+      ImmutableSet<XTypeElement> rootElements, XProcessingEnv env) {
     EnumOption<BooleanValue> option = DISABLE_CROSS_COMPILATION_ROOT_VALIDATION;
     return option.get(env) == BooleanValue.TRUE;
   }
 
   /** Returns {@code true} if the check for {@link dagger.hilt.InstallIn} is disabled. */
-  public static boolean isModuleInstallInCheckDisabled(ProcessingEnvironment env) {
+  public static boolean isModuleInstallInCheckDisabled(XProcessingEnv env) {
     return DISABLE_MODULES_HAVE_INSTALL_IN_CHECK.get(env) == BooleanValue.TRUE;
   }
 
@@ -78,7 +79,7 @@ public final class HiltCompilerOptions {
    * dagger.hilt.android.testing.BindValue} or a test {@link dagger.Module}) cannot use the shared
    * component. In these cases, a component will be generated for the test.
    */
-  public static boolean isSharedTestComponentsEnabled(ProcessingEnvironment env) {
+  public static boolean isSharedTestComponentsEnabled(XProcessingEnv env) {
     return SHARE_TEST_COMPONENTS.get(env) == BooleanValue.TRUE;
   }
 
@@ -87,7 +88,7 @@ public final class HiltCompilerOptions {
    *
    * <p>Note:This is for internal use only!
    */
-  public static boolean useAggregatingRootProcessor(ProcessingEnvironment env) {
+  public static boolean useAggregatingRootProcessor(XProcessingEnv env) {
     return USE_AGGREGATING_ROOT_PROCESSOR.get(env) == BooleanValue.TRUE;
   }
 
@@ -96,7 +97,7 @@ public final class HiltCompilerOptions {
    *
    * <p>Note:This is for internal use only!
    */
-  public static GradleProjectType getGradleProjectType(ProcessingEnvironment env) {
+  public static GradleProjectType getGradleProjectType(XProcessingEnv env) {
     return GRADLE_PROJECT_TYPE.get(env);
   }
 
@@ -126,7 +127,7 @@ public final class HiltCompilerOptions {
   private static final ImmutableSet<String> DEPRECATED_OPTIONS =
       ImmutableSet.of("dagger.hilt.android.useFragmentGetContextFix");
 
-  public static void checkWrongAndDeprecatedOptions(ProcessingEnvironment env) {
+  public static void checkWrongAndDeprecatedOptions(XProcessingEnv env) {
     Set<String> knownOptions = getProcessorOptions();
     for (String option : env.getOptions().keySet()) {
       if (knownOptions.contains(option)) {
@@ -173,7 +174,7 @@ public final class HiltCompilerOptions {
       return "dagger.hilt." + name;
     }
 
-    E get(ProcessingEnvironment env) {
+    E get(XProcessingEnv env) {
       String value = env.getOptions().get(getQualifiedName());
       if (value == null) {
         return defaultValue;

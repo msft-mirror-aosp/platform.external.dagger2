@@ -26,7 +26,6 @@ import static dagger.internal.codegen.binding.SourceFiles.classFileName;
 import static dagger.internal.codegen.extension.DaggerCollectors.toOptional;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
 import static dagger.internal.codegen.xprocessing.XElements.asMethod;
-import static dagger.internal.codegen.xprocessing.XElements.getMethodDescriptor;
 import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
 import static dagger.internal.codegen.xprocessing.XTypes.isDeclared;
 
@@ -47,8 +46,8 @@ import dagger.internal.codegen.base.ClearableCache;
 import dagger.internal.codegen.base.DaggerSuperficialValidation;
 import dagger.internal.codegen.base.ModuleKind;
 import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.model.Key;
 import dagger.internal.codegen.xprocessing.XTypeElements;
-import dagger.spi.model.Key;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -182,7 +181,7 @@ public abstract class ModuleDescriptor {
         XTypeElement companionModule, ImmutableSet.Builder<ContributionBinding> bindings) {
       ImmutableSet<String> bindingElementDescriptors =
           bindings.build().stream()
-              .map(binding -> getMethodDescriptor(asMethod(binding.bindingElement().get())))
+              .map(binding -> asMethod(binding.bindingElement().get()).getJvmDescriptor())
               .collect(toImmutableSet());
 
       XTypeElements.getAllMethods(companionModule).stream()
@@ -193,7 +192,7 @@ public abstract class ModuleDescriptor {
           // @JvmStatic by comparing descriptors. Contributing bindings are the only valid bindings
           // a companion module can declare. See: https://youtrack.jetbrains.com/issue/KT-35104
           // TODO(danysantiago): Checks qualifiers too.
-          .filter(method -> !bindingElementDescriptors.contains(getMethodDescriptor(method)))
+          .filter(method -> !bindingElementDescriptors.contains(method.getJvmDescriptor()))
           .forEach(
               method -> {
                 if (method.hasAnnotation(TypeNames.PROVIDES)) {

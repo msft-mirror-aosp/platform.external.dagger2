@@ -19,8 +19,10 @@ package dagger.hilt.processor.internal.aliasof;
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static dagger.hilt.android.testing.compile.HiltCompilerTests.compiler;
 
+import androidx.room.compiler.processing.util.Source;
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
+import dagger.hilt.android.testing.compile.HiltCompilerTests;
 import javax.tools.JavaFileObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -73,13 +75,35 @@ public final class AliasOfProcessorTest {
             .compile(root, defineComponent, scope);
 
     assertThat(compilation).failed();
-    // One extra error for the missing Hilt_MyApp reference
-    assertThat(compilation).hadErrorCount(2);
     assertThat(compilation)
         .hadErrorContaining(
             "@DefineComponent test.ChildComponent, references invalid scope(s) annotated with"
                 + " @AliasOf. @DefineComponent scopes cannot be aliases of other scopes:"
                 + " [@test.AliasScope]");
+  }
+
+  @Test
+  public void fails_alisOfOnNonScope() {
+    Source scope =
+        HiltCompilerTests.javaSource(
+            "test.AliasScope",
+            "package test;",
+            "",
+            "import javax.inject.Scope;",
+            "import javax.inject.Singleton;",
+            "import dagger.hilt.migration.AliasOf;",
+            "",
+            "@AliasOf(Singleton.class)",
+            "public @interface AliasScope{}");
+
+    HiltCompilerTests.hiltCompiler(scope)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(
+                  "AliasOf should only be used on scopes. However, it was found "
+                      + "annotating test.AliasScope");
+            });
   }
 
   @Test

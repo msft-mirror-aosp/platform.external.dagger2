@@ -24,14 +24,13 @@ import static dagger.internal.codegen.base.RequestKinds.extractKeyType;
 import static dagger.internal.codegen.base.RequestKinds.frameworkClassName;
 import static dagger.internal.codegen.base.RequestKinds.getRequestKind;
 import static dagger.internal.codegen.binding.AssistedInjectionAnnotations.isAssistedParameter;
-import static dagger.internal.codegen.binding.ConfigurationAnnotations.getNullableType;
+import static dagger.internal.codegen.model.RequestKind.FUTURE;
+import static dagger.internal.codegen.model.RequestKind.INSTANCE;
+import static dagger.internal.codegen.model.RequestKind.MEMBERS_INJECTION;
+import static dagger.internal.codegen.model.RequestKind.PRODUCER;
+import static dagger.internal.codegen.model.RequestKind.PROVIDER;
 import static dagger.internal.codegen.xprocessing.XTypes.isTypeOf;
 import static dagger.internal.codegen.xprocessing.XTypes.unwrapType;
-import static dagger.spi.model.RequestKind.FUTURE;
-import static dagger.spi.model.RequestKind.INSTANCE;
-import static dagger.spi.model.RequestKind.MEMBERS_INJECTION;
-import static dagger.spi.model.RequestKind.PRODUCER;
-import static dagger.spi.model.RequestKind.PROVIDER;
 
 import androidx.room.compiler.processing.XAnnotation;
 import androidx.room.compiler.processing.XElement;
@@ -44,10 +43,10 @@ import dagger.Lazy;
 import dagger.internal.codegen.base.MapType;
 import dagger.internal.codegen.base.OptionalType;
 import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.spi.model.DaggerElement;
-import dagger.spi.model.DependencyRequest;
-import dagger.spi.model.Key;
-import dagger.spi.model.RequestKind;
+import dagger.internal.codegen.model.DaggerElement;
+import dagger.internal.codegen.model.DependencyRequest;
+import dagger.internal.codegen.model.Key;
+import dagger.internal.codegen.model.RequestKind;
 import java.util.List;
 import java.util.Optional;
 import javax.inject.Inject;
@@ -214,7 +213,8 @@ public final class DependencyRequestFactory {
         .kind(kind)
         .key(key.get())
         .isNullable(
-            allowsNull(getRequestKind(OptionalType.from(requestKey).valueType()), Optional.empty()))
+            requestKindImplicitlyAllowsNull(
+                getRequestKind(OptionalType.from(requestKey).valueType())))
         .build();
   }
 
@@ -225,17 +225,21 @@ public final class DependencyRequestFactory {
         .kind(requestKind)
         .key(keyFactory.forQualifiedType(qualifier, extractKeyType(type)))
         .requestElement(DaggerElement.from(requestElement))
-        .isNullable(allowsNull(requestKind, getNullableType(requestElement)))
+        .isNullable(allowsNull(requestKind, Nullability.of(requestElement)))
         .build();
   }
 
   /**
    * Returns {@code true} if a given request element allows null values. {@link
-   * RequestKind#INSTANCE} requests must be annotated with {@code @Nullable} in order to allow null
-   * values. All other request kinds implicitly allow null values because they are are wrapped
-   * inside {@link Provider}, {@link Lazy}, etc.
+   * RequestKind#INSTANCE} requests must be nullable in order to allow null values. All other
+   * request kinds implicitly allow null values because they are are wrapped inside {@link
+   * Provider}, {@link Lazy}, etc.
    */
-  private boolean allowsNull(RequestKind kind, Optional<XType> nullableType) {
-    return nullableType.isPresent() || !kind.equals(INSTANCE);
+  private boolean allowsNull(RequestKind kind, Nullability nullability) {
+    return nullability.isNullable() || requestKindImplicitlyAllowsNull(kind);
+  }
+
+  private boolean requestKindImplicitlyAllowsNull(RequestKind kind) {
+    return !kind.equals(INSTANCE);
   }
 }

@@ -30,16 +30,38 @@ java_plugin(
 java_library(
     name = "processor_lib",
     srcs = [
+        "DefineComponentProcessingStep.java",
         "DefineComponentProcessor.java",
+        "KspDefineComponentProcessor.java",
     ],
     deps = [
-        ":define_components",
+        ":metadatas",
         "//java/dagger/hilt/processor/internal:base_processor",
         "//java/dagger/hilt/processor/internal:classnames",
         "//java/dagger/hilt/processor/internal:processors",
+        "//java/dagger/internal/codegen/xprocessing",
         "//third_party/java/auto:service",
         "//third_party/java/guava/collect",
         "//third_party/java/incap",
+        "//third_party/java/javapoet",
+        "@maven//:com_google_devtools_ksp_symbol_processing_api",
+    ],
+)
+
+java_library(
+    name = "metadatas",
+    srcs = [
+        "DefineComponentBuilderMetadatas.java",
+        "DefineComponentMetadatas.java",
+    ],
+    deps = [
+        "//java/dagger/hilt/processor/internal:classnames",
+        "//java/dagger/hilt/processor/internal:processor_errors",
+        "//java/dagger/hilt/processor/internal:processors",
+        "//java/dagger/internal/codegen/extension",
+        "//java/dagger/internal/codegen/xprocessing",
+        "//third_party/java/auto:value",
+        "//third_party/java/guava/collect",
         "//third_party/java/javapoet",
     ],
 )
@@ -47,12 +69,11 @@ java_library(
 java_library(
     name = "define_components",
     srcs = [
-        "DefineComponentBuilderMetadatas.java",
         "DefineComponentClassesMetadata.java",
-        "DefineComponentMetadatas.java",
         "DefineComponents.java",
     ],
     deps = [
+        ":metadatas",
         "//java/dagger/hilt/processor/internal:aggregated_elements",
         "//java/dagger/hilt/processor/internal:classnames",
         "//java/dagger/hilt/processor/internal:component_descriptor",
@@ -60,7 +81,7 @@ java_library(
         "//java/dagger/hilt/processor/internal:processors",
         "//java/dagger/hilt/processor/internal/root/ir",
         "//java/dagger/internal/codegen/extension",
-        "//third_party/java/auto:common",
+        "//java/dagger/internal/codegen/xprocessing",
         "//third_party/java/auto:value",
         "//third_party/java/guava/collect",
         "//third_party/java/javapoet",
