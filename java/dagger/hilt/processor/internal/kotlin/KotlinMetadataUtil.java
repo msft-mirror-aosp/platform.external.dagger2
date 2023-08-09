@@ -16,32 +16,26 @@
 
 package dagger.hilt.processor.internal.kotlin;
 
-import static com.google.auto.common.MoreElements.asType;
-import static com.google.auto.common.MoreElements.isAnnotationPresent;
-import static com.google.auto.common.MoreElements.isType;
-import static com.google.common.base.Preconditions.checkState;
+import static androidx.room.compiler.processing.XElementKt.isField;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
-import static dagger.internal.codegen.extension.DaggerStreams.toImmutableMap;
-import static kotlinx.metadata.Flag.Class.IS_COMPANION_OBJECT;
-import static kotlinx.metadata.Flag.Class.IS_DATA;
-import static kotlinx.metadata.Flag.Class.IS_OBJECT;
-import static kotlinx.metadata.Flag.IS_PRIVATE;
+import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
+import static dagger.internal.codegen.xprocessing.XElements.asField;
+import static dagger.internal.codegen.xprocessing.XElements.isStatic;
 
+import androidx.room.compiler.processing.XAnnotation;
+import androidx.room.compiler.processing.XElement;
+import androidx.room.compiler.processing.XFieldElement;
+import androidx.room.compiler.processing.XMethodElement;
+import androidx.room.compiler.processing.XTypeElement;
+import com.google.common.base.Equivalence;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.squareup.javapoet.ClassName;
-import dagger.hilt.processor.internal.kotlin.KotlinMetadata.FunctionMetadata;
-import dagger.internal.codegen.extension.DaggerCollectors;
+import dagger.hilt.processor.internal.ClassNames;
+import dagger.internal.codegen.xprocessing.XAnnotations;
+import dagger.internal.codegen.xprocessing.XElements;
 import java.util.Optional;
 import javax.inject.Inject;
-import javax.lang.model.element.AnnotationMirror;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.VariableElement;
-import javax.lang.model.util.ElementFilter;
-import kotlin.Metadata;
-import kotlinx.metadata.Flag;
 
 /** Utility class for interacting with Kotlin Metadata. */
 public final class KotlinMetadataUtil {
@@ -57,8 +51,63 @@ public final class KotlinMetadataUtil {
    * Returns {@code true} if this element has the Kotlin Metadata annotation or if it is enclosed in
    * an element that does.
    */
-  public boolean hasMetadata(Element element) {
-    return isAnnotationPresent(closestEnclosingTypeElement(element), Metadata.class);
+  public boolean hasMetadata(XElement element) {
+    return XElements.closestEnclosingTypeElement(element).hasAnnotation(ClassNames.KOTLIN_METADATA);
+  }
+
+  // TODO(kuanyingchou): Consider replacing it with `XAnnotated.getAnnotationsAnnotatedWith()`
+  //  once b/278077018 is resolved.
+  /**
+   * Returns the annotations on the given {@code element} annotated with {@code annotationName}.
+   *
+   * <p>Note: If the given {@code element} is a non-static field this method will return annotations
+   * on both the backing field and the associated synthetic property (if one exists).
+   */
+  public ImmutableList<XAnnotation> getAnnotationsAnnotatedWith(
+      XElement element, ClassName annotationName) {
+    return getAnnotations(element).stream()
+        .filter(annotation -> annotation.getTypeElement().hasAnnotation(annotationName))
+        .collect(toImmutableList());
+  }
+
+  /**
+   * Returns the annotations on the given {@code element} that match the {@code annotationName}.
+   *
+   * <p>Note: If the given {@code element} is a non-static field this method will return annotations
+   * on both the backing field and the associated synthetic property (if one exists).
+   */
+  private ImmutableList<XAnnotation> getAnnotations(XElement element) {
+    ImmutableList<XAnnotation> annotations = ImmutableList.copyOf(element.getAllAnnotations());
+    ImmutableList<XAnnotation> syntheticAnnotations = getSyntheticPropertyAnnotations(element);
+    if (syntheticAnnotations.isEmpty()) {
+      return annotations;
+    }
+    // Dedupe any annotation that appears on both the field and the property.
+    // Note: we reduce the number of annotations we have to dedupe by only checking equivalence on
+    // annotations that have the same class name as a synthetic annotation. This avoids hitting
+    // TypeNotPresentException on annotation values with error types unless it has the same class
+    // name as a synthetic annotation.
+    ImmutableSet<ClassName> syntheticAnnotationClassNames =
+        syntheticAnnotations.stream()
+            .map(XAnnotations::getClassName)
+            .collect(toImmutableSet());
+    ImmutableSet<Equivalence.Wrapper<XAnnotation>> annotationEquivalenceWrappers =
+        annotations.stream()
+            .filter(annotation -> syntheticAnnotationClassNames.contains(annotation.getClassName()))
+            .map(XAnnotations.equivalence()::wrap)
+            .collect(toImmutableSet());
+    ImmutableList<XAnnotation> uniqueSyntheticAnnotations =
+        syntheticAnnotations.stream()
+            .map(XAnnotations.equivalence()::wrap)
+            .filter(wrapper -> !annotationEquivalenceWrappers.contains(wrapper))
+            .map(Equivalence.Wrapper::get)
+            .collect(toImmutableList());
+    return uniqueSyntheticAnnotations.isEmpty()
+        ? annotations
+        : ImmutableList.<XAnnotation>builder()
+            .addAll(annotations)
+            .addAll(uniqueSyntheticAnnotations)
+            .build();
   }
 
   /**
@@ -67,135 +116,29 @@ public final class KotlinMetadataUtil {
    * <p>Note that this method only looks for additional annotations in the synthetic property
    * method, if any, of a Kotlin property and not for annotations in its backing field.
    */
-  public ImmutableList<? extends AnnotationMirror> getSyntheticPropertyAnnotations(
-      VariableElement fieldElement, ClassName annotationType) {
-    return metadataFactory
-        .create(fieldElement)
-        .getSyntheticAnnotationMethod(fieldElement)
-        .map(methodElement -> getAnnotationsAnnotatedWith(methodElement, annotationType))
-        .orElse(ImmutableList.of());
+  private ImmutableList<XAnnotation> getSyntheticPropertyAnnotations(XElement element) {
+    // Currently, we avoid trying to get annotations from properties on object class's (i.e.
+    // properties with static jvm backing fields) due to issues explained in CL/336150864.
+    if (!isField(element) || isStatic(element)) {
+      return ImmutableList.of();
+    }
+    XFieldElement field = asField(element);
+    return hasMetadata(field)
+        ? metadataFactory
+            .create(field)
+            .getSyntheticAnnotationMethod(field)
+            .map(XMethodElement::getAllAnnotations)
+            .map(ImmutableList::copyOf)
+            .orElse(ImmutableList.<XAnnotation>of())
+        : ImmutableList.of();
   }
 
-  /** Returns annotations of element that are annotated with subAnnotation */
-  private static ImmutableList<AnnotationMirror> getAnnotationsAnnotatedWith(
-      Element element, ClassName subAnnotation) {
-    return element.getAnnotationMirrors().stream()
-        .filter(
-            annotation ->
-                isAnnotationPresent(
-                    annotation.getAnnotationType().asElement(), subAnnotation.canonicalName()))
-        .collect(toImmutableList());
-  }
-
-  /**
-   * Returns {@code true} if the synthetic method for annotations is missing. This can occur when
-   * the Kotlin metadata of the property reports that it contains a synthetic method for annotations
-   * but such method is not found since it is synthetic and ignored by the processor.
-   */
-  public boolean isMissingSyntheticPropertyForAnnotations(VariableElement fieldElement) {
-    return metadataFactory.create(fieldElement).isMissingSyntheticAnnotationMethod(fieldElement);
-  }
-
-  /** Returns {@code true} if this type element is a Kotlin Object. */
-  public boolean isObjectClass(TypeElement typeElement) {
-    return hasMetadata(typeElement)
-        && metadataFactory.create(typeElement).classMetadata().flags(IS_OBJECT);
-  }
-
-  /** Returns {@code true} if this type element is a Kotlin data class. */
-  public boolean isDataClass(TypeElement typeElement) {
-    return hasMetadata(typeElement)
-        && metadataFactory.create(typeElement).classMetadata().flags(IS_DATA);
-  }
-
-  /* Returns {@code true} if this type element is a Kotlin Companion Object. */
-  public boolean isCompanionObjectClass(TypeElement typeElement) {
-    return hasMetadata(typeElement)
-        && metadataFactory.create(typeElement).classMetadata().flags(IS_COMPANION_OBJECT);
-  }
-
-  /** Returns {@code true} if this type element is a Kotlin object or companion object. */
-  public boolean isObjectOrCompanionObjectClass(TypeElement typeElement) {
-    return isObjectClass(typeElement) || isCompanionObjectClass(typeElement);
-  }
-
-  /* Returns {@code true} if this type element has a Kotlin Companion Object. */
-  public boolean hasEnclosedCompanionObject(TypeElement typeElement) {
-    return hasMetadata(typeElement)
-        && metadataFactory.create(typeElement).classMetadata().companionObjectName().isPresent();
-  }
-
-  /* Returns the Companion Object element enclosed by the given type element. */
-  public TypeElement getEnclosedCompanionObject(TypeElement typeElement) {
-    return metadataFactory
-        .create(typeElement)
-        .classMetadata()
-        .companionObjectName()
-        .map(
-            companionObjectName ->
-                ElementFilter.typesIn(typeElement.getEnclosedElements()).stream()
-                    .filter(
-                        innerType -> innerType.getSimpleName().contentEquals(companionObjectName))
-                    .collect(DaggerCollectors.onlyElement()))
-        .get();
-  }
-
-  /**
-   * Returns {@code true} if the given type element was declared <code>private</code> in its Kotlin
-   * source.
-   */
-  public boolean isVisibilityPrivate(TypeElement typeElement) {
-    return hasMetadata(typeElement)
-        && metadataFactory.create(typeElement).classMetadata().flags(IS_PRIVATE);
-  }
-
-  /**
-   * Returns {@code true} if the given type element was declared {@code internal} in its Kotlin
-   * source.
-   */
-  public boolean isVisibilityInternal(TypeElement type) {
-    return hasMetadata(type)
-        && metadataFactory.create(type).classMetadata().flags(Flag.IS_INTERNAL);
-  }
-
-  /**
-   * Returns {@code true} if the given executable element was declared {@code internal} in its
-   * Kotlin source.
-   */
-  public boolean isVisibilityInternal(ExecutableElement method) {
-    return hasMetadata(method)
-        && metadataFactory.create(method).getFunctionMetadata(method).flags(Flag.IS_INTERNAL);
-  }
-
-  public Optional<ExecutableElement> getPropertyGetter(VariableElement fieldElement) {
+  public Optional<XMethodElement> getPropertyGetter(XFieldElement fieldElement) {
     return metadataFactory.create(fieldElement).getPropertyGetter(fieldElement);
   }
 
-  public boolean containsConstructorWithDefaultParam(TypeElement typeElement) {
+  public boolean containsConstructorWithDefaultParam(XTypeElement typeElement) {
     return hasMetadata(typeElement)
         && metadataFactory.create(typeElement).containsConstructorWithDefaultParam();
-  }
-
-  /**
-   * Returns a map mapping all method signatures within the given class element, including methods
-   * that it inherits from its ancestors, to their method names.
-   */
-  public ImmutableMap<String, String> getAllMethodNamesBySignature(TypeElement element) {
-    checkState(
-        hasMetadata(element), "Can not call getAllMethodNamesBySignature for non-Kotlin class");
-    return metadataFactory.create(element).classMetadata().functionsBySignature().values().stream()
-        .collect(toImmutableMap(FunctionMetadata::signature, FunctionMetadata::name));
-  }
-
-  /** Returns the argument or the closest enclosing element that is a {@link TypeElement}. */
-  static TypeElement closestEnclosingTypeElement(Element element) {
-    Element current = element;
-    while (current != null) {
-      if (isType(current)) {
-        return asType(current);
-      }
-      current = current.getEnclosingElement();
-    }
-    throw new IllegalStateException("There is no enclosing TypeElement for: " + element);
   }
 }

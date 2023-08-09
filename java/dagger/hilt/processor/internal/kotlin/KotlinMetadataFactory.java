@@ -16,15 +16,16 @@
 
 package dagger.hilt.processor.internal.kotlin;
 
-import static com.google.auto.common.MoreElements.isAnnotationPresent;
 
+
+import androidx.room.compiler.processing.XElement;
+import androidx.room.compiler.processing.XTypeElement;
 import dagger.hilt.processor.internal.ClassNames;
+import dagger.internal.codegen.xprocessing.XElements;
 import java.util.HashMap;
 import java.util.Map;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.TypeElement;
 
 /**
  * Factory creating Kotlin metadata data objects.
@@ -34,7 +35,7 @@ import javax.lang.model.element.TypeElement;
  */
 @Singleton
 public final class KotlinMetadataFactory {
-  private final Map<TypeElement, KotlinMetadata> metadataCache = new HashMap<>();
+  private final Map<XTypeElement, KotlinMetadata> metadataCache = new HashMap<>();
 
   @Inject
   KotlinMetadataFactory() {}
@@ -44,11 +45,11 @@ public final class KotlinMetadataFactory {
    *
    * @throws IllegalStateException if the element has no metadata or is not enclosed in a type
    *     element with metadata. To check if an element has metadata use {@link
-   *     KotlinMetadataUtil#hasMetadata(Element)}
+   *     KotlinMetadataUtil#hasMetadata(XElement)}
    */
-  public KotlinMetadata create(Element element) {
-    TypeElement enclosingElement = KotlinMetadataUtil.closestEnclosingTypeElement(element);
-    if (!isAnnotationPresent(enclosingElement, ClassNames.KOTLIN_METADATA.canonicalName())) {
+  public KotlinMetadata create(XElement element) {
+    XTypeElement enclosingElement = XElements.closestEnclosingTypeElement(element);
+    if (!enclosingElement.hasAnnotation(ClassNames.KOTLIN_METADATA)) {
       throw new IllegalStateException("Missing @Metadata for: " + enclosingElement);
     }
     return metadataCache.computeIfAbsent(enclosingElement, KotlinMetadata::from);

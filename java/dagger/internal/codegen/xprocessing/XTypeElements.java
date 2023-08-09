@@ -16,16 +16,21 @@
 
 package dagger.internal.codegen.xprocessing;
 
+import static androidx.room.compiler.processing.compat.XConverters.getProcessingEnv;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
 import static kotlin.streams.jdk8.StreamsKt.asStream;
 
 import androidx.room.compiler.processing.XHasModifiers;
 import androidx.room.compiler.processing.XMethodElement;
+import androidx.room.compiler.processing.XProcessingEnv;
 import androidx.room.compiler.processing.XTypeElement;
 import androidx.room.compiler.processing.XTypeParameterElement;
+import androidx.room.compiler.processing.compat.XConverters;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.devtools.ksp.symbol.Origin;
+import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.TypeVariableName;
 
 // TODO(bcorso): Consider moving these methods into XProcessing library.
@@ -81,13 +86,18 @@ public final class XTypeElements {
         .collect(toImmutableList());
   }
 
-  // TODO(b/229784604): This is needed until the XProcessing getAllMethods fix is upstreamed. Due
-  // to the existing bug, XTypeElement#getAllMethods() will currently contain some inaccessible
-  // package-private methods from base classes, so we filter them manually here.
+  // TODO(wanyingd): rename this to getAllMethodsWithoutPrivate, since the private method declared
+  // within this element is being filtered out. This doesn't mirror {@code
+  // MoreElements#getAllMethods}'s behavior but have the same name, and can cause confusion to
+  // developers.
   public static ImmutableList<XMethodElement> getAllMethods(XTypeElement type) {
     return asStream(type.getAllMethods())
         .filter(method -> isAccessibleFrom(method, type))
         .collect(toImmutableList());
+  }
+
+  public static ImmutableList<XMethodElement> getAllMethodsIncludingPrivate(XTypeElement type) {
+    return asStream(type.getAllMethods()).collect(toImmutableList());
   }
 
   private static boolean isAccessibleFrom(XMethodElement method, XTypeElement type) {
@@ -113,6 +123,10 @@ public final class XTypeElements {
     return allVisibilities(element).contains(Visibility.PRIVATE);
   }
 
+  public static boolean isJvmClass(XTypeElement element) {
+    return element.isClass() || element.isKotlinObject() || element.isCompanionObject();
+  }
+
   /**
    * Returns a list of visibilities containing visibility of the given element and the visibility of
    * its enclosing elements.
@@ -126,6 +140,21 @@ public final class XTypeElements {
       currentElement = currentElement.getEnclosingTypeElement();
     }
     return visibilities.build();
+  }
+
+  /** Returns true if the source of the given type element is Kotlin. */
+  public static boolean isKotlinSource(XTypeElement typeElement) {
+    XProcessingEnv processingEnv = getProcessingEnv(typeElement);
+    switch (processingEnv.getBackend()) {
+      case KSP:
+        // If this is KSP, then we should be able to check the origin of the declaration.
+        Origin origin = XConverters.toKS(typeElement).getOrigin();
+        return origin == Origin.KOTLIN || origin == Origin.KOTLIN_LIB;
+      case JAVAC:
+        // If this is KAPT, then the java stubs should have kotlin metadata.
+        return typeElement.hasAnnotation(ClassName.get("kotlin", "Metadata"));
+    }
+    throw new AssertionError("Unhandled backend kind: " + processingEnv.getBackend());
   }
 
   private XTypeElements() {}

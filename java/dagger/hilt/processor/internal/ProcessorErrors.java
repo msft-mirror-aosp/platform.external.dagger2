@@ -16,18 +16,13 @@
 
 package dagger.hilt.processor.internal;
 
-import com.google.auto.common.MoreTypes;
+
+import androidx.room.compiler.processing.XElement;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 import java.util.Collection;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.type.TypeKind;
-import javax.lang.model.type.TypeMirror;
 
 /** Static helper methods for throwing errors during code generation. */
 public final class ProcessorErrors {
@@ -40,9 +35,7 @@ public final class ProcessorErrors {
    *     string using {@link String#valueOf(Object)}
    * @throws BadInputException if {@code expression} is false
    */
-  public static void checkState(
-      boolean expression,
-      @Nullable Object errorMessage) {
+  public static void checkState(boolean expression, @Nullable Object errorMessage) {
     if (!expression) {
       throw new BadInputException(String.valueOf(errorMessage));
     }
@@ -85,9 +78,7 @@ public final class ProcessorErrors {
    * @throws BadInputException if {@code expression} is false
    */
   public static void checkState(
-      boolean expression,
-      Element badElement,
-      @Nullable Object errorMessage) {
+      boolean expression, XElement badElement, @Nullable Object errorMessage) {
     Preconditions.checkNotNull(badElement);
     if (!expression) {
       throw new BadInputException(String.valueOf(errorMessage), badElement);
@@ -116,34 +107,13 @@ public final class ProcessorErrors {
   @FormatMethod
   public static void checkState(
       boolean expression,
-      Element badElement,
+      XElement badElement,
       @Nullable @FormatString String errorMessageTemplate,
       @Nullable Object... errorMessageArgs) {
     Preconditions.checkNotNull(badElement);
     if (!expression) {
       throw new BadInputException(
           String.format(errorMessageTemplate, errorMessageArgs), badElement);
-    }
-  }
-
-  /**
-   * Ensures the truth of an expression involving the state of the calling instance, but not
-   * involving any parameters to the calling method.
-   *
-   * @param expression a boolean expression
-   * @param badElements the element that were at fault
-   * @param errorMessage the exception message to use if the check fails; will be converted to a
-   *     string using {@link String#valueOf(Object)}
-   * @throws BadInputException if {@code expression} is false
-   */
-  public static void checkState(
-      boolean expression,
-      Collection<? extends Element> badElements,
-      @Nullable Object errorMessage) {
-    Preconditions.checkNotNull(badElements);
-    if (!expression) {
-      Preconditions.checkState(!badElements.isEmpty());
-      throw new BadInputException(String.valueOf(errorMessage), badElements);
     }
   }
 
@@ -164,10 +134,12 @@ public final class ProcessorErrors {
    * @throws NullPointerException if the check fails and either {@code errorMessageTemplate} or
    *     {@code errorMessageArgs} is null (don't let this happen)
    */
+  // TODO(bcorso): Rename this checkState once the javac API is removed (overloading doesn't work
+  // here since they have the same erasured signature).
   @FormatMethod
-  public static void checkState(
+  public static void checkStateX(
       boolean expression,
-      Collection<? extends Element> badElements,
+      Collection<? extends XElement> badElements,
       @Nullable @FormatString String errorMessageTemplate,
       @Nullable Object... errorMessageArgs) {
     Preconditions.checkNotNull(badElements);
@@ -175,31 +147,6 @@ public final class ProcessorErrors {
       Preconditions.checkState(!badElements.isEmpty());
       throw new BadInputException(
           String.format(errorMessageTemplate, errorMessageArgs), badElements);
-    }
-  }
-
-  /**
-   * Ensures that the given element is not an error kind and does not inherit from an error kind.
-   *
-   * @param element the element to check
-   * @throws ErrorTypeException if {@code element} inherits from an error kind.
-   */
-  public static void checkNotErrorKind(TypeElement element) {
-    TypeMirror currType = element.asType();
-    ImmutableList.Builder<String> typeHierarchy = ImmutableList.builder();
-    while (currType.getKind() != TypeKind.NONE) {
-      typeHierarchy.add(currType.toString());
-      if (currType.getKind() == TypeKind.ERROR) {
-        throw new ErrorTypeException(
-            String.format(
-                "%s, type hierarchy contains error kind, %s."
-                + "\n\tThe partially resolved hierarchy is:\n\t\t%s",
-                element,
-                currType,
-                typeHierarchy.build().stream().collect(Collectors.joining(" -> "))),
-            element);
-      }
-      currType = MoreTypes.asTypeElement(currType).getSuperclass();
     }
   }
 
