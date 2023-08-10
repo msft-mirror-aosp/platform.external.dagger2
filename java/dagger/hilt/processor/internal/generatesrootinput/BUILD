@@ -27,8 +27,10 @@ java_plugin(
 java_library(
     name = "processor_lib",
     srcs = [
+        "GeneratesRootInputProcessingStep.java",
         "GeneratesRootInputProcessor.java",
         "GeneratesRootInputPropagatedDataGenerator.java",
+        "KspGeneratesRootInputProcessor.java",
     ],
     deps = [
         ":generates_root_inputs",
@@ -36,10 +38,12 @@ java_library(
         "//java/dagger/hilt/processor/internal:classnames",
         "//java/dagger/hilt/processor/internal:processor_errors",
         "//java/dagger/hilt/processor/internal:processors",
+        "//java/dagger/internal/codegen/xprocessing",
         "//third_party/java/auto:service",
         "//third_party/java/guava/collect",
         "//third_party/java/incap",
         "//third_party/java/javapoet",
+        "@maven//:com_google_devtools_ksp_symbol_processing_api",
     ],
 )
 
@@ -53,6 +57,7 @@ java_library(
         "//java/dagger/hilt/processor/internal:processor_errors",
         "//java/dagger/hilt/processor/internal:processors",
         "//java/dagger/internal/codegen/extension",
+        "//java/dagger/internal/codegen/xprocessing",
         "//third_party/java/guava/base",
         "//third_party/java/guava/collect",
         "//third_party/java/javapoet",

@@ -16,23 +16,27 @@
 
 package dagger.hilt.android.processor.internal.customtestapplication;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static dagger.hilt.android.testing.compile.HiltCompilerTests.compiler;
+import static com.google.common.truth.Truth.assertThat;
 
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
+import com.google.common.collect.ImmutableList;
+import dagger.hilt.android.testing.compile.HiltCompilerTests;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class CustomTestApplicationProcessorTest {
 
+  @Rule public TemporaryFolder tempFolderRule = new TemporaryFolder();
+
   @Test
   public void validBaseClass_succeeds() {
-    Compilation compilation =
-        compiler().compile(
-            JavaFileObjects.forSourceLines(
+    // TODO(danysantiago): Add KSP test once b/288966076 is resolved.
+    HiltCompilerTests.compileWithKapt(
+        ImmutableList.of(
+            HiltCompilerTests.javaSource(
                 "test.HiltTest",
                 "package test;",
                 "",
@@ -42,41 +46,35 @@ public class CustomTestApplicationProcessorTest {
                 "",
                 "@CustomTestApplication(Application.class)",
                 "@HiltAndroidTest",
-                "public class HiltTest {}"));
-
-    assertThat(compilation).succeeded();
+                "public class HiltTest {}")),
+        tempFolderRule,
+        result -> assertThat(result.getSuccess()).isTrue());
   }
 
   @Test
   public void incorrectBaseType_fails() {
-    Compilation compilation =
-        compiler().compile(
-            JavaFileObjects.forSourceLines(
-                "test.Foo",
-                "package test;",
-                "",
-                "public class Foo {}"),
-            JavaFileObjects.forSourceLines(
+    HiltCompilerTests.hiltCompiler(
+            HiltCompilerTests.javaSource("test.Foo", "package test;", "", "public class Foo {}"),
+            HiltCompilerTests.javaSource(
                 "test.HiltTest",
                 "package test;",
                 "",
                 "import dagger.hilt.android.testing.CustomTestApplication;",
                 "",
                 "@CustomTestApplication(Foo.class)",
-                "public class HiltTest {}"));
-
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining(
-            "@CustomTestApplication value should be an instance of android.app.Application. "
-                + "Found: test.Foo");
+                "public class HiltTest {}"))
+        .compile(
+            subject -> {
+              subject.hasErrorContaining(
+                  "@CustomTestApplication value should be an instance of android.app.Application. "
+                      + "Found: test.Foo");
+            });
   }
 
   @Test
   public void baseWithHiltAndroidApp_fails() {
-    Compilation compilation =
-        compiler().compile(
-            JavaFileObjects.forSourceLines(
+    HiltCompilerTests.hiltCompiler(
+            HiltCompilerTests.javaSource(
                 "test.BaseApplication",
                 "package test;",
                 "",
@@ -85,27 +83,26 @@ public class CustomTestApplicationProcessorTest {
                 "",
                 "@HiltAndroidApp(Application.class)",
                 "public class BaseApplication extends Hilt_BaseApplication {}"),
-            JavaFileObjects.forSourceLines(
+            HiltCompilerTests.javaSource(
                 "test.HiltTest",
                 "package test;",
                 "",
                 "import dagger.hilt.android.testing.CustomTestApplication;",
                 "",
                 "@CustomTestApplication(BaseApplication.class)",
-                "public class HiltTest {}"));
-
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining(
-            "@CustomTestApplication value cannot be annotated with @HiltAndroidApp. "
-                + "Found: test.BaseApplication");
+                "public class HiltTest {}"))
+        .compile(
+            subject -> {
+              subject.hasErrorContaining(
+                  "@CustomTestApplication value cannot be annotated with @HiltAndroidApp. "
+                      + "Found: test.BaseApplication");
+            });
   }
 
   @Test
   public void superclassWithHiltAndroidApp_fails() {
-    Compilation compilation =
-        compiler().compile(
-            JavaFileObjects.forSourceLines(
+    HiltCompilerTests.hiltCompiler(
+            HiltCompilerTests.javaSource(
                 "test.BaseApplication",
                 "package test;",
                 "",
@@ -114,32 +111,31 @@ public class CustomTestApplicationProcessorTest {
                 "",
                 "@HiltAndroidApp(Application.class)",
                 "public class BaseApplication extends Hilt_BaseApplication {}"),
-            JavaFileObjects.forSourceLines(
+            HiltCompilerTests.javaSource(
                 "test.ParentApplication",
                 "package test;",
                 "",
                 "public class ParentApplication extends BaseApplication {}"),
-            JavaFileObjects.forSourceLines(
+            HiltCompilerTests.javaSource(
                 "test.HiltTest",
                 "package test;",
                 "",
                 "import dagger.hilt.android.testing.CustomTestApplication;",
                 "",
                 "@CustomTestApplication(ParentApplication.class)",
-                "public class HiltTest {}"));
-
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining(
-            "@CustomTestApplication value cannot be annotated with @HiltAndroidApp. "
-                + "Found: test.BaseApplication");
+                "public class HiltTest {}"))
+        .compile(
+            subject -> {
+              subject.hasErrorContaining(
+                  "@CustomTestApplication value cannot be annotated with @HiltAndroidApp. "
+                      + "Found: test.BaseApplication");
+            });
   }
 
   @Test
   public void withInjectField_fails() {
-    Compilation compilation =
-        compiler().compile(
-            JavaFileObjects.forSourceLines(
+    HiltCompilerTests.hiltCompiler(
+            HiltCompilerTests.javaSource(
                 "test.BaseApplication",
                 "package test;",
                 "",
@@ -149,27 +145,27 @@ public class CustomTestApplicationProcessorTest {
                 "public class BaseApplication extends Application {",
                 "  @Inject String str;",
                 "}"),
-            JavaFileObjects.forSourceLines(
+            HiltCompilerTests.javaSource(
                 "test.HiltTest",
                 "package test;",
                 "",
                 "import dagger.hilt.android.testing.CustomTestApplication;",
                 "",
                 "@CustomTestApplication(BaseApplication.class)",
-                "public class HiltTest {}"));
-
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining(
-            "@CustomTestApplication does not support application classes (or super classes) with "
-                + "@Inject fields. Found test.BaseApplication with @Inject fields [str]");
+                "public class HiltTest {}"))
+        .compile(
+            subject -> {
+              subject.hasErrorContaining(
+                  "@CustomTestApplication does not support application classes (or super classes)"
+                      + " with @Inject fields. Found test.BaseApplication with @Inject fields"
+                      + " [str]");
+            });
   }
 
   @Test
   public void withSuperclassInjectField_fails() {
-    Compilation compilation =
-        compiler().compile(
-            JavaFileObjects.forSourceLines(
+    HiltCompilerTests.hiltCompiler(
+            HiltCompilerTests.javaSource(
                 "test.BaseApplication",
                 "package test;",
                 "",
@@ -179,32 +175,32 @@ public class CustomTestApplicationProcessorTest {
                 "public class BaseApplication extends Application {",
                 "  @Inject String str;",
                 "}"),
-            JavaFileObjects.forSourceLines(
+            HiltCompilerTests.javaSource(
                 "test.ParentApplication",
                 "package test;",
                 "",
                 "public class ParentApplication extends BaseApplication {}"),
-            JavaFileObjects.forSourceLines(
+            HiltCompilerTests.javaSource(
                 "test.HiltTest",
                 "package test;",
                 "",
                 "import dagger.hilt.android.testing.CustomTestApplication;",
                 "",
                 "@CustomTestApplication(ParentApplication.class)",
-                "public class HiltTest {}"));
-
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining(
-            "@CustomTestApplication does not support application classes (or super classes) with "
-                + "@Inject fields. Found test.BaseApplication with @Inject fields [str]");
+                "public class HiltTest {}"))
+        .compile(
+            subject -> {
+              subject.hasErrorContaining(
+                  "@CustomTestApplication does not support application classes (or super classes)"
+                      + " with @Inject fields. Found test.BaseApplication with @Inject fields"
+                      + " [str]");
+            });
   }
 
   @Test
   public void withInjectMethod_fails() {
-    Compilation compilation =
-        compiler().compile(
-            JavaFileObjects.forSourceLines(
+    HiltCompilerTests.hiltCompiler(
+            HiltCompilerTests.javaSource(
                 "test.BaseApplication",
                 "package test;",
                 "",
@@ -214,27 +210,27 @@ public class CustomTestApplicationProcessorTest {
                 "public class BaseApplication extends Application {",
                 "  @Inject String str() { return null; }",
                 "}"),
-            JavaFileObjects.forSourceLines(
+            HiltCompilerTests.javaSource(
                 "test.HiltTest",
                 "package test;",
                 "",
                 "import dagger.hilt.android.testing.CustomTestApplication;",
                 "",
                 "@CustomTestApplication(BaseApplication.class)",
-                "public class HiltTest {}"));
-
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining(
-            "@CustomTestApplication does not support application classes (or super classes) with "
-                + "@Inject methods. Found test.BaseApplication with @Inject methods [str()]");
+                "public class HiltTest {}"))
+        .compile(
+            subject -> {
+              subject.hasErrorContaining(
+                  "@CustomTestApplication does not support application classes (or super classes)"
+                      + " with @Inject methods. Found test.BaseApplication with @Inject methods"
+                      + " [str()]");
+            });
   }
 
   @Test
   public void withSuperclassInjectMethod_fails() {
-    Compilation compilation =
-        compiler().compile(
-            JavaFileObjects.forSourceLines(
+    HiltCompilerTests.hiltCompiler(
+            HiltCompilerTests.javaSource(
                 "test.BaseApplication",
                 "package test;",
                 "",
@@ -244,32 +240,32 @@ public class CustomTestApplicationProcessorTest {
                 "public class BaseApplication extends Application {",
                 "  @Inject String str() { return null; }",
                 "}"),
-            JavaFileObjects.forSourceLines(
+            HiltCompilerTests.javaSource(
                 "test.ParentApplication",
                 "package test;",
                 "",
                 "public class ParentApplication extends BaseApplication {}"),
-            JavaFileObjects.forSourceLines(
+            HiltCompilerTests.javaSource(
                 "test.HiltTest",
                 "package test;",
                 "",
                 "import dagger.hilt.android.testing.CustomTestApplication;",
                 "",
                 "@CustomTestApplication(ParentApplication.class)",
-                "public class HiltTest {}"));
-
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining(
-            "@CustomTestApplication does not support application classes (or super classes) with "
-                + "@Inject methods. Found test.BaseApplication with @Inject methods [str()]");
+                "public class HiltTest {}"))
+        .compile(
+            subject -> {
+              subject.hasErrorContaining(
+                  "@CustomTestApplication does not support application classes (or super classes)"
+                      + " with @Inject methods. Found test.BaseApplication with @Inject methods"
+                      + " [str()]");
+            });
   }
 
   @Test
   public void withInjectConstructor_fails() {
-    Compilation compilation =
-        compiler().compile(
-            JavaFileObjects.forSourceLines(
+    HiltCompilerTests.hiltCompiler(
+            HiltCompilerTests.javaSource(
                 "test.BaseApplication",
                 "package test;",
                 "",
@@ -279,28 +275,27 @@ public class CustomTestApplicationProcessorTest {
                 "public class BaseApplication extends Application {",
                 "  @Inject BaseApplication() {}",
                 "}"),
-            JavaFileObjects.forSourceLines(
+            HiltCompilerTests.javaSource(
                 "test.HiltTest",
                 "package test;",
                 "",
                 "import dagger.hilt.android.testing.CustomTestApplication;",
                 "",
                 "@CustomTestApplication(BaseApplication.class)",
-                "public class HiltTest {}"));
-
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining(
-            "@CustomTestApplication does not support application classes (or super classes) with "
-                + "@Inject constructors. Found test.BaseApplication with @Inject constructors "
-                + "[BaseApplication()]");
+                "public class HiltTest {}"))
+        .compile(
+            subject -> {
+              subject.hasErrorContaining(
+                  "@CustomTestApplication does not support application classes (or super classes)"
+                      + " with @Inject constructors. Found test.BaseApplication with @Inject"
+                      + " constructors [BaseApplication()]");
+            });
   }
 
   @Test
   public void withSuperclassInjectConstructor_fails() {
-    Compilation compilation =
-        compiler().compile(
-            JavaFileObjects.forSourceLines(
+    HiltCompilerTests.hiltCompiler(
+            HiltCompilerTests.javaSource(
                 "test.BaseApplication",
                 "package test;",
                 "",
@@ -310,25 +305,25 @@ public class CustomTestApplicationProcessorTest {
                 "public class BaseApplication extends Application {",
                 "  @Inject BaseApplication() {}",
                 "}"),
-            JavaFileObjects.forSourceLines(
+            HiltCompilerTests.javaSource(
                 "test.ParentApplication",
                 "package test;",
                 "",
                 "public class ParentApplication extends BaseApplication {}"),
-            JavaFileObjects.forSourceLines(
+            HiltCompilerTests.javaSource(
                 "test.HiltTest",
                 "package test;",
                 "",
                 "import dagger.hilt.android.testing.CustomTestApplication;",
                 "",
                 "@CustomTestApplication(ParentApplication.class)",
-                "public class HiltTest {}"));
-
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining(
-            "@CustomTestApplication does not support application classes (or super classes) with "
-                + "@Inject constructors. Found test.BaseApplication with @Inject constructors "
-                + "[BaseApplication()]");
+                "public class HiltTest {}"))
+        .compile(
+            subject -> {
+              subject.hasErrorContaining(
+                  "@CustomTestApplication does not support application classes (or super classes)"
+                      + " with @Inject constructors. Found test.BaseApplication with @Inject"
+                      + " constructors [BaseApplication()]");
+            });
   }
 }

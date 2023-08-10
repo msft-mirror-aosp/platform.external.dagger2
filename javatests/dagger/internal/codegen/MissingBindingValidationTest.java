@@ -16,9 +16,14 @@
 
 package dagger.internal.codegen;
 
+import static com.google.common.truth.Truth.assertThat;
+
+import androidx.room.compiler.processing.util.DiagnosticMessage;
 import androidx.room.compiler.processing.util.Source;
 import com.google.common.collect.ImmutableList;
 import dagger.testing.compile.CompilerTests;
+import java.util.List;
+import javax.tools.Diagnostic;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -1296,6 +1301,495 @@ public class MissingBindingValidationTest {
               subject.hasErrorContaining("A binding for Object exists in bar.Sub:");
               subject.hasErrorContaining(
                   "[foo.Sub] foo.Sub.getObject() [Parent → Child1 → foo.Sub]");
+            });
+  }
+
+  @Test
+  public void requestWildcardTypeWithNonWildcardTypeBindingProvided_failsWithMissingBinding() {
+    Source component =
+        CompilerTests.javaSource(
+            "test.MyComponent",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "import java.util.Set;",
+            "",
+            "@Component(modules = TestModule.class)",
+            "interface MyComponent {",
+            "  Foo getFoo();",
+            "  Child getChild();",
+            "}");
+    Source child =
+        CompilerTests.javaSource(
+            "test.Child",
+            "package test;",
+            "",
+            "import dagger.Subcomponent;",
+            "",
+            "@Subcomponent(modules = ChildModule.class)",
+            "interface Child {}");
+    Source childModule =
+        CompilerTests.javaSource(
+            "test.ChildModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import java.util.Set;",
+            "import java.util.HashSet;",
+            "",
+            "@Module",
+            "interface ChildModule {",
+            "  @Provides",
+            "  static Set<? extends Bar> provideBar() {",
+            "    return new HashSet<Bar>();",
+            "  }",
+            "}");
+    Source fooSrc =
+        CompilerTests.javaSource(
+            "test.Foo",
+            "package test;",
+            "",
+            "import javax.inject.Inject;",
+            "import java.util.Set;",
+            "",
+            "class Foo {",
+            "  @Inject Foo(Set<? extends Bar> bar) {}",
+            "}");
+    Source barSrc =
+        CompilerTests.javaSource("test.Bar", "package test;", "", "public interface Bar {}");
+    Source moduleSrc =
+        CompilerTests.javaSource(
+            "test.TestModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import dagger.multibindings.ElementsIntoSet;",
+            "import java.util.Set;",
+            "import java.util.HashSet;",
+            "",
+            "@Module",
+            "public class TestModule {",
+            "   @ElementsIntoSet",
+            "   @Provides",
+            "   Set<Bar> provideBars() {",
+            "     return new HashSet<Bar>();",
+            "   }",
+            "}");
+
+    CompilerTests.daggerCompiler(component, child, childModule, fooSrc, barSrc, moduleSrc)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject
+                  .hasErrorContaining("Found similar bindings:")
+                  .onSource(component)
+                  .onLineContaining("interface MyComponent");
+              subject.hasErrorContaining("Set<Bar> in [MyComponent");
+              subject.hasErrorContaining("Set<? extends Bar> in [MyComponent → Child]");
+            });
+  }
+
+  @Test
+  public void
+      injectParameterDoesNotSuppressWildcardGeneration_conflictsWithNonWildcardTypeBinding() {
+    Source component =
+        CompilerTests.javaSource(
+            "test.MyComponent",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "import java.util.Set;",
+            "",
+            "@Component(modules = TestModule.class)",
+            "interface MyComponent {",
+            "  Foo getFoo();",
+            "}");
+    Source fooSrc =
+        CompilerTests.kotlinSource(
+            "Foo.kt",
+            "package test",
+            "",
+            "import javax.inject.Inject",
+            "",
+            "class Foo @Inject constructor(val bar: Set<Bar>) {}");
+    Source barSrc =
+        CompilerTests.javaSource("test.Bar", "package test;", "", "public interface Bar {}");
+    Source moduleSrc =
+        CompilerTests.javaSource(
+            "test.TestModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import dagger.multibindings.ElementsIntoSet;",
+            "import java.util.Set;",
+            "import java.util.HashSet;",
+            "",
+            "@Module",
+            "public class TestModule {",
+            "   @ElementsIntoSet",
+            "   @Provides",
+            "   Set<Bar> provideBars() {",
+            "     return new HashSet<Bar>();",
+            "   }",
+            "}");
+
+    CompilerTests.daggerCompiler(component, fooSrc, barSrc, moduleSrc)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject
+                  .hasErrorContaining("Set<Bar> in [MyComponent]")
+                  .onSource(component)
+                  .onLineContaining("interface MyComponent");
+            });
+  }
+
+  @Test
+  public void injectWildcardTypeWithNonWildcardTypeBindingProvided_failsWithMissingBinding() {
+    Source component =
+        CompilerTests.javaSource(
+            "test.MyComponent",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "import java.util.Set;",
+            "",
+            "@Component(modules = TestModule.class)",
+            "interface MyComponent {",
+            "  Foo getFoo();",
+            "}");
+    Source fooSrc =
+        CompilerTests.javaSource(
+            "test.Foo",
+            "package test;",
+            "",
+            "import javax.inject.Inject;",
+            "import java.util.Set;",
+            "",
+            "class Foo {",
+            "  @Inject Set<? extends Bar> bar;",
+            "  @Inject Foo() {}",
+            "}");
+    Source barSrc =
+        CompilerTests.javaSource("test.Bar", "package test;", "", "public interface Bar {}");
+    Source moduleSrc =
+        CompilerTests.javaSource(
+            "test.TestModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import dagger.multibindings.ElementsIntoSet;",
+            "import java.util.Set;",
+            "import java.util.HashSet;",
+            "",
+            "@Module",
+            "public class TestModule {",
+            "   @ElementsIntoSet",
+            "   @Provides",
+            "   Set<Bar> provideBars() {",
+            "     return new HashSet<Bar>();",
+            "   }",
+            "}");
+
+    CompilerTests.daggerCompiler(component, fooSrc, barSrc, moduleSrc)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject
+                  .hasErrorContaining("Found similar bindings:")
+                  .onSource(component)
+                  .onLineContaining("interface MyComponent");
+              subject.hasErrorContaining("Set<Bar> in [MyComponent]");
+            });
+  }
+
+  @Test
+  public void requestFinalClassWithWildcardAnnotation_missingWildcardTypeBinding() {
+    Source component =
+        CompilerTests.javaSource(
+            "test.MyComponent",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "import java.util.Set;",
+            "",
+            "@Component(modules = TestModule.class)",
+            "interface MyComponent {",
+            "  Foo getFoo();",
+            "}");
+    Source fooSrc =
+        CompilerTests.kotlinSource(
+            "test.Foo.kt",
+            "package test",
+            "",
+            "import javax.inject.Inject",
+            "",
+            "class Foo @Inject constructor(val bar: List<Bar>) {}");
+    Source barSrc =
+        CompilerTests.javaSource("test.Bar", "package test;", "", "public final class Bar {}");
+    Source moduleSrc =
+        CompilerTests.kotlinSource(
+            "test.TestModule.kt",
+            "package test",
+            "",
+            "import dagger.Module",
+            "import dagger.Provides",
+            "import dagger.multibindings.ElementsIntoSet",
+            "",
+            "@Module",
+            "object TestModule {",
+            "   @Provides fun provideBars(): List<@JvmWildcard Bar> = setOf()",
+            "}");
+
+    CompilerTests.daggerCompiler(component, fooSrc, barSrc, moduleSrc)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject
+                  .hasErrorContaining("Found similar bindings:")
+                  .onSource(component)
+                  .onLineContaining("interface MyComponent");
+              subject.hasErrorContaining("List<? extends Bar> in [MyComponent]");
+            });
+  }
+
+  @Test
+  public void multipleTypeParameters_notSuppressWildcardType_failsWithMissingBinding() {
+    Source component =
+        CompilerTests.javaSource(
+            "test.MyComponent",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "import java.util.Set;",
+            "",
+            "@Component(modules = TestModule.class)",
+            "interface MyComponent {",
+            "  Foo getFoo();",
+            "}");
+    Source fooSrc =
+        CompilerTests.kotlinSource(
+            "test.Foo.kt",
+            "package test",
+            "",
+            "import javax.inject.Inject",
+            "",
+            "class Foo @Inject constructor(val bar: Bar<Baz, Baz, Set<Baz>>) {}");
+    Source barSrc =
+        CompilerTests.kotlinSource(
+            "test.Bar.kt", "package test", "", "class Bar<out T1, T2, T3> {}");
+
+    Source bazSrc =
+        CompilerTests.javaSource("test.Baz", "package test;", "", "public interface Baz {}");
+
+    Source moduleSrc =
+        CompilerTests.javaSource(
+            "test.TestModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import java.util.Set;",
+            "",
+            "@Module",
+            "public class TestModule {",
+            "   @Provides",
+            "   Bar<Baz, Baz, Set<Baz>> provideBar() {",
+            "     return new Bar<Baz, Baz, Set<Baz>>();",
+            "   }",
+            "}");
+
+    CompilerTests.daggerCompiler(component, fooSrc, barSrc, bazSrc, moduleSrc)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject
+                  .hasErrorContaining("Bar<Baz,Baz,Set<Baz>> in [MyComponent]")
+                  .onSource(component)
+                  .onLineContaining("interface MyComponent");
+            });
+  }
+
+  @Test
+  public void missingBindingWithoutQualifier_warnAboutSimilarTypeWithQualifierExists() {
+    Source qualifierSrc =
+        CompilerTests.javaSource(
+            "test.MyQualifier",
+            "package test;",
+            "",
+            "import javax.inject.Qualifier;",
+            "",
+            "@Qualifier",
+            "@interface MyQualifier {}");
+    Source component =
+        CompilerTests.javaSource(
+            "test.MyComponent",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "import java.util.Set;",
+            "",
+            "@Component(modules = TestModule.class)",
+            "interface MyComponent {",
+            "  Foo getFoo();",
+            "}");
+    Source fooSrc =
+        CompilerTests.kotlinSource(
+            "Foo.kt",
+            "package test",
+            "",
+            "import javax.inject.Inject",
+            "",
+            "class Foo @Inject constructor(val bar: Set<Bar>) {}");
+    Source barSrc =
+        CompilerTests.javaSource("test.Bar", "package test;", "", "public interface Bar {}");
+    Source moduleSrc =
+        CompilerTests.javaSource(
+            "test.TestModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import dagger.multibindings.ElementsIntoSet;",
+            "import java.util.Set;",
+            "import java.util.HashSet;",
+            "",
+            "@Module",
+            "public class TestModule {",
+            "   @ElementsIntoSet",
+            "   @Provides",
+            "   @MyQualifier",
+            "   Set<Bar> provideBars() {",
+            "     return new HashSet<Bar>();",
+            "   }",
+            "}");
+
+    CompilerTests.daggerCompiler(qualifierSrc, component, fooSrc, barSrc, moduleSrc)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining("MissingBinding");
+              List<DiagnosticMessage> diagnostics =
+                  subject.getCompilationResult().getDiagnostics().get(Diagnostic.Kind.ERROR);
+              assertThat(diagnostics).hasSize(1);
+              assertThat(diagnostics.get(0).getMsg())
+                  .doesNotContain("bindings with similar types exists in the graph");
+            });
+  }
+
+  @Test
+  public void missingWildcardTypeWithObjectBound_providedRawType_warnAboutSimilarTypeExists() {
+    Source component =
+        CompilerTests.javaSource(
+            "test.MyComponent",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "import java.util.Set;",
+            "",
+            "@Component(modules = TestModule.class)",
+            "interface MyComponent {",
+            "  Foo getFoo();",
+            "}");
+    Source fooSrc =
+        CompilerTests.kotlinSource(
+            "test.Foo.kt",
+            "package test",
+            "",
+            "import javax.inject.Inject",
+            "",
+            "class Foo @Inject constructor(val bar: Bar<Object>) {}");
+    Source barSrc =
+        CompilerTests.kotlinSource("test.Bar.kt", "package test", "", "class Bar<out T1> {}");
+    Source moduleSrc =
+        CompilerTests.javaSource(
+            "test.TestModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import java.util.Set;",
+            "",
+            "@Module",
+            "public class TestModule {",
+            "   @Provides",
+            "   Bar provideBar() {",
+            "     return new Bar<Object>();",
+            "   }",
+            "}");
+
+    CompilerTests.daggerCompiler(component, fooSrc, barSrc, moduleSrc)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining("Found similar bindings:");
+              subject.hasErrorContaining("Bar in [MyComponent]");
+            });
+  }
+
+  @Test
+  public void missingWildcardType_providedRawType_warnAboutSimilarTypeExists() {
+    Source component =
+        CompilerTests.javaSource(
+            "test.MyComponent",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "import java.util.Set;",
+            "",
+            "@Component(modules = TestModule.class)",
+            "interface MyComponent {",
+            "  Foo getFoo();",
+            "}");
+    Source fooSrc =
+        CompilerTests.kotlinSource(
+            "test.Foo.kt",
+            "package test",
+            "",
+            "import javax.inject.Inject",
+            "",
+            "class Foo @Inject constructor(val bar: Bar<String>) {}");
+    Source barSrc =
+        CompilerTests.kotlinSource("test.Bar.kt", "package test", "", "class Bar<out T1> {}");
+    Source moduleSrc =
+        CompilerTests.javaSource(
+            "test.TestModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import java.util.Set;",
+            "",
+            "@Module",
+            "public class TestModule {",
+            "   @Provides",
+            "   Bar provideBar() {",
+            "     return new Bar<Object>();",
+            "   }",
+            "}");
+
+    CompilerTests.daggerCompiler(component, fooSrc, barSrc, moduleSrc)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining("MissingBinding");
+              List<DiagnosticMessage> diagnostics =
+                  subject.getCompilationResult().getDiagnostics().get(Diagnostic.Kind.ERROR);
+              assertThat(diagnostics).hasSize(1);
+              assertThat(diagnostics.get(0).getMsg())
+                  .doesNotContain("bindings with similar types exists in the graph");
             });
   }
 }

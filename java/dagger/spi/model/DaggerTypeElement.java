@@ -16,32 +16,78 @@
 
 package dagger.spi.model;
 
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
-
-import androidx.room.compiler.processing.XTypeElement;
+import com.google.auto.common.MoreElements;
 import com.google.auto.value.AutoValue;
-import com.squareup.javapoet.ClassName;
+import com.google.devtools.ksp.symbol.KSClassDeclaration;
+import javax.annotation.Nullable;
 import javax.lang.model.element.TypeElement;
 
 /** Wrapper type for a type element. */
 @AutoValue
 public abstract class DaggerTypeElement {
-  public static DaggerTypeElement from(XTypeElement typeElement) {
-    return new AutoValue_DaggerTypeElement(typeElement);
+  public static DaggerTypeElement fromJavac(@Nullable TypeElement element) {
+    return new AutoValue_DaggerTypeElement(element, null);
   }
 
-  public abstract XTypeElement xprocessing();
-
-  public TypeElement java() {
-    return toJavac(xprocessing());
+  public static DaggerTypeElement fromKsp(@Nullable KSClassDeclaration declaration) {
+    return new AutoValue_DaggerTypeElement(null, declaration);
   }
 
-  public ClassName className() {
-    return xprocessing().getClassName();
+  /** Java representation for the type, returns {@code null} not using java annotation processor. */
+  @Nullable
+  public abstract TypeElement java();
+
+  /** KSP declaration for the element, returns {@code null} not using KSP. */
+  @Nullable
+  public abstract KSClassDeclaration ksp();
+
+  public final boolean hasAnnotation(String annotationName) {
+    switch (backend()) {
+      case JAVAC:
+        return MoreElements.isAnnotationPresent(java(), annotationName);
+      case KSP:
+        return KspUtilsKt.hasAnnotation(ksp(), annotationName);
+    }
+    throw new IllegalStateException(String.format("Backend %s not supported yet.", backend()));
+  }
+
+  public String packageName() {
+    switch (backend()) {
+      case JAVAC:
+        return MoreElements.getPackage(java()).getQualifiedName().toString();
+      case KSP:
+        return KspUtilsKt.getNormalizedPackageName(ksp());
+    }
+    throw new IllegalStateException(String.format("Backend %s not supported yet.", backend()));
+  }
+
+  public String qualifiedName() {
+    switch (backend()) {
+      case JAVAC:
+        return java().getQualifiedName().toString();
+      case KSP:
+        return ksp().getQualifiedName().asString();
+    }
+    throw new IllegalStateException(String.format("Backend %s not supported yet.", backend()));
+  }
+
+  public DaggerProcessingEnv.Backend backend() {
+    if (java() != null) {
+      return DaggerProcessingEnv.Backend.JAVAC;
+    } else if (ksp() != null) {
+      return DaggerProcessingEnv.Backend.KSP;
+    }
+    throw new AssertionError("Unexpected backend");
   }
 
   @Override
   public final String toString() {
-    return xprocessing().toString();
+    switch (backend()) {
+      case JAVAC:
+        return java().toString();
+      case KSP:
+        return ksp().toString();
+    }
+    throw new IllegalStateException(String.format("Backend %s not supported yet.", backend()));
   }
 }
