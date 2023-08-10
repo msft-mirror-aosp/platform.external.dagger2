@@ -32,10 +32,10 @@ import static dagger.internal.codegen.javapoet.AnnotationSpecs.Suppression.UNCHE
 import static dagger.internal.codegen.javapoet.AnnotationSpecs.suppressWarnings;
 import static dagger.internal.codegen.javapoet.CodeBlocks.makeParametersCodeBlock;
 import static dagger.internal.codegen.javapoet.TypeNames.factoryOf;
+import static dagger.internal.codegen.model.BindingKind.INJECTION;
+import static dagger.internal.codegen.model.BindingKind.PROVISION;
 import static dagger.internal.codegen.writing.GwtCompatibility.gwtIncompatibleAnnotation;
 import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
-import static dagger.spi.model.BindingKind.INJECTION;
-import static dagger.spi.model.BindingKind.PROVISION;
 import static javax.lang.model.element.Modifier.FINAL;
 import static javax.lang.model.element.Modifier.PRIVATE;
 import static javax.lang.model.element.Modifier.PUBLIC;
@@ -44,8 +44,6 @@ import static javax.lang.model.element.Modifier.STATIC;
 import androidx.room.compiler.processing.XElement;
 import androidx.room.compiler.processing.XFiler;
 import androidx.room.compiler.processing.XProcessingEnv;
-import androidx.room.compiler.processing.XType;
-import androidx.room.compiler.processing.XTypeElement;
 import androidx.room.compiler.processing.XVariableElement;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -66,13 +64,14 @@ import dagger.internal.codegen.binding.ProvisionBinding;
 import dagger.internal.codegen.binding.SourceFiles;
 import dagger.internal.codegen.compileroption.CompilerOptions;
 import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.model.BindingKind;
+import dagger.internal.codegen.model.DaggerAnnotation;
+import dagger.internal.codegen.model.DependencyRequest;
+import dagger.internal.codegen.model.Key;
+import dagger.internal.codegen.model.Scope;
 import dagger.internal.codegen.writing.InjectionMethods.InjectionSiteMethod;
 import dagger.internal.codegen.writing.InjectionMethods.ProvisionMethod;
-import dagger.spi.model.BindingKind;
-import dagger.spi.model.DaggerAnnotation;
-import dagger.spi.model.DependencyRequest;
-import dagger.spi.model.Key;
-import dagger.spi.model.Scope;
+import dagger.internal.codegen.xprocessing.XAnnotations;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -270,9 +269,9 @@ public final class FactoryGenerator extends SourceFileGenerator<ProvisionBinding
 
     if (binding.kind().equals(PROVISION)) {
       binding
-          .nullableType()
-          .map(XType::getTypeElement)
-          .map(XTypeElement::getClassName)
+          .nullability()
+          .nullableAnnotation()
+          .map(XAnnotations::getClassName)
           .ifPresent(getMethod::addAnnotation);
       getMethod.addStatement("return $L", invokeNewInstance);
     } else if (!binding.injectionSites().isEmpty()) {

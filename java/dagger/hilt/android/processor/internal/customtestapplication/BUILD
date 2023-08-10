@@ -29,7 +29,9 @@ java_library(
     srcs = [
         "CustomTestApplicationGenerator.java",
         "CustomTestApplicationMetadata.java",
+        "CustomTestApplicationProcessingStep.java",
         "CustomTestApplicationProcessor.java",
+        "KspCustomTestApplicationProcessor.java",
     ],
     deps = [
         "//java/dagger/hilt/processor/internal:base_processor",
@@ -37,13 +39,14 @@ java_library(
         "//java/dagger/hilt/processor/internal:processor_errors",
         "//java/dagger/hilt/processor/internal:processors",
         "//java/dagger/internal/codegen/extension",
-        "//third_party/java/auto:common",
+        "//java/dagger/internal/codegen/xprocessing",
         "//third_party/java/auto:service",
         "//third_party/java/auto:value",
         "//third_party/java/guava/base",
         "//third_party/java/guava/collect",
         "//third_party/java/incap",
         "//third_party/java/javapoet",
+        "@maven//:com_google_devtools_ksp_symbol_processing_api",
     ],
 )
 

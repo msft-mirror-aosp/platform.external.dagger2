@@ -16,38 +16,96 @@
 
 package dagger.hilt.android.testing.compile;
 
+import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
 import static java.util.stream.Collectors.toMap;
 
+import androidx.room.compiler.processing.XProcessingEnv;
+import androidx.room.compiler.processing.util.CompilationResultSubject;
+import androidx.room.compiler.processing.util.ProcessorTestExtKt;
 import androidx.room.compiler.processing.util.Source;
 import androidx.room.compiler.processing.util.compiler.TestCompilationArguments;
 import androidx.room.compiler.processing.util.compiler.TestCompilationResult;
 import androidx.room.compiler.processing.util.compiler.TestKotlinCompilerKt;
+import com.google.auto.value.AutoValue;
+import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.devtools.ksp.processing.SymbolProcessorProvider;
 import com.google.testing.compile.Compiler;
 import dagger.hilt.android.processor.internal.androidentrypoint.AndroidEntryPointProcessor;
+import dagger.hilt.android.processor.internal.androidentrypoint.KspAndroidEntryPointProcessor;
 import dagger.hilt.android.processor.internal.customtestapplication.CustomTestApplicationProcessor;
+import dagger.hilt.android.processor.internal.customtestapplication.KspCustomTestApplicationProcessor;
+import dagger.hilt.processor.internal.BaseProcessingStep;
+import dagger.hilt.processor.internal.HiltProcessingEnvConfigs;
 import dagger.hilt.processor.internal.aggregateddeps.AggregatedDepsProcessor;
+import dagger.hilt.processor.internal.aggregateddeps.KspAggregatedDepsProcessor;
 import dagger.hilt.processor.internal.aliasof.AliasOfProcessor;
+import dagger.hilt.processor.internal.aliasof.KspAliasOfProcessor;
 import dagger.hilt.processor.internal.definecomponent.DefineComponentProcessor;
+import dagger.hilt.processor.internal.definecomponent.KspDefineComponentProcessor;
 import dagger.hilt.processor.internal.earlyentrypoint.EarlyEntryPointProcessor;
+import dagger.hilt.processor.internal.earlyentrypoint.KspEarlyEntryPointProcessor;
 import dagger.hilt.processor.internal.generatesrootinput.GeneratesRootInputProcessor;
+import dagger.hilt.processor.internal.generatesrootinput.KspGeneratesRootInputProcessor;
+import dagger.hilt.processor.internal.originatingelement.KspOriginatingElementProcessor;
 import dagger.hilt.processor.internal.originatingelement.OriginatingElementProcessor;
 import dagger.hilt.processor.internal.root.ComponentTreeDepsProcessor;
+import dagger.hilt.processor.internal.root.KspComponentTreeDepsProcessor;
+import dagger.hilt.processor.internal.root.KspRootProcessor;
 import dagger.hilt.processor.internal.root.RootProcessor;
+import dagger.hilt.processor.internal.uninstallmodules.KspUninstallModulesProcessor;
 import dagger.hilt.processor.internal.uninstallmodules.UninstallModulesProcessor;
 import dagger.internal.codegen.ComponentProcessor;
+import dagger.internal.codegen.KspComponentProcessor;
 import dagger.testing.compile.CompilerTests;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.annotation.processing.Processor;
 import org.junit.rules.TemporaryFolder;
 
 /** {@link Compiler} instances for testing Android Hilt. */
 public final class HiltCompilerTests {
+  /** Returns the {@link XProcessingEnv.Backend} for the given {@link CompilationResultSubject}. */
+  public static XProcessingEnv.Backend backend(CompilationResultSubject subject) {
+    return CompilerTests.backend(subject);
+  }
+
+  /** Returns a {@link Source.KotlinSource} with the given file name and content. */
+  public static Source.KotlinSource kotlinSource(
+      String fileName, ImmutableCollection<String> srcLines) {
+    return CompilerTests.kotlinSource(fileName, srcLines);
+  }
+
+  /** Returns a {@link Source.KotlinSource} with the given file name and content. */
+  public static Source.KotlinSource kotlinSource(String fileName, String... srcLines) {
+    return CompilerTests.kotlinSource(fileName, srcLines);
+  }
+
+  /** Returns a {@link Source.JavaSource} with the given file name and content. */
+  public static Source.JavaSource javaSource(
+      String fileName, ImmutableCollection<String> srcLines) {
+    return CompilerTests.javaSource(fileName, srcLines);
+  }
+
+  /** Returns a {@link Source.JavaSource} with the given file name and content. */
+  public static Source.JavaSource javaSource(String fileName, String... srcLines) {
+    return CompilerTests.javaSource(fileName, srcLines);
+  }
+
+  /** Returns a {@link Compiler} instance with the given sources. */
+  public static HiltCompiler hiltCompiler(Source... sources) {
+    return hiltCompiler(ImmutableList.copyOf(sources));
+  }
+
+  /** Returns a {@link Compiler} instance with the given sources. */
+  public static HiltCompiler hiltCompiler(ImmutableCollection<Source> sources) {
+    return HiltCompiler.builder().sources(sources).build();
+  }
 
   public static Compiler compiler(Processor... extraProcessors) {
     return compiler(Arrays.asList(extraProcessors));
@@ -68,7 +126,8 @@ public final class HiltCompilerTests {
       List<Source> sources,
       TemporaryFolder tempFolder,
       Consumer<TestCompilationResult> onCompilationResult) {
-    compileWithKapt(sources, ImmutableMap.of(), tempFolder, onCompilationResult);
+    compileWithKapt(
+        sources, ImmutableMap.of(), ImmutableList.of(), tempFolder, onCompilationResult);
   }
 
   public static void compileWithKapt(
@@ -76,17 +135,40 @@ public final class HiltCompilerTests {
       Map<String, String> processorOptions,
       TemporaryFolder tempFolder,
       Consumer<TestCompilationResult> onCompilationResult) {
-    TestCompilationResult result = TestKotlinCompilerKt.compile(
-        tempFolder.getRoot(),
-        new TestCompilationArguments(
-            sources,
-            /*classpath=*/ ImmutableList.of(CompilerTests.compilerDepsJar()),
-            /*inheritClasspath=*/ false,
-            /*javacArguments=*/ ImmutableList.of(),
-            /*kotlincArguments=*/ ImmutableList.of(),
-            /*kaptProcessors=*/ defaultProcessors(),
-            /*symbolProcessorProviders=*/ ImmutableList.of(),
-            /*processorOptions=*/ processorOptions));
+    compileWithKapt(
+        sources, processorOptions, ImmutableList.of(), tempFolder, onCompilationResult);
+  }
+
+  public static void compileWithKapt(
+      List<Source> sources,
+      List<Processor> additionalProcessors,
+      TemporaryFolder tempFolder,
+      Consumer<TestCompilationResult> onCompilationResult) {
+    compileWithKapt(
+        sources, ImmutableMap.of(), additionalProcessors, tempFolder, onCompilationResult);
+  }
+
+  public static void compileWithKapt(
+      List<Source> sources,
+      Map<String, String> processorOptions,
+      List<Processor> additionalProcessors,
+      TemporaryFolder tempFolder,
+      Consumer<TestCompilationResult> onCompilationResult) {
+    TestCompilationResult result =
+        TestKotlinCompilerKt.compile(
+            tempFolder.getRoot(),
+            new TestCompilationArguments(
+                sources,
+                /* classpath= */ ImmutableList.of(CompilerTests.compilerDepsJar()),
+                /* inheritClasspath= */ false,
+                /* javacArguments= */ ImmutableList.of(),
+                /* kotlincArguments= */ ImmutableList.of(),
+                /* kaptProcessors= */ ImmutableList.<Processor>builder()
+                    .addAll(defaultProcessors())
+                    .addAll(additionalProcessors)
+                    .build(),
+                /* symbolProcessorProviders= */ ImmutableList.of(),
+                /* processorOptions= */ processorOptions));
     onCompilationResult.accept(result);
   }
 
@@ -104,6 +186,135 @@ public final class HiltCompilerTests {
         new OriginatingElementProcessor(),
         new RootProcessor(),
         new UninstallModulesProcessor());
+  }
+
+  private static ImmutableList<SymbolProcessorProvider> kspDefaultProcessors() {
+    // TODO(bcorso): Add the rest of the KSP processors here.
+    return ImmutableList.of(
+        new KspAndroidEntryPointProcessor.Provider(),
+        new KspAliasOfProcessor.Provider(),
+        new KspAggregatedDepsProcessor.Provider(),
+        new KspComponentProcessor.Provider(),
+        new KspComponentTreeDepsProcessor.Provider(),
+        new KspCustomTestApplicationProcessor.Provider(),
+        new KspDefineComponentProcessor.Provider(),
+        new KspEarlyEntryPointProcessor.Provider(),
+        new KspGeneratesRootInputProcessor.Provider(),
+        new KspOriginatingElementProcessor.Provider(),
+        new KspRootProcessor.Provider(),
+        new KspUninstallModulesProcessor.Provider());
+  }
+
+  /** Used to compile Hilt sources and inspect the compiled results. */
+  @AutoValue
+  public abstract static class HiltCompiler {
+    static Builder builder() {
+      return new AutoValue_HiltCompilerTests_HiltCompiler.Builder()
+          // Set the builder defaults.
+          .processorOptions(ImmutableMap.of())
+          .additionalJavacProcessors(ImmutableList.of())
+          .additionalKspProcessors(ImmutableList.of())
+          .processingSteps(ImmutableList.of())
+          .javacArguments(ImmutableList.of());
+    }
+
+    /** Returns the sources being compiled */
+    abstract ImmutableCollection<Source> sources();
+
+    /** Returns the annotation processors options. */
+    abstract ImmutableMap<String, String> processorOptions();
+
+    /** Returns the extra Javac processors. */
+    abstract ImmutableCollection<Processor> additionalJavacProcessors();
+
+    /** Returns the extra KSP processors. */
+    abstract ImmutableCollection<SymbolProcessorProvider> additionalKspProcessors();
+
+    /** Returns the command-line options */
+    abstract ImmutableCollection<String> javacArguments();
+
+    /** Returns a new {@link HiltCompiler} instance with the annotation processors options. */
+    public HiltCompiler withProcessorOptions(ImmutableMap<String, String> processorOptions) {
+      return toBuilder().processorOptions(processorOptions).build();
+    }
+
+    /** Returns the processing steps suppliers. */
+    abstract ImmutableCollection<Function<XProcessingEnv, BaseProcessingStep>> processingSteps();
+
+    public HiltCompiler withProcessingSteps(
+        Function<XProcessingEnv, BaseProcessingStep>... mapping) {
+      return toBuilder().processingSteps(ImmutableList.copyOf(mapping)).build();
+    }
+
+    /** Returns a new {@link HiltCompiler} instance with the additional Javac processors. */
+    public HiltCompiler withAdditionalJavacProcessors(Processor... processors) {
+      return toBuilder().additionalJavacProcessors(ImmutableList.copyOf(processors)).build();
+    }
+
+    /** Returns a new {@link HiltCompiler} instance with the additional KSP processors. */
+    public HiltCompiler withAdditionalKspProcessors(SymbolProcessorProvider... processors) {
+      return toBuilder().additionalKspProcessors(ImmutableList.copyOf(processors)).build();
+    }
+
+    /** Returns a new {@link HiltCompiler} instance with command-line options. */
+    public HiltCompiler withJavacArguments(String... arguments) {
+      return toBuilder().javacArguments(ImmutableList.copyOf(arguments)).build();
+    }
+
+    /** Returns a new {@link HiltCompiler} instance with command-line options. */
+    public HiltCompiler withJavacArguments(ImmutableCollection<String> arguments) {
+      return toBuilder().javacArguments(arguments).build();
+    }
+
+    /** Returns a builder with the current values of this {@link Compiler} as default. */
+    abstract Builder toBuilder();
+
+    public void compile(Consumer<CompilationResultSubject> onCompilationResult) {
+      ProcessorTestExtKt.runProcessorTest(
+          sources().asList(),
+          /* classpath= */ ImmutableList.of(CompilerTests.compilerDepsJar()),
+          /* options= */ processorOptions(),
+          /* javacArguments= */ javacArguments().asList(),
+          /* kotlincArguments= */ ImmutableList.of(
+              "-P", "plugin:org.jetbrains.kotlin.kapt3:correctErrorTypes=true"),
+          /* config= */ HiltProcessingEnvConfigs.CONFIGS,
+          /* javacProcessors= */ ImmutableList.<Processor>builder()
+              .addAll(defaultProcessors())
+              .addAll(additionalJavacProcessors())
+              .addAll(
+                  processingSteps().stream()
+                      .map(HiltCompilerProcessors.JavacProcessor::new)
+                      .collect(toImmutableList()))
+              .build(),
+          /* symbolProcessorProviders= */ ImmutableList.<SymbolProcessorProvider>builder()
+              .addAll(kspDefaultProcessors())
+              .addAll(additionalKspProcessors())
+              .addAll(
+                  processingSteps().stream()
+                      .map(HiltCompilerProcessors.KspProcessor.Provider::new)
+                      .collect(toImmutableList()))
+              .build(),
+          result -> {
+            onCompilationResult.accept(result);
+            return null;
+          });
+    }
+
+    /** Used to build a {@link HiltCompiler}. */
+    @AutoValue.Builder
+    public abstract static class Builder {
+      abstract Builder sources(ImmutableCollection<Source> sources);
+      abstract Builder processorOptions(ImmutableMap<String, String> processorOptions);
+      abstract Builder additionalJavacProcessors(ImmutableCollection<Processor> processors);
+      abstract Builder additionalKspProcessors(
+          ImmutableCollection<SymbolProcessorProvider> processors);
+      abstract Builder javacArguments(ImmutableCollection<String> arguments);
+
+      abstract Builder processingSteps(
+          ImmutableCollection<Function<XProcessingEnv, BaseProcessingStep>> processingSteps);
+
+      abstract HiltCompiler build();
+    }
   }
 
   private HiltCompilerTests() {}

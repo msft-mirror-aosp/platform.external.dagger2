@@ -32,9 +32,9 @@ import com.google.auto.value.AutoValue;
 import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.TypeName;
 import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.model.BindingKind;
+import dagger.internal.codegen.model.Key;
 import dagger.internal.codegen.xprocessing.XTypeElements;
-import dagger.spi.model.BindingKind;
-import dagger.spi.model.Key;
 import java.util.Optional;
 
 /** A type that a component needs an instance of. */
@@ -191,8 +191,7 @@ public abstract class ComponentRequirement {
 
   public static ComponentRequirement forBoundInstance(ContributionBinding binding) {
     checkArgument(binding.kind().equals(BindingKind.BOUND_INSTANCE));
-    return forBoundInstance(
-        binding.key(), binding.nullableType().isPresent(), binding.bindingElement().get());
+    return forBoundInstance(binding.key(), binding.isNullable(), binding.bindingElement().get());
   }
 
   static ComponentRequirement forBoundInstance(

@@ -16,30 +16,19 @@
 
 package dagger.hilt.processor.internal.earlyentrypoint;
 
-import static com.google.auto.common.MoreElements.asType;
 import static net.ltgt.gradle.incap.IncrementalAnnotationProcessorType.ISOLATING;
 
 import com.google.auto.service.AutoService;
-import com.google.common.collect.ImmutableSet;
-import dagger.hilt.processor.internal.BaseProcessor;
-import dagger.hilt.processor.internal.ClassNames;
+import dagger.hilt.processor.internal.JavacBaseProcessingStepProcessor;
 import javax.annotation.processing.Processor;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.TypeElement;
 import net.ltgt.gradle.incap.IncrementalAnnotationProcessor;
 
 /** Validates {@link dagger.hilt.android.EarlyEntryPoint} usages. */
 @IncrementalAnnotationProcessor(ISOLATING)
 @AutoService(Processor.class)
-public final class EarlyEntryPointProcessor extends BaseProcessor {
-
+public final class EarlyEntryPointProcessor extends JavacBaseProcessingStepProcessor {
   @Override
-  public ImmutableSet<String> getSupportedAnnotationTypes() {
-    return ImmutableSet.of(ClassNames.EARLY_ENTRY_POINT.toString());
-  }
-
-  @Override
-  public void processEach(TypeElement annotation, Element element) throws Exception {
-    new AggregatedEarlyEntryPointGenerator(asType(element), getProcessingEnv()).generate();
+  public EarlyEntryPointProcessingStep processingStep() {
+    return new EarlyEntryPointProcessingStep(getXProcessingEnv());
   }
 }

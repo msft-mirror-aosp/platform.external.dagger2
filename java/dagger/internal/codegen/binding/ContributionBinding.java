@@ -29,11 +29,11 @@ import dagger.internal.codegen.base.ContributionType;
 import dagger.internal.codegen.base.ContributionType.HasContributionType;
 import dagger.internal.codegen.base.MapType;
 import dagger.internal.codegen.base.SetType;
+import dagger.internal.codegen.model.BindingKind;
+import dagger.internal.codegen.model.DaggerAnnotation;
+import dagger.internal.codegen.model.DependencyRequest;
+import dagger.internal.codegen.model.Key;
 import dagger.internal.codegen.xprocessing.XTypes;
-import dagger.spi.model.BindingKind;
-import dagger.spi.model.DaggerAnnotation;
-import dagger.spi.model.DependencyRequest;
-import dagger.spi.model.Key;
 import java.util.Optional;
 
 /**
@@ -43,8 +43,8 @@ import java.util.Optional;
 @CheckReturnValue
 public abstract class ContributionBinding extends Binding implements HasContributionType {
 
-  /** Returns the type that specifies this' nullability, absent if not nullable. */
-  public abstract Optional<XType> nullableType();
+  /** Returns the nullability of this binding. */
+  public abstract Nullability nullability();
 
   // Note: We're using DaggerAnnotation instead of XAnnotation for its equals/hashcode
   public abstract Optional<DaggerAnnotation> mapKey();
@@ -64,7 +64,7 @@ public abstract class ContributionBinding extends Binding implements HasContribu
 
   @Override
   public final boolean isNullable() {
-    return nullableType().isPresent();
+    return nullability().isNullable();
   }
 
   /**
@@ -134,7 +134,7 @@ public abstract class ContributionBinding extends Binding implements HasContribu
     public abstract B key(Key key);
 
     @CanIgnoreReturnValue
-    public abstract B nullableType(Optional<XType> nullableType);
+    public abstract B nullability(Nullability nullability);
 
     @CanIgnoreReturnValue
     abstract B mapKey(Optional<DaggerAnnotation> mapKey);
