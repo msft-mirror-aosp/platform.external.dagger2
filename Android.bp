@@ -147,6 +147,7 @@ java_import_host {
 java_library_host {
     name: "dagger2-compiler-lib",
     use_tools_jar: true,
+    visibility: ["//visibility:public"],
 
     srcs: [
         "java/dagger/internal/codegen/**/*.java",
@@ -155,6 +156,7 @@ java_library_host {
         "java/dagger/model/*.java",
         "java/dagger/spi/*.java",
         "java/dagger/spi/model/*.java",
+        "java/dagger/spi/model/*.kt",
     ],
 
     exclude_srcs: [
@@ -179,6 +181,7 @@ java_library_host {
         "kotlin-stdlib-jdk8",
         "kotlinpoet",
         "kotlinx_metadata_jvm",
+        "kotlin_symbol_processing_api",
     ],
 
 
