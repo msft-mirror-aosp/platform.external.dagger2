@@ -40,6 +40,7 @@ import androidx.room.compiler.processing.XMethodType;
 import androidx.room.compiler.processing.XProcessingEnv;
 import androidx.room.compiler.processing.XType;
 import androidx.room.compiler.processing.XTypeElement;
+import androidx.room.compiler.processing.XTypeVariableType;
 import com.google.auto.common.MoreElements;
 import com.google.common.base.Equivalence;
 import com.squareup.javapoet.ArrayTypeName;
@@ -63,26 +64,79 @@ import javax.lang.model.util.SimpleTypeVisitor8;
 // TODO(bcorso): Consider moving these methods into XProcessing library.
 /** A utility class for {@link XType} helper methods. */
 public final class XTypes {
-  private static final Equivalence<XType> XTYPE_EQUIVALENCE =
-      new Equivalence<XType>() {
-        @Override
-        protected boolean doEquivalent(XType left, XType right) {
-          return left.getTypeName().equals(right.getTypeName());
-        }
+  private static class XTypeEquivalence extends Equivalence<XType> {
+    private final boolean ignoreVariance;
 
-        @Override
-        protected int doHash(XType type) {
-          return type.getTypeName().hashCode();
-        }
+    XTypeEquivalence(boolean ignoreVariance) {
+      this.ignoreVariance = ignoreVariance;
+    }
 
-        @Override
-        public String toString() {
-          return "XTypes.equivalence()";
-        }
-      };
+    @Override
+    protected boolean doEquivalent(XType left, XType right) {
+      return getTypeName(left).equals(getTypeName(right));
+    }
+
+    @Override
+    protected int doHash(XType type) {
+      return getTypeName(type).hashCode();
+    }
+
+    @Override
+    public String toString() {
+      return "XTypes.equivalence()";
+    }
+
+    private TypeName getTypeName(XType type) {
+      return ignoreVariance ? stripVariances(type.getTypeName()) : type.getTypeName();
+    }
+  }
+
+  public static TypeName stripVariances(TypeName typeName) {
+    if (typeName instanceof WildcardTypeName) {
+      WildcardTypeName wildcardTypeName = (WildcardTypeName) typeName;
+      if (!wildcardTypeName.lowerBounds.isEmpty()) {
+        return stripVariances(getOnlyElement(wildcardTypeName.lowerBounds));
+      } else if (!wildcardTypeName.upperBounds.isEmpty()) {
+        return stripVariances(getOnlyElement(wildcardTypeName.upperBounds));
+      }
+    } else if (typeName instanceof ArrayTypeName) {
+      ArrayTypeName arrayTypeName = (ArrayTypeName) typeName;
+      return ArrayTypeName.of(stripVariances(arrayTypeName.componentType));
+    } else if (typeName instanceof ParameterizedTypeName) {
+      ParameterizedTypeName parameterizedTypeName = (ParameterizedTypeName) typeName;
+      if (parameterizedTypeName.typeArguments.isEmpty()) {
+        return parameterizedTypeName;
+      } else {
+        return ParameterizedTypeName.get(
+            parameterizedTypeName.rawType,
+            parameterizedTypeName.typeArguments.stream()
+                .map(XTypes::stripVariances)
+                .toArray(TypeName[]::new));
+      }
+    }
+    return typeName;
+  }
+
+  private static final Equivalence<XType> XTYPE_EQUIVALENCE_IGNORING_VARIANCE =
+      new XTypeEquivalence(/* ignoreVariance= */ true);
 
   /**
-   * Returns an {@link Equivalence} for {@link XType}.
+   * Returns an {@link Equivalence} for {@link XType} based on the {@link TypeName} with variances
+   * ignored (e.g. {@code Foo<? extends Bar>} would be equivalent to {@code Foo<Bar>}).
+   *
+   * <p>Currently, this equivalence does not take into account nullability, as it just relies on
+   * JavaPoet's {@link TypeName}. Thus, two types with the same type name but different nullability
+   * are equal with this equivalence.
+   */
+  public static Equivalence<XType> equivalenceIgnoringVariance() {
+    return XTYPE_EQUIVALENCE_IGNORING_VARIANCE;
+  }
+
+  private static final Equivalence<XType> XTYPE_EQUIVALENCE =
+      new XTypeEquivalence(/* ignoreVariance= */ false);
+
+  /**
+   * Returns an {@link Equivalence} for {@link XType} based on the {@link TypeName}.
    *
    * <p>Currently, this equivalence does not take into account nullability, as it just relies on
    * JavaPoet's {@link TypeName}. Thus, two types with the same type name but different nullability
@@ -215,6 +269,11 @@ public final class XTypes {
     return (XArrayType) type;
   }
 
+  /** Returns the given {@code type} as an {@link XTypeVariableType}. */
+  public static XTypeVariableType asTypeVariable(XType type) {
+    return (XTypeVariableType) type;
+  }
+
   /** Returns {@code true} if the raw type of {@code type} is equal to {@code className}. */
   public static boolean isTypeOf(XType type, ClassName className) {
     return isDeclared(type) && type.getTypeElement().getClassName().equals(className);
@@ -281,10 +340,6 @@ public final class XTypes {
   /** Returns {@code true} if the given type has type parameters. */
   public static boolean hasTypeParameters(XType type) {
     return !type.getTypeArguments().isEmpty();
-  }
-
-  public static boolean isExecutable(XType type) {
-    return type instanceof XExecutableType;
   }
 
   public static boolean isMethod(XExecutableType type) {

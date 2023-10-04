@@ -16,45 +16,55 @@
 
 package dagger.spi.model;
 
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
-
-import androidx.room.compiler.processing.XAnnotation;
+import com.google.auto.common.AnnotationMirrors;
 import com.google.auto.value.AutoValue;
-import com.google.common.base.Equivalence;
-import com.google.common.base.Preconditions;
-import com.squareup.javapoet.ClassName;
-import dagger.internal.codegen.xprocessing.XAnnotations;
+import com.google.devtools.ksp.symbol.KSAnnotation;
+import javax.annotation.Nullable;
 import javax.lang.model.element.AnnotationMirror;
 
 /** Wrapper type for an annotation. */
 @AutoValue
 public abstract class DaggerAnnotation {
-
-  public static DaggerAnnotation from(XAnnotation annotation) {
-    Preconditions.checkNotNull(annotation);
-    return new AutoValue_DaggerAnnotation(XAnnotations.equivalence().wrap(annotation));
+  public static DaggerAnnotation fromJavac(
+      DaggerTypeElement annotationTypeElement, AnnotationMirror annotation) {
+    return new AutoValue_DaggerAnnotation(annotationTypeElement, annotation, null);
   }
 
-  abstract Equivalence.Wrapper<XAnnotation> equivalenceWrapper();
-
-  public DaggerTypeElement annotationTypeElement() {
-    return DaggerTypeElement.from(xprocessing().getType().getTypeElement());
+  public static DaggerAnnotation fromKsp(
+      DaggerTypeElement annotationTypeElement, KSAnnotation ksp) {
+    return new AutoValue_DaggerAnnotation(annotationTypeElement, null, ksp);
   }
 
-  public ClassName className() {
-    return annotationTypeElement().className();
-  }
+  public abstract DaggerTypeElement annotationTypeElement();
 
-  public XAnnotation xprocessing() {
-    return equivalenceWrapper().get();
-  }
+  /**
+   * java representation for the annotation, returns {@code null} if the annotation isn't a java
+   * element.
+   */
+  @Nullable
+  public abstract AnnotationMirror java();
 
-  public AnnotationMirror java() {
-    return toJavac(xprocessing());
+  /** KSP declaration for the annotation, returns {@code null} not using KSP. */
+  @Nullable
+  public abstract KSAnnotation ksp();
+
+  public DaggerProcessingEnv.Backend backend() {
+    if (java() != null) {
+      return DaggerProcessingEnv.Backend.JAVAC;
+    } else if (ksp() != null) {
+      return DaggerProcessingEnv.Backend.KSP;
+    }
+    throw new AssertionError("Unexpected backend");
   }
 
   @Override
   public final String toString() {
-    return XAnnotations.toString(xprocessing());
+    switch (backend()) {
+      case JAVAC:
+        return AnnotationMirrors.toString(java());
+      case KSP:
+        return ksp().toString();
+    }
+    throw new IllegalStateException(String.format("Backend %s not supported yet.", backend()));
   }
 }
