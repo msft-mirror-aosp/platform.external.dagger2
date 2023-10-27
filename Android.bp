@@ -364,7 +364,7 @@ android_library {
         "junit",
     ],
     sdk_version: "current",
-    min_sdk_version: "14",
+    min_sdk_version: "19",
     plugins: [
         "auto_value_plugin",
         "dagger2-compiler",
