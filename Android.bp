@@ -306,7 +306,7 @@ android_library {
         "hilt_core",
     ],
     sdk_version: "current",
-    min_sdk_version: "14",
+    min_sdk_version: "19",
     plugins: [
         "dagger2-compiler",
         "hilt_android_entry_point_processor",
