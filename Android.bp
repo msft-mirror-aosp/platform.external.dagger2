@@ -83,9 +83,10 @@ java_library {
         "//apex_available:platform",
         "com.android.adservices",
         "com.android.extservices",
-        "com.android.ondevicepersonalization",
-        "com.android.healthfitness",
         "com.android.devicelock",
+        "com.android.healthfitness",
+        "com.android.mediaprovider",
+        "com.android.ondevicepersonalization",
     ],
 
     sdk_version: "core_current",
@@ -259,8 +260,9 @@ java_library {
     ],
     apex_available: [
         "//apex_available:platform",
-        "com.android.ondevicepersonalization",
         "com.android.healthfitness",
+        "com.android.mediaprovider",
+        "com.android.ondevicepersonalization",
     ],
 }
 
@@ -330,8 +332,9 @@ android_library {
     ],
     apex_available: [
         "//apex_available:platform",
-        "com.android.ondevicepersonalization",
         "com.android.healthfitness",
+        "com.android.mediaprovider",
+        "com.android.ondevicepersonalization",
     ],
 }
 
