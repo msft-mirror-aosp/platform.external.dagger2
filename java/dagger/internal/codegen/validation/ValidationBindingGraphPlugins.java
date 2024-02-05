@@ -19,46 +19,43 @@ package dagger.internal.codegen.validation;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
 import static javax.tools.Diagnostic.Kind.ERROR;
 
-import androidx.room.compiler.processing.XFiler;
-import androidx.room.compiler.processing.compat.XConverters;
+import androidx.room.compiler.processing.XProcessingEnv;
+import com.google.common.base.Optional;
+import com.google.common.base.Supplier;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import dagger.internal.codegen.compileroption.CompilerOptions;
 import dagger.internal.codegen.compileroption.ProcessingOptions;
 import dagger.internal.codegen.compileroption.ValidationType;
-import dagger.internal.codegen.langmodel.DaggerElements;
-import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.internal.codegen.validation.DiagnosticReporterFactory.DiagnosticReporterImpl;
 import dagger.spi.model.BindingGraph;
 import dagger.spi.model.BindingGraphPlugin;
+import dagger.spi.model.DaggerProcessingEnv;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.inject.Inject;
 
 /** Initializes {@link BindingGraphPlugin}s. */
 public final class ValidationBindingGraphPlugins {
-  private final ImmutableSet<BindingGraphPlugin> plugins;
+  private final ImmutableSet<ValidationBindingGraphPlugin> plugins;
   private final DiagnosticReporterFactory diagnosticReporterFactory;
-  private final XFiler filer;
-  private final DaggerTypes types;
-  private final DaggerElements elements;
+  private final XProcessingEnv processingEnv;
   private final CompilerOptions compilerOptions;
   private final Map<String, String> processingOptions;
 
   @Inject
   ValidationBindingGraphPlugins(
-      @Validation ImmutableSet<BindingGraphPlugin> plugins,
+      @Validation ImmutableSet<ValidationBindingGraphPlugin> plugins,
       DiagnosticReporterFactory diagnosticReporterFactory,
-      XFiler filer,
-      DaggerTypes types,
-      DaggerElements elements,
+      XProcessingEnv processingEnv,
       CompilerOptions compilerOptions,
       @ProcessingOptions Map<String, String> processingOptions) {
     this.plugins = plugins;
     this.diagnosticReporterFactory = diagnosticReporterFactory;
-    this.filer = filer;
-    this.types = types;
-    this.elements = elements;
+    this.processingEnv = processingEnv;
     this.compilerOptions = compilerOptions;
     this.processingOptions = processingOptions;
   }
@@ -73,34 +70,57 @@ public final class ValidationBindingGraphPlugins {
   /** Initializes the plugins. */
   // TODO(ronshapiro): Should we validate the uniqueness of plugin names?
   public void initializePlugins() {
-    plugins.forEach(this::initializePlugin);
+    DaggerProcessingEnv daggerProcessingEnv = DaggerProcessingEnv.from(processingEnv);
+    plugins.forEach(plugin -> plugin.init(daggerProcessingEnv, pluginOptions(plugin)));
   }
 
-  private void initializePlugin(BindingGraphPlugin plugin) {
-    plugin.initFiler(XConverters.toJavac(filer));
-    plugin.initTypes(types);
-    plugin.initElements(elements);
+  /** Returns the filtered map of processing options supported by the given plugin. */
+  private ImmutableMap<String, String> pluginOptions(BindingGraphPlugin plugin) {
     Set<String> supportedOptions = plugin.supportedOptions();
-    if (!supportedOptions.isEmpty()) {
-      plugin.initOptions(Maps.filterKeys(processingOptions, supportedOptions::contains));
-    }
+    return supportedOptions.isEmpty()
+        ? ImmutableMap.of()
+        : ImmutableMap.copyOf(Maps.filterKeys(processingOptions, supportedOptions::contains));
   }
 
   /** Returns {@code false} if any of the plugins reported an error. */
-  boolean visit(BindingGraph graph) {
-    boolean errorsAsWarnings =
-        graph.isFullBindingGraph()
-            && compilerOptions.fullBindingGraphValidationType().equals(ValidationType.WARNING);
+  boolean visit(Optional<BindingGraph> prunedGraph, Supplier<BindingGraph> fullGraphSupplier) {
+    BindingGraph graph = prunedGraph.isPresent() ? prunedGraph.get() : fullGraphSupplier.get();
 
     boolean isClean = true;
-    for (BindingGraphPlugin plugin : plugins) {
-      DiagnosticReporterImpl reporter =
-          diagnosticReporterFactory.reporter(graph, plugin.pluginName(), errorsAsWarnings);
+    List<ValidationBindingGraphPlugin> rerunPlugins = new ArrayList<>();
+    for (ValidationBindingGraphPlugin plugin : plugins) {
+      DiagnosticReporterImpl reporter = createReporter(plugin.pluginName(), graph);
       plugin.visitGraph(graph, reporter);
+      if (plugin.visitFullGraphRequested(graph)) {
+        rerunPlugins.add(plugin);
+      }
       if (reporter.reportedDiagnosticKinds().contains(ERROR)) {
         isClean = false;
       }
     }
+    if (!rerunPlugins.isEmpty()) {
+      BindingGraph fullGraph = fullGraphSupplier.get();
+      for (ValidationBindingGraphPlugin plugin : rerunPlugins) {
+        DiagnosticReporterImpl reporter = createReporter(plugin.pluginName(), fullGraph);
+        plugin.revisitFullGraph(prunedGraph.get(), fullGraph, reporter);
+        if (reporter.reportedDiagnosticKinds().contains(ERROR)) {
+          isClean = false;
+        }
+      }
+    }
     return isClean;
+  }
+
+  private DiagnosticReporterImpl createReporter(String pluginName, BindingGraph graph) {
+    boolean errorsAsWarnings =
+        graph.isFullBindingGraph()
+            && compilerOptions.fullBindingGraphValidationType().equals(ValidationType.WARNING);
+    return errorsAsWarnings
+        ? diagnosticReporterFactory.reporterWithErrorAsWarnings(graph, pluginName)
+        : diagnosticReporterFactory.reporter(graph, pluginName);
+  }
+
+  public void endPlugins() {
+    plugins.forEach(BindingGraphPlugin::onPluginEnd);
   }
 }
