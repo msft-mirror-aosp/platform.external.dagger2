@@ -16,13 +16,13 @@
 
 package dagger.internal.codegen.writing;
 
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static dagger.internal.codegen.binding.BindingRequest.bindingRequest;
 import static dagger.internal.codegen.javapoet.CodeBlocks.toParametersCodeBlock;
 import static dagger.internal.codegen.langmodel.Accessibility.isTypeAccessibleFrom;
-import static javax.lang.model.util.ElementFilter.methodsIn;
+import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
 
+import androidx.room.compiler.processing.XProcessingEnv;
 import androidx.room.compiler.processing.XType;
 import com.google.common.collect.ImmutableSet;
 import com.squareup.javapoet.ClassName;
@@ -38,19 +38,15 @@ import dagger.internal.codegen.binding.ProvisionBinding;
 import dagger.internal.codegen.javapoet.CodeBlocks;
 import dagger.internal.codegen.javapoet.Expression;
 import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.internal.codegen.langmodel.DaggerElements;
-import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.spi.model.DependencyRequest;
 import java.util.Collections;
-import javax.lang.model.type.DeclaredType;
 
 /** A binding expression for multibound sets. */
 final class SetRequestRepresentation extends RequestRepresentation {
   private final ProvisionBinding binding;
   private final BindingGraph graph;
   private final ComponentRequestRepresentations componentRequestRepresentations;
-  private final DaggerTypes types;
-  private final DaggerElements elements;
+  private final XProcessingEnv processingEnv;
   private final boolean isExperimentalMergedMode;
 
   @AssistedInject
@@ -59,13 +55,11 @@ final class SetRequestRepresentation extends RequestRepresentation {
       BindingGraph graph,
       ComponentImplementation componentImplementation,
       ComponentRequestRepresentations componentRequestRepresentations,
-      DaggerTypes types,
-      DaggerElements elements) {
+      XProcessingEnv processingEnv) {
     this.binding = binding;
     this.graph = graph;
     this.componentRequestRepresentations = componentRequestRepresentations;
-    this.types = types;
-    this.elements = elements;
+    this.processingEnv = processingEnv;
     this.isExperimentalMergedMode =
         componentImplementation.compilerMode().isExperimentalMergedMode();
   }
@@ -130,15 +124,15 @@ final class SetRequestRepresentation extends RequestRepresentation {
         }
         instantiation.add(".build()");
         return Expression.create(
-            isImmutableSetAvailable ? immutableSetType() : binding.key().type().java(),
+            isImmutableSetAvailable ? immutableSetType() : binding.key().type().xprocessing(),
             instantiation.build());
     }
   }
 
-  private DeclaredType immutableSetType() {
-    return types.getDeclaredType(
-        elements.getTypeElement(TypeNames.IMMUTABLE_SET),
-        toJavac(SetType.from(binding.key()).elementType()));
+  private XType immutableSetType() {
+    return processingEnv.getDeclaredType(
+        processingEnv.requireTypeElement(TypeNames.IMMUTABLE_SET),
+        SetType.from(binding.key()).elementType());
   }
 
   private CodeBlock getContributionExpression(
@@ -160,7 +154,8 @@ final class SetRequestRepresentation extends RequestRepresentation {
     // "addAll()" method expects a collection. For example, ".addAll((Collection)
     // provideInaccessibleSetOfFoo.get())"
     return (!isSingleValue(dependency)
-            && !isTypeAccessibleFrom(binding.key().type().java(), requestingClass.packageName())
+            && !isTypeAccessibleFrom(
+                binding.key().type().xprocessing(), requestingClass.packageName())
             // TODO(wanyingd): Replace instanceof checks with validation on the binding.
             && (bindingExpression instanceof DerivedFromFrameworkInstanceRequestRepresentation
                 || bindingExpression instanceof DelegateRequestRepresentation))
@@ -171,7 +166,7 @@ final class SetRequestRepresentation extends RequestRepresentation {
   private Expression collectionsStaticFactoryInvocation(
       ClassName requestingClass, CodeBlock methodInvocation) {
     return Expression.create(
-        binding.key().type().java(),
+        binding.key().type().xprocessing(),
         CodeBlock.builder()
             .add("$T.", Collections.class)
             .add(maybeTypeParameter(requestingClass))
@@ -181,7 +176,7 @@ final class SetRequestRepresentation extends RequestRepresentation {
 
   private CodeBlock maybeTypeParameter(ClassName requestingClass) {
     XType elementType = SetType.from(binding.key()).elementType();
-    return isTypeAccessibleFrom(toJavac(elementType), requestingClass.packageName())
+    return isTypeAccessibleFrom(elementType, requestingClass.packageName())
         ? CodeBlock.of("<$T>", elementType.getTypeName())
         : CodeBlock.of("");
   }
@@ -193,16 +188,13 @@ final class SetRequestRepresentation extends RequestRepresentation {
   }
 
   private boolean isImmutableSetBuilderWithExpectedSizeAvailable() {
-    if (isImmutableSetAvailable()) {
-      return methodsIn(elements.getTypeElement(TypeNames.IMMUTABLE_SET).getEnclosedElements())
-          .stream()
-          .anyMatch(method -> method.getSimpleName().contentEquals("builderWithExpectedSize"));
-    }
-    return false;
+    return isImmutableSetAvailable()
+        && processingEnv.requireTypeElement(TypeNames.IMMUTABLE_SET).getDeclaredMethods().stream()
+            .anyMatch(method -> getSimpleName(method).contentEquals("builderWithExpectedSize"));
   }
 
   private boolean isImmutableSetAvailable() {
-    return elements.getTypeElement(TypeNames.IMMUTABLE_SET) != null;
+    return processingEnv.findTypeElement(TypeNames.IMMUTABLE_SET) != null;
   }
 
   @AssistedFactory
