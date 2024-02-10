@@ -19,7 +19,6 @@ package dagger.internal.codegen.validation;
 import static androidx.room.compiler.processing.XTypeKt.isArray;
 import static androidx.room.compiler.processing.XTypeKt.isVoid;
 import static com.google.common.base.Verify.verifyNotNull;
-import static com.google.common.collect.Iterables.getOnlyElement;
 import static dagger.internal.codegen.base.Util.reentrantComputeIfAbsent;
 import static dagger.internal.codegen.binding.AssistedInjectionAnnotations.isAssistedFactoryType;
 import static dagger.internal.codegen.binding.AssistedInjectionAnnotations.isAssistedInjectionType;
@@ -30,7 +29,6 @@ import static dagger.internal.codegen.xprocessing.XTypes.isTypeVariable;
 
 import androidx.room.compiler.processing.XAnnotation;
 import androidx.room.compiler.processing.XElement;
-import androidx.room.compiler.processing.XProcessingEnv;
 import androidx.room.compiler.processing.XType;
 import androidx.room.compiler.processing.XTypeElement;
 import com.google.common.collect.ImmutableSet;
@@ -48,16 +46,12 @@ import java.util.Formatter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import javax.inject.Inject;
 import javax.inject.Qualifier;
 
 /** A validator for elements that represent binding declarations. */
 public abstract class BindingElementValidator<E extends XElement> {
   private static final ImmutableSet<ClassName> MULTIBINDING_ANNOTATIONS =
       ImmutableSet.of(TypeNames.INTO_SET, TypeNames.ELEMENTS_INTO_SET, TypeNames.INTO_MAP);
-
-  // TODO(bcorso): Inject this directly into InjectionAnnotations instead of using field injection.
-  @Inject XProcessingEnv processingEnv;
 
   private final AllowsMultibindings allowsMultibindings;
   private final AllowsScoping allowsScoping;
@@ -78,7 +72,7 @@ public abstract class BindingElementValidator<E extends XElement> {
   }
 
   /** Returns a {@link ValidationReport} for {@code element}. */
-  final ValidationReport validate(E element) {
+  public final ValidationReport validate(E element) {
     return reentrantComputeIfAbsent(cache, element, this::validateUncached);
   }
 
@@ -251,10 +245,7 @@ public abstract class BindingElementValidator<E extends XElement> {
         if (setType.isRawType()) {
           report.addError(elementsIntoSetRawSetMessage());
         } else {
-          // TODO(bcorso): Use setType.elementType() once setType is fully converted to XProcessing.
-          // However, currently SetType returns TypeMirror instead of XType and we have no
-          // conversion from TypeMirror to XType, so we just get the type ourselves.
-          checkKeyType(getOnlyElement(type.getTypeArguments()));
+          checkKeyType(setType.elementType());
         }
       }
     }
