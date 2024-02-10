@@ -26,7 +26,8 @@ import dagger.internal.codegen.binding.InjectionAnnotations;
 import java.util.Optional;
 import javax.inject.Inject;
 
-final class BindsInstanceParameterValidator
+/** Validates {@link BindsInstance} usages on factory method parameters. */
+public final class BindsInstanceParameterValidator
     extends BindsInstanceElementValidator<XExecutableParameterElement> {
   @Inject
   BindsInstanceParameterValidator(InjectionAnnotations injectionAnnotations) {
@@ -48,13 +49,13 @@ final class BindsInstanceParameterValidator
 
     @Override
     protected void checkAdditionalProperties() {
-      if (!parameter.getEnclosingMethodElement().isAbstract()) {
+      if (!parameter.getEnclosingElement().isAbstract()) {
         report.addError("@BindsInstance parameters may only be used in abstract methods");
       }
 
       // The above check should rule out constructors since constructors cannot be abstract, so we
       // know the XExecutableElement enclosing the parameter has to be an XMethodElement.
-      XMethodElement method = (XMethodElement) parameter.getEnclosingMethodElement();
+      XMethodElement method = (XMethodElement) parameter.getEnclosingElement();
       if (!(isDeclared(method.getReturnType()) || isTypeVariable(method.getReturnType()))) {
         report.addError(
             "@BindsInstance parameters may not be used in methods with a void, array or primitive "
