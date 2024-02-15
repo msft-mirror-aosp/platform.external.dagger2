@@ -21,19 +21,19 @@ import static javax.tools.Diagnostic.Kind.ERROR;
 
 import dagger.internal.codegen.binding.KeyFactory;
 import dagger.internal.codegen.compileroption.CompilerOptions;
-import dagger.spi.model.Binding;
-import dagger.spi.model.BindingGraph;
-import dagger.spi.model.BindingGraph.MaybeBinding;
-import dagger.spi.model.BindingGraphPlugin;
-import dagger.spi.model.DiagnosticReporter;
-import dagger.spi.model.Key;
+import dagger.internal.codegen.model.Binding;
+import dagger.internal.codegen.model.BindingGraph;
+import dagger.internal.codegen.model.BindingGraph.MaybeBinding;
+import dagger.internal.codegen.model.DiagnosticReporter;
+import dagger.internal.codegen.model.Key;
+import dagger.internal.codegen.validation.ValidationBindingGraphPlugin;
 import javax.inject.Inject;
 
 /**
  * Reports an error on all bindings that depend explicitly on the {@code @Production Executor} key.
  */
 // TODO(dpb,beder): Validate this during @Inject/@Provides/@Produces validation.
-final class DependsOnProductionExecutorValidator implements BindingGraphPlugin {
+final class DependsOnProductionExecutorValidator extends ValidationBindingGraphPlugin {
   private final CompilerOptions compilerOptions;
   private final KeyFactory keyFactory;
 

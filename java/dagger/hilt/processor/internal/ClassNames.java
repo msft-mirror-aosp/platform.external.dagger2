@@ -77,11 +77,13 @@ public final class ClassNames {
       get("dagger", "Binds");
   public static final ClassName BINDS_OPTIONAL_OF =
       get("dagger", "BindsOptionalOf");
+  public static final ClassName MAP_KEY = get("dagger", "MapKey");
   public static final ClassName MODULE = get("dagger", "Module");
   public static final ClassName MULTIBINDS =
       get("dagger.multibindings", "Multibinds");
   public static final ClassName INTO_MAP = get("dagger.multibindings", "IntoMap");
   public static final ClassName INTO_SET = get("dagger.multibindings", "IntoSet");
+  public static final ClassName ELEMENTS_INTO_SET = get("dagger.multibindings", "ElementsIntoSet");
   public static final ClassName STRING_KEY = get("dagger.multibindings", "StringKey");
   public static final ClassName PROVIDES =
       get("dagger", "Provides");

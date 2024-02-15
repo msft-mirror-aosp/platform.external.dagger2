@@ -4,10 +4,17 @@ set -eu
 
 function github-rest-api {
   local GITHUB_REST_API=$1
-
   local GITHUB_API_HEADER_ACCEPT="Accept: application/vnd.github.v3+json"
+  # Grab the GH_TOKEN or else default to an empty string.
+  local GITHUB_TOKEN="${GH_TOKEN:-}"
 
-  curl -s $GITHUB_REST_API -H $GITHUB_API_HEADER_ACCEPT
+  if [ -z "$GITHUB_TOKEN" ]; then
+    curl -s $GITHUB_REST_API -H $GITHUB_API_HEADER_ACCEPT
+  else
+    curl -s $GITHUB_REST_API \
+      -H $GITHUB_API_HEADER_ACCEPT \
+      -H "authorization: Bearer $GITHUB_TOKEN"
+  fi
 }
 
 function github-latest-release-tag {

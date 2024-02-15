@@ -32,9 +32,9 @@ java_library(
         "//java/dagger/internal/codegen/javapoet",
         "//java/dagger/internal/codegen/kotlin",
         "//java/dagger/internal/codegen/langmodel",
+        "//java/dagger/internal/codegen/model",
         "//java/dagger/internal/codegen/xprocessing",
         "//java/dagger/producers",
-        "//java/dagger/spi",
         "//third_party/java/auto:common",
         "//third_party/java/auto:value",
         "//third_party/java/error_prone:annotations",
@@ -43,6 +43,5 @@ java_library(
         "//third_party/java/guava/graph",
         "//third_party/java/guava/util/concurrent",
         "//third_party/java/javapoet",
-        "@maven//:org_jetbrains_kotlin_kotlin_stdlib_jdk8",
     ],
 )

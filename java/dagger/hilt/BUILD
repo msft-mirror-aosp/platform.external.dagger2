@@ -115,11 +115,11 @@ filegroup(
     srcs = glob(["*"]) + [
         "//java/dagger/hilt/codegen:srcs_filegroup",
         "//java/dagger/hilt/components:srcs_filegroup",
-        "//java/dagger/hilt/migration:srcs_filegroup",
         "//java/dagger/hilt/internal:srcs_filegroup",
         "//java/dagger/hilt/internal/aliasof:srcs_filegroup",
         "//java/dagger/hilt/internal/definecomponent:srcs_filegroup",
         "//java/dagger/hilt/internal/generatesrootinput:srcs_filegroup",
+        "//java/dagger/hilt/migration:srcs_filegroup",
     ],
 )
 
@@ -144,7 +144,7 @@ filegroup(
         "//java/dagger/hilt/android/internal/modules:srcs_filegroup",
         "//java/dagger/hilt/android/lifecycle:srcs_filegroup",
         "//java/dagger/hilt/android/migration:srcs_filegroup",
-        "//java/dagger/hilt/android/plugin:srcs_filegroup",
+        "//java/dagger/hilt/android/plugin/main:srcs_filegroup",
         "//java/dagger/hilt/android/qualifiers:srcs_filegroup",
         "//java/dagger/hilt/android/scopes:srcs_filegroup",
     ],
@@ -174,6 +174,7 @@ filegroup(
         "//java/dagger/hilt/processor/internal/definecomponent:srcs_filegroup",
         "//java/dagger/hilt/processor/internal/disableinstallincheck:srcs_filegroup",
         "//java/dagger/hilt/processor/internal/generatesrootinput:srcs_filegroup",
+        "//java/dagger/hilt/processor/internal/optionvalues:srcs_filegroup",
         "//java/dagger/hilt/processor/internal/originatingelement:srcs_filegroup",
         "//java/dagger/hilt/processor/internal/root:srcs_filegroup",
         "//java/dagger/hilt/processor/internal/root/ir:srcs_filegroup",
@@ -232,7 +233,7 @@ gen_maven_artifact(
     ],
     artifact_target_maven_deps_banned = [
         "com.google.guava:guava",
-        "javax.annotation:jsr250-api",
+        "javax.annotation:javax.annotation-api",
     ],
     javadoc_exclude_packages = [
         "dagger.hilt.internal",

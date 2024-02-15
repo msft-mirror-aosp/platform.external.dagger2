@@ -27,6 +27,8 @@ java_plugin(
 java_library(
     name = "processor_lib",
     srcs = [
+        "KspOriginatingElementProcessor.java",
+        "OriginatingElementProcessingStep.java",
         "OriginatingElementProcessor.java",
     ],
     deps = [
@@ -34,10 +36,12 @@ java_library(
         "//java/dagger/hilt/processor/internal:classnames",
         "//java/dagger/hilt/processor/internal:processor_errors",
         "//java/dagger/hilt/processor/internal:processors",
-        "//third_party/java/auto:common",
+        "//java/dagger/internal/codegen/xprocessing",
         "//third_party/java/auto:service",
         "//third_party/java/guava/collect",
         "//third_party/java/incap",
+        "//third_party/java/javapoet",
+        "@maven//:com_google_devtools_ksp_symbol_processing_api",
     ],
 )
 

@@ -17,23 +17,25 @@
 package dagger.internal.codegen.binding;
 
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
-import static dagger.spi.model.BindingKind.COMPONENT_PROVISION;
-import static dagger.spi.model.BindingKind.PROVISION;
+import static dagger.internal.codegen.model.BindingKind.COMPONENT_PROVISION;
+import static dagger.internal.codegen.model.BindingKind.PROVISION;
 
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
+import com.google.errorprone.annotations.CheckReturnValue;
 import dagger.internal.codegen.binding.MembersInjectionBinding.InjectionSite;
 import dagger.internal.codegen.compileroption.CompilerOptions;
-import dagger.spi.model.BindingKind;
-import dagger.spi.model.DependencyRequest;
-import dagger.spi.model.Key;
-import dagger.spi.model.Scope;
+import dagger.internal.codegen.model.BindingKind;
+import dagger.internal.codegen.model.DependencyRequest;
+import dagger.internal.codegen.model.Key;
+import dagger.internal.codegen.model.Scope;
 import java.util.Optional;
 
 /** A value object representing the mechanism by which a {@link Key} can be provided. */
+@CheckReturnValue
 @AutoValue
 public abstract class ProvisionBinding extends ContributionBinding {
 
@@ -80,6 +82,7 @@ public abstract class ProvisionBinding extends ContributionBinding {
 
   public static Builder builder() {
     return new AutoValue_ProvisionBinding.Builder()
+        .nullability(Nullability.NOT_NULLABLE)
         .provisionDependencies(ImmutableSet.of())
         .injectionSites(ImmutableSortedSet.of());
   }
@@ -93,7 +96,7 @@ public abstract class ProvisionBinding extends ContributionBinding {
   public boolean shouldCheckForNull(CompilerOptions compilerOptions) {
     return KINDS_TO_CHECK_FOR_NULL.contains(kind())
         && !contributedPrimitiveType().isPresent()
-        && !nullableType().isPresent()
+        && !isNullable()
         && compilerOptions.doCheckForNulls();
   }
 
@@ -115,10 +118,10 @@ public abstract class ProvisionBinding extends ContributionBinding {
 
   /** A {@link ProvisionBinding} builder. */
   @AutoValue.Builder
-  @CanIgnoreReturnValue
   public abstract static class Builder
       extends ContributionBinding.Builder<ProvisionBinding, Builder> {
 
+    @CanIgnoreReturnValue
     @Override
     public Builder dependencies(Iterable<DependencyRequest> dependencies) {
       return provisionDependencies(dependencies);
@@ -128,6 +131,7 @@ public abstract class ProvisionBinding extends ContributionBinding {
 
     public abstract Builder injectionSites(ImmutableSortedSet<InjectionSite> injectionSites);
 
+    @CanIgnoreReturnValue // TODO(kak): remove this once open-source checkers understand AutoValue
     @Override
     public abstract Builder unresolved(ProvisionBinding unresolved);
 

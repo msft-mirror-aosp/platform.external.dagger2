@@ -16,39 +16,47 @@
 
 package dagger.spi.model;
 
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
-
-import androidx.room.compiler.processing.XType;
-import com.google.auto.common.MoreTypes;
 import com.google.auto.value.AutoValue;
-import com.google.common.base.Equivalence;
-import com.google.common.base.Preconditions;
+import com.google.devtools.ksp.symbol.KSType;
+import javax.annotation.Nullable;
 import javax.lang.model.type.TypeMirror;
 
 /** Wrapper type for a type. */
 @AutoValue
 public abstract class DaggerType {
-  private XType type;
-
-  public static DaggerType from(XType type) {
-    Preconditions.checkNotNull(type);
-    DaggerType daggerType = new AutoValue_DaggerType(MoreTypes.equivalence().wrap(toJavac(type)));
-    daggerType.type = type;
-    return daggerType;
+  public static DaggerType fromJavac(TypeMirror type) {
+    return new AutoValue_DaggerType(type, null);
   }
 
-  abstract Equivalence.Wrapper<TypeMirror> typeMirror();
-
-  public XType xprocessing() {
-    return type;
+  public static DaggerType fromKsp(KSType type) {
+    return new AutoValue_DaggerType(null, type);
   }
 
-  public TypeMirror java() {
-    return toJavac(type);
+  /** Java representation for the type, returns {@code null} not using java annotation processor. */
+  @Nullable
+  public abstract TypeMirror java();
+
+  /** KSP declaration for the type, returns {@code null} not using KSP. */
+  @Nullable
+  public abstract KSType ksp();
+
+  public DaggerProcessingEnv.Backend backend() {
+    if (java() != null) {
+      return DaggerProcessingEnv.Backend.JAVAC;
+    } else if (ksp() != null) {
+      return DaggerProcessingEnv.Backend.KSP;
+    }
+    throw new AssertionError("Unexpected backend");
   }
 
   @Override
   public final String toString() {
-    return type.toString();
+    switch (backend()) {
+      case JAVAC:
+        return java().toString();
+      case KSP:
+        return ksp().toString();
+    }
+    throw new IllegalStateException(String.format("Backend %s not supported yet.", backend()));
   }
 }

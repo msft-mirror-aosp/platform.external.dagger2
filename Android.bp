@@ -83,9 +83,10 @@ java_library {
         "//apex_available:platform",
         "com.android.adservices",
         "com.android.extservices",
-        "com.android.ondevicepersonalization",
-        "com.android.healthfitness",
         "com.android.devicelock",
+        "com.android.healthfitness",
+        "com.android.mediaprovider",
+        "com.android.ondevicepersonalization",
     ],
 
     sdk_version: "core_current",
@@ -147,6 +148,7 @@ java_import_host {
 java_library_host {
     name: "dagger2-compiler-lib",
     use_tools_jar: true,
+    visibility: ["//visibility:public"],
 
     srcs: [
         "java/dagger/internal/codegen/**/*.java",
@@ -155,16 +157,13 @@ java_library_host {
         "java/dagger/model/*.java",
         "java/dagger/spi/*.java",
         "java/dagger/spi/model/*.java",
+        "java/dagger/spi/model/*.kt",
     ],
 
     exclude_srcs: [
         "java/dagger/internal/codegen/BindingGraphStatisticsCollector.java",
         "java/dagger/internal/codegen/kythe/DaggerKythePlugin.java",
     ],
-
-    // Manually include META-INF/services/javax.annotation.processing.Processor
-    // as the AutoService processor doesn't work properly.
-    java_resource_dirs: ["resources"],
 
     static_libs: [
         "auto_common",
@@ -175,9 +174,12 @@ java_library_host {
         "guava",
         "javapoet",
         "jsr330",
+        "kotlin_symbol_processing_api",
         "kotlin-stdlib",
         "kotlin-stdlib-jdk8",
+        "kotlinpoet",
         "kotlinx_metadata_jvm",
+        "kotlin_symbol_processing_api",
     ],
 
 
@@ -259,8 +261,9 @@ java_library {
     ],
     apex_available: [
         "//apex_available:platform",
-        "com.android.ondevicepersonalization",
         "com.android.healthfitness",
+        "com.android.mediaprovider",
+        "com.android.ondevicepersonalization",
     ],
 }
 
@@ -280,6 +283,7 @@ android_library {
         "java/dagger/hilt/android/scopes/*.java",
         "java/dagger/hilt/android/internal/*.java",
         "java/dagger/hilt/android/internal/builders/*.java",
+        "java/dagger/hilt/android/internal/earlyentrypoint/*.java",
         "java/dagger/hilt/android/internal/legacy/*.java",
         "java/dagger/hilt/android/internal/lifecycle/*.java",
         "java/dagger/hilt/android/internal/managers/*.java",
@@ -304,7 +308,7 @@ android_library {
         "hilt_core",
     ],
     sdk_version: "current",
-    min_sdk_version: "14",
+    min_sdk_version: "19",
     plugins: [
         "dagger2-compiler",
         "hilt_android_entry_point_processor",
@@ -330,8 +334,9 @@ android_library {
     ],
     apex_available: [
         "//apex_available:platform",
-        "com.android.ondevicepersonalization",
         "com.android.healthfitness",
+        "com.android.mediaprovider",
+        "com.android.ondevicepersonalization",
     ],
 }
 
@@ -362,7 +367,7 @@ android_library {
         "junit",
     ],
     sdk_version: "current",
-    min_sdk_version: "14",
+    min_sdk_version: "19",
     plugins: [
         "auto_value_plugin",
         "dagger2-compiler",
@@ -481,6 +486,10 @@ java_library_host {
         "java/dagger/hilt/codegen/*.java",
         "java/dagger/hilt/processor/internal/**/*.java",
         "java/dagger/hilt/processor/internal/**/*.kt",
+    ],
+    exclude_srcs: [
+        // Depends on DefineComponentValidationProcessingStep which is not present in github.
+        "java/dagger/hilt/processor/internal/definecomponent/KspDefineComponentValidationProcessor.java",
     ],
     plugins: [
         "auto_service_plugin",

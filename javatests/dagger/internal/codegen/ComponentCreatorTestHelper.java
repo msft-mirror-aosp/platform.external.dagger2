@@ -16,19 +16,17 @@
 
 package dagger.internal.codegen;
 
-import static dagger.internal.codegen.Compilers.compilerWithOptions;
 import static dagger.internal.codegen.base.ComponentCreatorKind.FACTORY;
 import static dagger.internal.codegen.binding.ErrorMessages.creatorMessagesFor;
 import static java.util.stream.Collectors.joining;
 
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
+import androidx.room.compiler.processing.util.Source;
 import dagger.internal.codegen.base.ComponentCreatorAnnotation;
 import dagger.internal.codegen.base.ComponentCreatorKind;
 import dagger.internal.codegen.binding.ErrorMessages;
+import dagger.testing.compile.CompilerTests;
 import java.util.Arrays;
 import java.util.stream.Stream;
-import javax.tools.JavaFileObject;
 
 /**
  * Base class for component creator codegen tests that are written in terms of builders and
@@ -73,20 +71,15 @@ abstract class ComponentCreatorTestHelper {
   }
 
   /**
-   * Returns a Java file with the {@linkplain #process(String...)} processed} versions of the given
-   * lines.
+   * Returns a Java source with the {@linkplain #process(String...)} processed} versions of the
+   * given lines.
    */
-  JavaFileObject preprocessedJavaFile(String fullyQualifiedName, String... lines) {
-    return JavaFileObjects.forSourceString(fullyQualifiedName, process(lines));
+  Source preprocessedJavaSource(String fullyQualifiedName, String... lines) {
+    return CompilerTests.javaSource(fullyQualifiedName, process(lines));
   }
 
   /** Returns a file builder for the current creator kind. */
   JavaFileBuilder javaFileBuilder(String qualifiedName) {
     return new JavaFileBuilder(qualifiedName).withSettings(compilerMode, creatorKind);
-  }
-
-  /** Compiles the given files with the set compiler mode's javacopts. */
-  Compilation compile(JavaFileObject... files) {
-    return compilerWithOptions(compilerMode.javacopts()).compile(files);
   }
 }

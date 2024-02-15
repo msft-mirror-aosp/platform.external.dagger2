@@ -135,4 +135,14 @@ final class JavacPluginCompilerOptions extends CompilerOptions {
   public boolean strictSuperficialValidation() {
     return true;
   }
+
+  @Override
+  public boolean generatedClassExtendsComponent() {
+    return false;
+  }
+
+  @Override
+  public boolean ignoreProvisionKeyWildcards() {
+    return false;
+  }
 }

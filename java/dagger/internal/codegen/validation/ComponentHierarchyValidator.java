@@ -43,7 +43,7 @@ import dagger.internal.codegen.binding.ComponentDescriptor.ComponentMethodDescri
 import dagger.internal.codegen.binding.InjectionAnnotations;
 import dagger.internal.codegen.binding.ModuleDescriptor;
 import dagger.internal.codegen.compileroption.CompilerOptions;
-import dagger.spi.model.Scope;
+import dagger.internal.codegen.model.Scope;
 import java.util.Collection;
 import java.util.Formatter;
 import java.util.Map;
@@ -199,13 +199,16 @@ final class ComponentHierarchyValidator {
     StringBuilder error = new StringBuilder();
     Formatter formatter = new Formatter(error);
 
-    formatter.format("%s repeats @ProducerModules:", componentDescriptor.typeElement());
+    formatter.format(
+        "%s repeats @ProducerModules:", componentDescriptor.typeElement().getQualifiedName());
 
     for (Map.Entry<ComponentDescriptor, Collection<ModuleDescriptor>> entry :
         repeatedModules.asMap().entrySet()) {
-      formatter.format("\n  %s also installs: ", entry.getKey().typeElement());
+      formatter.format("\n  %s also installs: ", entry.getKey().typeElement().getQualifiedName());
       COMMA_SEPARATED_JOINER
-          .appendTo(error, Iterables.transform(entry.getValue(), m -> m.moduleElement()));
+          .appendTo(
+              error,
+              Iterables.transform(entry.getValue(), m -> m.moduleElement().getQualifiedName()));
     }
 
     report.addError(error.toString());

@@ -8,10 +8,9 @@ Dagger is a compile-time framework for dependency injection. It uses no
 reflection or runtime bytecode generation, does all its analysis at
 compile-time, and generates plain Java source code.
 
-Dagger is actively maintained by the same team that works on [Guava]. Snapshot
-releases are auto-deployed to Sonatype's central Maven repository on every clean
-build with the version `HEAD-SNAPSHOT`. The current version builds upon previous
-work done at [Square][square].
+Dagger is actively maintained by Google.  Snapshot releases are auto-deployed to
+Sonatype's central Maven repository on every clean build with the version
+`HEAD-SNAPSHOT`. The current version builds upon previous work done at [Square][square].
 
 ## Documentation
 
@@ -39,8 +38,8 @@ release.
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
-DAGGER_TAG = "2.40.5"
-DAGGER_SHA = "5a6923e56edbc1e34c8089ecab5338a1b8ddb79a3a54b6c86cdcf31212680d32"
+DAGGER_TAG = "2.46.1"
+DAGGER_SHA = "bbd75275faa3186ebaa08e6779dc5410741a940146d43ef532306eb2682c13f7"
 http_archive(
     name = "dagger",
     strip_prefix = "dagger-dagger-%s" % DAGGER_TAG,
@@ -333,7 +332,6 @@ See [the CONTRIBUTING.md docs][Building Dagger].
 [GitHub Issues]: https://github.com/google/dagger/issues
 [gradle-api-implementation]: https://docs.gradle.org/current/userguide/java_library_plugin.html#sec:java_library_separation
 [gradle-api-implementation-android]: https://developer.android.com/studio/build/dependencies#dependency_configurations
-[Guava]: https://github.com/google/guava
 [`kapt`]: https://kotlinlang.org/docs/reference/kapt.html
 [latestapi]: https://dagger.dev/api/latest/
 [mavenbadge-svg]: https://maven-badges.herokuapp.com/maven-central/com.google.dagger/dagger/badge.svg

@@ -24,6 +24,7 @@ import androidx.lifecycle.AbstractSavedStateViewModelFactory;
 import androidx.lifecycle.SavedStateHandle;
 import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.lifecycle.viewmodel.CreationExtras;
 import androidx.savedstate.SavedStateRegistryOwner;
 import dagger.Module;
 import dagger.hilt.EntryPoint;
@@ -70,22 +71,23 @@ public final class HiltViewModelFactory implements ViewModelProvider.Factory {
   private final AbstractSavedStateViewModelFactory hiltViewModelFactory;
 
   public HiltViewModelFactory(
-      @NonNull SavedStateRegistryOwner owner,
-      @Nullable Bundle defaultArgs,
       @NonNull Set<String> hiltViewModelKeys,
       @NonNull ViewModelProvider.Factory delegateFactory,
       @NonNull ViewModelComponentBuilder viewModelComponentBuilder) {
     this.hiltViewModelKeys = hiltViewModelKeys;
     this.delegateFactory = delegateFactory;
     this.hiltViewModelFactory =
-        new AbstractSavedStateViewModelFactory(owner, defaultArgs) {
+        new AbstractSavedStateViewModelFactory() {
           @NonNull
           @Override
           @SuppressWarnings("unchecked")
           protected <T extends ViewModel> T create(
               @NonNull String key, @NonNull Class<T> modelClass, @NonNull SavedStateHandle handle) {
-            ViewModelComponent component =
-                viewModelComponentBuilder.savedStateHandle(handle).build();
+            RetainedLifecycleImpl lifecycle = new RetainedLifecycleImpl();
+            ViewModelComponent component = viewModelComponentBuilder
+                .savedStateHandle(handle)
+                .viewModelLifecycle(lifecycle)
+                .build();
             Provider<? extends ViewModel> provider =
                 EntryPoints.get(component, ViewModelFactoriesEntryPoint.class)
                     .getHiltViewModelMap()
@@ -97,9 +99,22 @@ public final class HiltViewModelFactory implements ViewModelProvider.Factory {
                       + "' to be available in the multi-binding of "
                       + "@HiltViewModelMap but none was found.");
             }
-            return (T) provider.get();
+            ViewModel viewModel = provider.get();
+            viewModel.addCloseable(lifecycle::dispatchOnCleared);
+            return (T) viewModel;
           }
         };
+  }
+
+  @NonNull
+  @Override
+  public <T extends ViewModel> T create(
+      @NonNull Class<T> modelClass, @NonNull CreationExtras extras) {
+    if (hiltViewModelKeys.contains(modelClass.getName())) {
+      return hiltViewModelFactory.create(modelClass, extras);
+    } else {
+      return delegateFactory.create(modelClass, extras);
+    }
   }
 
   @NonNull
@@ -125,11 +140,14 @@ public final class HiltViewModelFactory implements ViewModelProvider.Factory {
       @NonNull SavedStateRegistryOwner owner,
       @Nullable Bundle defaultArgs,
       @NonNull ViewModelProvider.Factory delegateFactory) {
+    return createInternal(activity, delegateFactory);
+  }
+
+  public static ViewModelProvider.Factory createInternal(
+      @NonNull Activity activity, @NonNull ViewModelProvider.Factory delegateFactory) {
     ActivityCreatorEntryPoint entryPoint =
         EntryPoints.get(activity, ActivityCreatorEntryPoint.class);
     return new HiltViewModelFactory(
-        owner,
-        defaultArgs,
         entryPoint.getViewModelKeys(),
         delegateFactory,
         entryPoint.getViewModelComponentBuilder()

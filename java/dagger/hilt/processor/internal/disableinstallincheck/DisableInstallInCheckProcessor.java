@@ -19,32 +19,16 @@ package dagger.hilt.processor.internal.disableinstallincheck;
 import static net.ltgt.gradle.incap.IncrementalAnnotationProcessorType.ISOLATING;
 
 import com.google.auto.service.AutoService;
-import com.google.common.collect.ImmutableSet;
-import dagger.hilt.processor.internal.BaseProcessor;
-import dagger.hilt.processor.internal.ClassNames;
-import dagger.hilt.processor.internal.ProcessorErrors;
-import dagger.hilt.processor.internal.Processors;
+import dagger.hilt.processor.internal.JavacBaseProcessingStepProcessor;
 import javax.annotation.processing.Processor;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.TypeElement;
 import net.ltgt.gradle.incap.IncrementalAnnotationProcessor;
 
 /** Processes the annotations annotated with {@link dagger.hilt.migration.DisableInstallInCheck} */
 @IncrementalAnnotationProcessor(ISOLATING)
 @AutoService(Processor.class)
-public final class DisableInstallInCheckProcessor extends BaseProcessor {
+public final class DisableInstallInCheckProcessor extends JavacBaseProcessingStepProcessor {
   @Override
-  public ImmutableSet<String> getSupportedAnnotationTypes() {
-    return ImmutableSet.of(ClassNames.DISABLE_INSTALL_IN_CHECK.toString());
-  }
-
-  @Override
-  public void processEach(TypeElement annotation, Element element) {
-    ProcessorErrors.checkState(
-        Processors.hasAnnotation(element, ClassNames.MODULE),
-        element,
-        "@DisableInstallInCheck should only be used on modules. However, it was found annotating"
-            + " %s",
-        element);
+  public DisableInstallInCheckProcessingStep processingStep() {
+    return new DisableInstallInCheckProcessingStep(getXProcessingEnv());
   }
 }

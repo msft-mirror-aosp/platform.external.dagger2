@@ -22,6 +22,7 @@ import static dagger.internal.codegen.base.DiagnosticFormatting.stripCommonTypeP
 import static dagger.internal.codegen.xprocessing.XElements.closestEnclosingTypeElement;
 import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
 import static dagger.internal.codegen.xprocessing.XTypes.isDeclared;
+import static java.util.stream.Collectors.joining;
 
 import androidx.room.compiler.processing.XAnnotation;
 import androidx.room.compiler.processing.XExecutableElement;
@@ -32,8 +33,10 @@ import androidx.room.compiler.processing.XMethodType;
 import androidx.room.compiler.processing.XType;
 import androidx.room.compiler.processing.XTypeElement;
 import androidx.room.compiler.processing.XVariableElement;
+import com.squareup.javapoet.ClassName;
 import dagger.internal.codegen.base.Formatter;
 import dagger.internal.codegen.xprocessing.XAnnotations;
+import dagger.internal.codegen.xprocessing.XTypes;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -41,6 +44,9 @@ import javax.inject.Inject;
 
 /** Formats the signature of an {@link XExecutableElement} suitable for use in error messages. */
 public final class MethodSignatureFormatter extends Formatter<XExecutableElement> {
+  private static final ClassName JET_BRAINS_NOT_NULL =
+      ClassName.get("org.jetbrains.annotations", "NotNull");
+
   private final InjectionAnnotations injectionAnnotations;
 
   @Inject
@@ -58,7 +64,10 @@ public final class MethodSignatureFormatter extends Formatter<XExecutableElement
       @Override
       public String format(XMethodElement method) {
         return MethodSignatureFormatter.this.format(
-            method, method.asMemberOf(type), closestEnclosingTypeElement(method));
+            method,
+            method.asMemberOf(type),
+            closestEnclosingTypeElement(method),
+            /* includeReturnType= */ true);
       }
     };
   }
@@ -73,34 +82,47 @@ public final class MethodSignatureFormatter extends Formatter<XExecutableElement
    * present.
    */
   public String format(XExecutableElement method, Optional<XType> container) {
-    return container.isPresent()
-        ? format(method, method.asMemberOf(container.get()), container.get().getTypeElement())
-        : format(method, method.getExecutableType(), closestEnclosingTypeElement(method));
+    return format(method, container, /* includeReturnType= */ true);
   }
 
   private String format(
-      XExecutableElement method, XExecutableType methodType, XTypeElement container) {
+      XExecutableElement method, Optional<XType> container, boolean includeReturnType) {
+    return container.isPresent()
+        ? format(
+            method,
+            method.asMemberOf(container.get()),
+            container.get().getTypeElement(),
+            includeReturnType)
+        : format(
+            method,
+            method.getExecutableType(),
+            closestEnclosingTypeElement(method),
+            includeReturnType);
+  }
+
+  private String format(
+      XExecutableElement method,
+      XExecutableType methodType,
+      XTypeElement container,
+      boolean includeReturnType) {
     StringBuilder builder = new StringBuilder();
     List<XAnnotation> annotations = method.getAllAnnotations();
     if (!annotations.isEmpty()) {
-      Iterator<XAnnotation> annotationIterator = annotations.iterator();
-      for (int i = 0; annotationIterator.hasNext(); i++) {
-        if (i > 0) {
-          builder.append(' ');
-        }
-        builder.append(formatAnnotation(annotationIterator.next()));
-      }
-      builder.append(' ');
+      builder.append(
+          annotations.stream()
+              // Filter out @NotNull annotations added by KAPT to make error messages consistent
+              .filter(annotation -> !annotation.getClassName().equals(JET_BRAINS_NOT_NULL))
+              .map(MethodSignatureFormatter::formatAnnotation)
+              .collect(joining(" ")))
+          .append(" ");
     }
     if (getSimpleName(method).contentEquals("<init>")) {
       builder.append(container.getQualifiedName());
     } else {
-      builder
-          .append(nameOfType(((XMethodType) methodType).getReturnType()))
-          .append(' ')
-          .append(container.getQualifiedName())
-          .append('.')
-          .append(getSimpleName(method));
+      if (includeReturnType) {
+        builder.append(nameOfType(((XMethodType) methodType).getReturnType())).append(' ');
+      }
+      builder.append(container.getQualifiedName()).append('.').append(getSimpleName(method));
     }
     builder.append('(');
     checkState(method.getParameters().size() == methodType.getParameterTypes().size());
@@ -116,6 +138,10 @@ public final class MethodSignatureFormatter extends Formatter<XExecutableElement
     return builder.toString();
   }
 
+  public String formatWithoutReturnType(XExecutableElement method) {
+    return format(method, Optional.empty(), /* includeReturnType= */ false);
+  }
+
   private void appendParameter(
       StringBuilder builder, XVariableElement parameter, XType parameterType) {
     injectionAnnotations
@@ -125,7 +151,7 @@ public final class MethodSignatureFormatter extends Formatter<XExecutableElement
   }
 
   private static String nameOfType(XType type) {
-    return stripCommonTypePrefixes(type.toString());
+    return stripCommonTypePrefixes(XTypes.toStableString(type));
   }
 
   private static String formatAnnotation(XAnnotation annotation) {

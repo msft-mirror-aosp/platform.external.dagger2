@@ -16,12 +16,8 @@
 
 package dagger.internal.codegen;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static dagger.internal.codegen.Compilers.daggerCompiler;
-
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
-import javax.tools.JavaFileObject;
+import androidx.room.compiler.processing.util.Source;
+import dagger.testing.compile.CompilerTests;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -34,8 +30,8 @@ import org.junit.runners.JUnit4;
 public class MembersInjectionValidationTest {
   @Test
   public void membersInjectDependsOnUnboundedType() {
-    JavaFileObject injectsUnboundedType =
-        JavaFileObjects.forSourceLines(
+    Source injectsUnboundedType =
+        CompilerTests.javaSource(
             "test.InjectsUnboundedType",
             "package test;",
             "",
@@ -47,20 +43,22 @@ public class MembersInjectionValidationTest {
             "  @Inject MembersInjector<ArrayList<?>> listInjector;",
             "}");
 
-    Compilation compilation = daggerCompiler().compile(injectsUnboundedType);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining(
-            "Cannot inject members into types with unbounded type arguments: "
-                + "java.util.ArrayList<?>")
-        .inFile(injectsUnboundedType)
-        .onLineContaining("@Inject MembersInjector<ArrayList<?>> listInjector;");
+    CompilerTests.daggerCompiler(injectsUnboundedType)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(
+                      "Cannot inject members into types with unbounded type arguments: "
+                          + "java.util.ArrayList<?>")
+                  .onSource(injectsUnboundedType)
+                  .onLineContaining("@Inject MembersInjector<ArrayList<?>> listInjector;");
+            });
   }
 
   @Test
   public void membersInjectPrimitive() {
-    JavaFileObject component =
-        JavaFileObjects.forSourceLines(
+    Source component =
+        CompilerTests.javaSource(
             "test.TestComponent",
             "package test;",
             "",
@@ -70,18 +68,20 @@ public class MembersInjectionValidationTest {
             "interface TestComponent {",
             "  void inject(int primitive);",
             "}");
-    Compilation compilation = daggerCompiler().compile(component);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining("Cannot inject members into int")
-        .inFile(component)
-        .onLineContaining("void inject(int primitive);");
+    CompilerTests.daggerCompiler(component)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining("Cannot inject members into int")
+                  .onSource(component)
+                  .onLineContaining("void inject(int primitive);");
+            });
   }
 
   @Test
   public void membersInjectArray() {
-    JavaFileObject component =
-        JavaFileObjects.forSourceLines(
+    Source component =
+        CompilerTests.javaSource(
             "test.TestComponent",
             "package test;",
             "",
@@ -91,18 +91,20 @@ public class MembersInjectionValidationTest {
             "interface TestComponent {",
             "  void inject(Object[] array);",
             "}");
-    Compilation compilation = daggerCompiler().compile(component);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining("Cannot inject members into java.lang.Object[]")
-        .inFile(component)
-        .onLineContaining("void inject(Object[] array);");
+    CompilerTests.daggerCompiler(component)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining("Cannot inject members into java.lang.Object[]")
+                  .onSource(component)
+                  .onLineContaining("void inject(Object[] array);");
+            });
   }
 
   @Test
   public void membersInjectorOfArray() {
-    JavaFileObject component =
-        JavaFileObjects.forSourceLines(
+    Source component =
+        CompilerTests.javaSource(
             "test.TestComponent",
             "package test;",
             "",
@@ -113,18 +115,20 @@ public class MembersInjectionValidationTest {
             "interface TestComponent {",
             "  MembersInjector<Object[]> objectArrayInjector();",
             "}");
-    Compilation compilation = daggerCompiler().compile(component);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining("Cannot inject members into java.lang.Object[]")
-        .inFile(component)
-        .onLineContaining("objectArrayInjector();");
+    CompilerTests.daggerCompiler(component)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining("Cannot inject members into java.lang.Object[]")
+                  .onSource(component)
+                  .onLineContaining("objectArrayInjector();");
+            });
   }
 
   @Test
   public void membersInjectRawType() {
-    JavaFileObject component =
-        JavaFileObjects.forSourceLines(
+    Source component =
+        CompilerTests.javaSource(
             "test.TestComponent",
             "package test;",
             "",
@@ -135,15 +139,18 @@ public class MembersInjectionValidationTest {
             "interface TestComponent {",
             "  void inject(Set rawSet);",
             "}");
-    Compilation compilation = daggerCompiler().compile(component);
-    assertThat(compilation).failed();
-    assertThat(compilation).hadErrorContaining("Cannot inject members into raw type java.util.Set");
+    CompilerTests.daggerCompiler(component)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining("Cannot inject members into raw type java.util.Set");
+            });
   }
 
   @Test
   public void qualifiedMembersInjector() {
-    JavaFileObject component =
-        JavaFileObjects.forSourceLines(
+    Source component =
+        CompilerTests.javaSource(
             "test.TestComponent",
             "package test;",
             "",
@@ -155,18 +162,20 @@ public class MembersInjectionValidationTest {
             "interface TestComponent {",
             "  @Named(\"foo\") MembersInjector<Object> objectInjector();",
             "}");
-    Compilation compilation = daggerCompiler().compile(component);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining("Cannot inject members into qualified types")
-        .inFile(component)
-        .onLineContaining("objectInjector();");
+    CompilerTests.daggerCompiler(component)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining("Cannot inject members into qualified types")
+                  .onSource(component)
+                  .onLineContaining("objectInjector();");
+            });
   }
 
   @Test
   public void qualifiedMembersInjectionMethod() {
-    JavaFileObject component =
-        JavaFileObjects.forSourceLines(
+    Source component =
+        CompilerTests.javaSource(
             "test.TestComponent",
             "package test;",
             "",
@@ -178,18 +187,20 @@ public class MembersInjectionValidationTest {
             "interface TestComponent {",
             "  @Named(\"foo\") void injectObject(Object object);",
             "}");
-    Compilation compilation = daggerCompiler().compile(component);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining("Cannot inject members into qualified types")
-        .inFile(component)
-        .onLineContaining("injectObject(Object object);");
+    CompilerTests.daggerCompiler(component)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining("Cannot inject members into qualified types")
+                  .onSource(component)
+                  .onLineContaining("injectObject(Object object);");
+            });
   }
 
   @Test
   public void qualifiedMembersInjectionMethodParameter() {
-    JavaFileObject component =
-        JavaFileObjects.forSourceLines(
+    Source component =
+        CompilerTests.javaSource(
             "test.TestComponent",
             "package test;",
             "",
@@ -201,18 +212,20 @@ public class MembersInjectionValidationTest {
             "interface TestComponent {",
             "  void injectObject(@Named(\"foo\") Object object);",
             "}");
-    Compilation compilation = daggerCompiler().compile(component);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining("Cannot inject members into qualified types")
-        .inFile(component)
-        .onLineContaining("injectObject(@Named(\"foo\") Object object);");
+    CompilerTests.daggerCompiler(component)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining("Cannot inject members into qualified types")
+                  .onSource(component)
+                  .onLineContaining("injectObject(@Named(\"foo\") Object object);");
+            });
   }
 
   @Test
   public void staticFieldInjection() {
-    JavaFileObject injected =
-        JavaFileObjects.forSourceLines(
+    Source injected =
+        CompilerTests.javaSource(
             "test.Injected",
             "package test;",
             "",
@@ -221,8 +234,8 @@ public class MembersInjectionValidationTest {
             "final class Injected {",
             "  @Inject static Object object;",
             "}");
-    JavaFileObject component =
-        JavaFileObjects.forSourceLines(
+    Source component =
+        CompilerTests.javaSource(
             "test.TestComponent",
             "package test;",
             "",
@@ -232,15 +245,23 @@ public class MembersInjectionValidationTest {
             "interface TestComponent {",
             "  void inject(Injected injected);",
             "}");
-    Compilation compilation = daggerCompiler().compile(injected, component);
-    assertThat(compilation).failed();
-    assertThat(compilation).hadErrorContaining("static fields").inFile(injected).onLine(6);
+    CompilerTests.daggerCompiler(injected, component)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(2);
+              subject.hasErrorContaining("static fields")
+                  .onSource(injected)
+                  .onLine(6);
+              subject.hasErrorContaining(
+                  "Injected cannot be provided without an @Inject constructor or an "
+                      + "@Provides-annotated method.");
+            });
   }
 
   @Test
   public void missingMembersInjectorForKotlinProperty() {
-    JavaFileObject component =
-        JavaFileObjects.forSourceLines(
+    Source component =
+        CompilerTests.javaSource(
             "test.TestComponent",
             "package test;",
             "",
@@ -251,8 +272,8 @@ public class MembersInjectionValidationTest {
             "interface TestComponent {",
             "  void inject(KotlinInjectedQualifier injected);",
             "}");
-    JavaFileObject module =
-        JavaFileObjects.forSourceLines(
+    Source module =
+        CompilerTests.javaSource(
             "test.TestModule",
             "package test;",
             "",
@@ -266,16 +287,28 @@ public class MembersInjectionValidationTest {
             "  @Named(\"TheString\")",
             "  String theString() { return \"\"; }",
             "}");
-    Compilation compilation = daggerCompiler().compile(component, module);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining("Unable to read annotations on an injected Kotlin property.");
+    CompilerTests.daggerCompiler(component, module)
+        .compile(
+            subject -> {
+              switch (CompilerTests.backend(subject)) {
+                case KSP:
+                  // KSP works fine in this case so we shouldn't expect any errors here.
+                  subject.hasErrorCount(0);
+                  break;
+                case JAVAC:
+                  subject.hasErrorCount(2);
+                  subject.hasErrorContaining(
+                      "Unable to read annotations on an injected Kotlin property.");
+                  subject.hasErrorContaining("KotlinInjectedQualifier cannot be provided");
+                  break;
+              }
+            });
   }
 
   @Test
   public void memberInjectionForKotlinObjectFails() {
-    JavaFileObject component =
-        JavaFileObjects.forSourceLines(
+    Source component =
+        CompilerTests.javaSource(
             "test.TestComponent",
             "package test;",
             "",
@@ -286,16 +319,28 @@ public class MembersInjectionValidationTest {
             "interface TestComponent {",
             "  void inject(KotlinObjectWithMemberInjection injected);",
             "}");
-    Compilation compilation = daggerCompiler().compile(component, testModule);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining("Dagger does not support injection into Kotlin objects");
+    CompilerTests.daggerCompiler(component, testModule)
+        .compile(
+            subject -> {
+              switch (CompilerTests.backend(subject)) {
+                case KSP:
+                  subject.hasErrorCount(2);
+                  break;
+                case JAVAC:
+                  subject.hasErrorCount(3);
+                  subject.hasErrorContaining(
+                      "Dagger does not support injection into static fields");
+                  break;
+              }
+              subject.hasErrorContaining("Dagger does not support injection into Kotlin objects");
+              subject.hasErrorContaining("KotlinObjectWithMemberInjection cannot be provided");
+            });
   }
 
   @Test
   public void setterMemberInjectionForKotlinObjectFails() {
-    JavaFileObject component =
-        JavaFileObjects.forSourceLines(
+    Source component =
+        CompilerTests.javaSource(
             "test.TestComponent",
             "package test;",
             "",
@@ -306,16 +351,21 @@ public class MembersInjectionValidationTest {
             "interface TestComponent {",
             "  void inject(KotlinObjectWithSetterMemberInjection injected);",
             "}");
-    Compilation compilation = daggerCompiler().compile(component, testModule);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining("Dagger does not support injection into Kotlin objects");
+    CompilerTests.daggerCompiler(component, testModule)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(2);
+              subject.hasErrorContaining("Dagger does not support injection into Kotlin objects");
+              subject.hasErrorContaining(
+                  "KotlinObjectWithSetterMemberInjection cannot be provided without an "
+                      + "@Provides-annotated method.");
+            });
   }
 
   @Test
   public void memberInjectionForKotlinClassWithCompanionObjectFails() {
-    JavaFileObject component =
-        JavaFileObjects.forSourceLines(
+    Source component =
+        CompilerTests.javaSource(
             "test.TestComponent",
             "package test;",
             "",
@@ -327,16 +377,29 @@ public class MembersInjectionValidationTest {
             "  void inject(KotlinClassWithMemberInjectedCompanion injected);",
             "  void injectCompanion(KotlinClassWithMemberInjectedCompanion.Companion injected);",
             "}");
-    Compilation compilation = daggerCompiler().compile(component, testModule);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining("Dagger does not support injection into static fields");
+    CompilerTests.daggerCompiler(component, testModule)
+        .compile(
+            subject -> {
+              switch (CompilerTests.backend(subject)) {
+                case KSP:
+                  subject.hasErrorCount(4);
+                  subject.hasErrorContaining(
+                      "Dagger does not support injection into Kotlin objects");
+                  break;
+                case JAVAC:
+                  subject.hasErrorCount(2);
+                  break;
+              }
+              subject.hasErrorContaining("Dagger does not support injection into static fields");
+              subject.hasErrorContaining(
+                  "KotlinClassWithMemberInjectedCompanion cannot be provided");
+            });
   }
 
   @Test
   public void setterMemberInjectionForKotlinClassWithCompanionObjectFails() {
-    JavaFileObject component =
-        JavaFileObjects.forSourceLines(
+    Source component =
+        CompilerTests.javaSource(
             "test.TestComponent",
             "package test;",
             "",
@@ -347,16 +410,30 @@ public class MembersInjectionValidationTest {
             "interface TestComponent {",
             "  void inject(KotlinClassWithSetterMemberInjectedCompanion.Companion injected);",
             "}");
-    Compilation compilation = daggerCompiler().compile(component, testModule);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining("Dagger does not support injection into Kotlin objects");
+    CompilerTests.daggerCompiler(component, testModule)
+        .compile(
+            subject -> {
+              switch (CompilerTests.backend(subject)) {
+                case KSP:
+                  // TODO(b/268257007): The KSP results should match KAPT once this bug is fixed.
+                  subject.hasErrorCount(3);
+                  subject.hasErrorContaining(
+                      "Dagger does not support injection into static methods");
+                  break;
+                case JAVAC:
+                  subject.hasErrorCount(2);
+                  break;
+              }
+              subject.hasErrorContaining("Dagger does not support injection into Kotlin objects");
+              subject.hasErrorContaining(
+                  "KotlinClassWithSetterMemberInjectedCompanion.Companion cannot be provided");
+            });
   }
 
   @Test
   public void memberInjectionForKotlinClassWithNamedCompanionObjectFails() {
-    JavaFileObject component =
-        JavaFileObjects.forSourceLines(
+    Source component =
+        CompilerTests.javaSource(
             "test.TestComponent",
             "package test;",
             "",
@@ -369,16 +446,29 @@ public class MembersInjectionValidationTest {
             "  void injectCompanion(KotlinClassWithMemberInjectedNamedCompanion.TheCompanion"
                 + " injected);",
             "}");
-    Compilation compilation = daggerCompiler().compile(component, testModule);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining("Dagger does not support injection into static fields");
+    CompilerTests.daggerCompiler(component, testModule)
+        .compile(
+            subject -> {
+              switch (CompilerTests.backend(subject)) {
+                case KSP:
+                  subject.hasErrorCount(4);
+                  subject.hasErrorContaining(
+                      "Dagger does not support injection into Kotlin objects");
+                  break;
+                case JAVAC:
+                  subject.hasErrorCount(2);
+                  break;
+              }
+              subject.hasErrorContaining("Dagger does not support injection into static fields");
+              subject.hasErrorContaining(
+                  "KotlinClassWithMemberInjectedNamedCompanion cannot be provided");
+            });
   }
 
   @Test
   public void setterMemberInjectionForKotlinClassWithNamedCompanionObjectFails() {
-    JavaFileObject component =
-        JavaFileObjects.forSourceLines(
+    Source component =
+        CompilerTests.javaSource(
             "test.TestComponent",
             "package test;",
             "",
@@ -390,14 +480,29 @@ public class MembersInjectionValidationTest {
             "  void inject(",
             "      KotlinClassWithSetterMemberInjectedNamedCompanion.TheCompanion injected);",
             "}");
-    Compilation compilation = daggerCompiler().compile(component, testModule);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining("Dagger does not support injection into Kotlin objects");
+    CompilerTests.daggerCompiler(component, testModule)
+        .compile(
+            subject -> {
+              switch (CompilerTests.backend(subject)) {
+                case KSP:
+                  // TODO(b/268257007): The KSP results should match KAPT once this bug is fixed.
+                  subject.hasErrorCount(3);
+                  subject.hasErrorContaining(
+                      "Dagger does not support injection into static methods");
+                  break;
+                case JAVAC:
+                  subject.hasErrorCount(2);
+                  break;
+              }
+              subject.hasErrorContaining("Dagger does not support injection into Kotlin objects");
+              subject.hasErrorContaining(
+                  "KotlinClassWithSetterMemberInjectedNamedCompanion.TheCompanion "
+                      + "cannot be provided");
+            });
   }
 
-  private final JavaFileObject testModule =
-      JavaFileObjects.forSourceLines(
+  private final Source testModule =
+        CompilerTests.javaSource(
           "test.TestModule",
           "package test;",
           "",

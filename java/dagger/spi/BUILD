@@ -58,12 +58,10 @@ gen_maven_artifact(
     artifact_target = ":spi",
     artifact_target_libs = [
         "//java/dagger/internal/codegen/extension",
-        "//java/dagger/internal/codegen/xprocessing",
         "//java/dagger/model",
         "//java/dagger/spi/model",
     ],
     artifact_target_maven_deps = [
-        "com.google.auto:auto-common",
         "com.google.code.findbugs:jsr305",
         "com.google.dagger:dagger-producers",
         "com.google.dagger:dagger",
@@ -72,8 +70,6 @@ gen_maven_artifact(
         "com.google.guava:guava",
         "com.squareup:javapoet",
         "javax.inject:javax.inject",
-        "org.jetbrains.kotlin:kotlin-stdlib",
-        "org.jetbrains.kotlin:kotlin-stdlib-jdk8",
     ],
     javadoc_root_packages = [
         "dagger.model",
@@ -85,6 +81,7 @@ gen_maven_artifact(
     # util/deploy-dagger.sh
     shaded_deps = [
         "//third_party/java/auto:common",
+        "@maven//:org_jetbrains_kotlinx_kotlinx_metadata_jvm",
         "//java/dagger/internal/codegen/xprocessing:xprocessing-jar",
     ],
 )

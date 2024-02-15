@@ -29,7 +29,9 @@ import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompil
 import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.FAST_INIT;
 import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.FLOATING_BINDS_METHODS;
 import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.FORMAT_GENERATED_SOURCE;
+import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.GENERATED_CLASS_EXTENDS_COMPONENT;
 import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.IGNORE_PRIVATE_AND_STATIC_INJECTION_FOR_COMPONENT;
+import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.IGNORE_PROVISION_KEY_WILDCARDS;
 import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.INCLUDE_STACKTRACE_WITH_DEFERRED_ERROR_MESSAGES;
 import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.PLUGINS_VISIT_FULL_BINDING_GRAPHS;
 import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.STRICT_MULTIBINDING_VALIDATION;
@@ -54,13 +56,13 @@ import static java.util.stream.Collectors.joining;
 import static java.util.stream.Stream.concat;
 
 import androidx.room.compiler.processing.XMessager;
+import androidx.room.compiler.processing.XProcessingEnv;
 import androidx.room.compiler.processing.XTypeElement;
 import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.internal.codegen.langmodel.DaggerElements;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -76,25 +78,27 @@ public final class ProcessingEnvironmentCompilerOptions extends CompilerOptions 
   // EnumOption<T> doesn't support integer inputs so just doing this as a 1-off for now.
   private static final String KEYS_PER_COMPONENT_SHARD = "dagger.keysPerComponentShard";
 
+  private final XProcessingEnv processingEnv;
   private final XMessager messager;
   private final Map<String, String> options;
-  private final DaggerElements elements;
   private final Map<EnumOption<?>, Object> enumOptions = new HashMap<>();
   private final Map<EnumOption<?>, ImmutableMap<String, ? extends Enum<?>>> allCommandLineOptions =
       new HashMap<>();
 
   @Inject
   ProcessingEnvironmentCompilerOptions(
-      XMessager messager, @ProcessingOptions Map<String, String> options, DaggerElements elements) {
+      XProcessingEnv processingEnv,
+      XMessager messager,
+      @ProcessingOptions Map<String, String> options) {
+    this.processingEnv = processingEnv;
     this.messager = messager;
     this.options = options;
-    this.elements = elements;
     checkValid();
   }
 
   @Override
   public boolean usesProducers() {
-    return elements.getTypeElement(TypeNames.PRODUCES) != null;
+    return processingEnv.findTypeElement(TypeNames.PRODUCES) != null;
   }
 
   @Override
@@ -210,6 +214,11 @@ public final class ProcessingEnvironmentCompilerOptions extends CompilerOptions 
   }
 
   @Override
+  public boolean ignoreProvisionKeyWildcards() {
+    return isEnabled(IGNORE_PROVISION_KEY_WILDCARDS);
+  }
+
+  @Override
   public boolean strictMultibindingValidation() {
     return isEnabled(STRICT_MULTIBINDING_VALIDATION);
   }
@@ -217,6 +226,11 @@ public final class ProcessingEnvironmentCompilerOptions extends CompilerOptions 
   @Override
   public boolean strictSuperficialValidation() {
     return isEnabled(STRICT_SUPERFICIAL_VALIDATION);
+  }
+
+  @Override
+  public boolean generatedClassExtendsComponent() {
+    return isEnabled(GENERATED_CLASS_EXTENDS_COMPONENT);
   }
 
   @Override
@@ -342,6 +356,10 @@ public final class ProcessingEnvironmentCompilerOptions extends CompilerOptions 
     STRICT_MULTIBINDING_VALIDATION,
 
     STRICT_SUPERFICIAL_VALIDATION(ENABLED),
+
+    GENERATED_CLASS_EXTENDS_COMPONENT,
+
+    IGNORE_PROVISION_KEY_WILDCARDS,
 
     VALIDATE_TRANSITIVE_COMPONENT_DEPENDENCIES(ENABLED)
     ;

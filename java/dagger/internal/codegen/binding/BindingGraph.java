@@ -27,6 +27,7 @@ import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
 
 import androidx.room.compiler.processing.XExecutableElement;
 import androidx.room.compiler.processing.XExecutableParameterElement;
+import androidx.room.compiler.processing.XMethodElement;
 import androidx.room.compiler.processing.XTypeElement;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
@@ -41,15 +42,15 @@ import com.google.common.collect.Sets;
 import com.google.common.graph.ImmutableNetwork;
 import com.google.common.graph.Traverser;
 import dagger.internal.codegen.base.TarjanSCCs;
-import dagger.spi.model.BindingGraph.ChildFactoryMethodEdge;
-import dagger.spi.model.BindingGraph.ComponentNode;
-import dagger.spi.model.BindingGraph.DependencyEdge;
-import dagger.spi.model.BindingGraph.Edge;
-import dagger.spi.model.BindingGraph.Node;
-import dagger.spi.model.ComponentPath;
-import dagger.spi.model.DaggerTypeElement;
-import dagger.spi.model.DependencyRequest;
-import dagger.spi.model.Key;
+import dagger.internal.codegen.model.BindingGraph.ChildFactoryMethodEdge;
+import dagger.internal.codegen.model.BindingGraph.ComponentNode;
+import dagger.internal.codegen.model.BindingGraph.DependencyEdge;
+import dagger.internal.codegen.model.BindingGraph.Edge;
+import dagger.internal.codegen.model.BindingGraph.Node;
+import dagger.internal.codegen.model.ComponentPath;
+import dagger.internal.codegen.model.DaggerTypeElement;
+import dagger.internal.codegen.model.DependencyRequest;
+import dagger.internal.codegen.model.Key;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -70,7 +71,8 @@ public abstract class BindingGraph {
    * their bindings.
    */
   @AutoValue
-  public abstract static class TopLevelBindingGraph extends dagger.spi.model.BindingGraph {
+  public abstract static class TopLevelBindingGraph
+      extends dagger.internal.codegen.model.BindingGraph {
     static TopLevelBindingGraph create(
         ImmutableNetwork<Node, Edge> network, boolean isFullBindingGraph) {
       TopLevelBindingGraph topLevelBindingGraph =
@@ -105,7 +107,8 @@ public abstract class BindingGraph {
 
     TopLevelBindingGraph() {}
 
-    // This overrides dagger.spi.model.BindingGraph with a more efficient implementation.
+    // This overrides dagger.internal.codegen.model.BindingGraph with a more efficient
+    // implementation.
     @Override
     public Optional<ComponentNode> componentNode(ComponentPath componentPath) {
       return componentNodes.containsKey(componentPath)
@@ -161,9 +164,10 @@ public abstract class BindingGraph {
     }
 
     private static ImmutableSet<Binding> frameworkRequestBindingSet(
-        ImmutableNetwork<Node, Edge> network, ImmutableSet<dagger.spi.model.Binding> bindings) {
+        ImmutableNetwork<Node, Edge> network,
+        ImmutableSet<dagger.internal.codegen.model.Binding> bindings) {
       Set<Binding> frameworkRequestBindings = new HashSet<>();
-      for (dagger.spi.model.Binding binding : bindings) {
+      for (dagger.internal.codegen.model.Binding binding : bindings) {
         ImmutableList<DependencyEdge> edges =
             network.inEdges(binding).stream()
                 .flatMap(instancesOf(DependencyEdge.class))
@@ -351,10 +355,13 @@ public abstract class BindingGraph {
    * </code></pre>
    */
   // TODO(b/73294201): Consider returning the resolved ExecutableType for the factory method.
-  public final Optional<XExecutableElement> factoryMethod() {
+  public final Optional<XMethodElement> factoryMethod() {
     return topLevelBindingGraph().network().inEdges(componentNode()).stream()
         .filter(edge -> edge instanceof ChildFactoryMethodEdge)
         .map(edge -> ((ChildFactoryMethodEdge) edge).factoryMethod().xprocessing())
+        // Factory methods are represented by XMethodElement (rather than XConstructorElement)
+        // TODO(bcorso): consider adding DaggerMethodElement so this cast isn't needed.
+        .map(XMethodElement.class::cast)
         .collect(toOptional());
   }
 
