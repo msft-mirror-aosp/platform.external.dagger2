@@ -17,8 +17,8 @@
 
 load(
     "//:build_defs.bzl",
+    "JAVA_RELEASE_MIN",
     "POM_VERSION",
-    "SOURCE_7_TARGET_7",
 )
 load("//tools:dejetify.bzl", "dejetified_library")
 load("//tools:maven.bzl", "pom_file")
@@ -34,7 +34,7 @@ filegroup(
 android_library(
     name = "support",
     srcs = glob(["*.java"]),
-    javacopts = SOURCE_7_TARGET_7,
+    javacopts = JAVA_RELEASE_MIN,
     manifest = "AndroidManifest.xml",
     tags = ["maven_coordinates=com.google.dagger:dagger-android-support:" + POM_VERSION],
     deps = [
@@ -89,7 +89,7 @@ pom_file(
 javadoc_library(
     name = "support-javadoc",
     srcs = [":support-srcs"],
-    android_api_level = 30,
+    android_api_level = 32,
     root_packages = ["dagger.android.support"],
     deps = [":support"],
 )
