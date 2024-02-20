@@ -35,10 +35,10 @@ import dagger.hilt.android.processor.internal.AndroidClassNames;
 import dagger.hilt.processor.internal.BadInputException;
 import dagger.hilt.processor.internal.ClassNames;
 import dagger.hilt.processor.internal.Components;
-import dagger.hilt.processor.internal.KotlinMetadataUtils;
 import dagger.hilt.processor.internal.ProcessorErrors;
 import dagger.hilt.processor.internal.Processors;
-import dagger.internal.codegen.kotlin.KotlinMetadataUtil;
+import dagger.hilt.processor.internal.kotlin.KotlinMetadataUtil;
+import dagger.hilt.processor.internal.kotlin.KotlinMetadataUtils;
 import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -270,7 +270,7 @@ public abstract class AndroidEntryPointMetadata {
           !MoreTypes.isTypeOf(Void.class, baseElement.asType()),
           androidEntryPointElement,
           "Expected @%s to have a value."
-          + " Did you forget to apply the Gradle Plugin? (dagger.hilt.android.plugin)\n"
+          + " Did you forget to apply the Gradle Plugin? (com.google.dagger.hilt.android)\n"
           + "See https://dagger.dev/hilt/gradle-setup.html" ,
           annotationClassName.simpleName());
 
@@ -438,10 +438,6 @@ public abstract class AndroidEntryPointMetadata {
       this.componentManagerInitArgs = componentManagerInitArgs;
     }
 
-    AndroidType androidType() {
-      return androidType;
-    }
-
     private static Type of(TypeElement element, TypeElement baseElement) {
       if (Processors.hasAnnotation(element, AndroidClassNames.HILT_ANDROID_APP)) {
         return forHiltAndroidApp(element, baseElement);
@@ -499,8 +495,7 @@ public abstract class AndroidEntryPointMetadata {
         baseMetadata.allowsOptionalInjection()
             || !Processors.hasAnnotation(element, AndroidClassNames.OPTIONAL_INJECT),
         element,
-        "@OptionalInject Hilt class cannot extend from a non-optional @AndroidEntryPoint "
-            + "base: %s",
+        "@OptionalInject Hilt class cannot extend from a non-optional @AndroidEntryPoint base: %s",
         element);
   }
 
@@ -513,9 +508,8 @@ public abstract class AndroidEntryPointMetadata {
         element,
         isBaseAnnotated
             ? "Classes that extend an @%1$s base class must also be annotated @%1$s"
-                : "Classes that extend a @AndroidEntryPoint base class must not use @%1$s when the "
-                    + "base class "
-                + "does not use @%1$s",
+            : "Classes that extend a @AndroidEntryPoint base class must not use @%1$s when the "
+                + "base class does not use @%1$s",
         annotationName.simpleName());
   }
 }
