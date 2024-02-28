@@ -16,16 +16,12 @@
 
 package dagger.internal.codegen;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static dagger.internal.codegen.CompilerMode.DEFAULT_MODE;
-import static dagger.internal.codegen.CompilerMode.FAST_INIT_MODE;
-import static dagger.internal.codegen.Compilers.compilerWithOptions;
-import static dagger.internal.codegen.Compilers.daggerCompiler;
-
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
+import androidx.room.compiler.processing.util.Source;
+import com.google.common.collect.ImmutableMap;
+import dagger.testing.compile.CompilerTests;
+import dagger.testing.golden.GoldenFileRule;
 import java.util.Collection;
-import javax.tools.JavaFileObject;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -38,6 +34,8 @@ public class ProductionComponentProcessorTest {
     return CompilerMode.TEST_PARAMETERS;
   }
 
+  @Rule public GoldenFileRule goldenFileRule = new GoldenFileRule();
+
   private final CompilerMode compilerMode;
 
   public ProductionComponentProcessorTest(CompilerMode compilerMode) {
@@ -45,20 +43,27 @@ public class ProductionComponentProcessorTest {
   }
 
   @Test public void componentOnConcreteClass() {
-    JavaFileObject componentFile = JavaFileObjects.forSourceLines("test.NotAComponent",
+    Source componentFile =
+        CompilerTests.javaSource("test.NotAComponent",
         "package test;",
         "",
         "import dagger.producers.ProductionComponent;",
         "",
         "@ProductionComponent",
         "final class NotAComponent {}");
-    Compilation compilation = daggerCompiler().compile(componentFile);
-    assertThat(compilation).failed();
-    assertThat(compilation).hadErrorContaining("interface");
+    CompilerTests.daggerCompiler(componentFile)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(
+                  "@ProductionComponent may only be applied to an interface or abstract class");
+            });
   }
 
   @Test public void componentOnEnum() {
-    JavaFileObject componentFile = JavaFileObjects.forSourceLines("test.NotAComponent",
+    Source componentFile =
+        CompilerTests.javaSource("test.NotAComponent",
         "package test;",
         "",
         "import dagger.producers.ProductionComponent;",
@@ -67,45 +72,57 @@ public class ProductionComponentProcessorTest {
         "enum NotAComponent {",
         "  INSTANCE",
         "}");
-    Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts()).compile(componentFile);
-    assertThat(compilation).failed();
-    assertThat(compilation).hadErrorContaining("interface");
+    CompilerTests.daggerCompiler(componentFile)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(
+                  "@ProductionComponent may only be applied to an interface or abstract class");
+            });
   }
 
   @Test public void componentOnAnnotation() {
-    JavaFileObject componentFile = JavaFileObjects.forSourceLines("test.NotAComponent",
+    Source componentFile =
+        CompilerTests.javaSource("test.NotAComponent",
         "package test;",
         "",
         "import dagger.producers.ProductionComponent;",
         "",
         "@ProductionComponent",
         "@interface NotAComponent {}");
-    Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts()).compile(componentFile);
-    assertThat(compilation).failed();
-    assertThat(compilation).hadErrorContaining("interface");
+    CompilerTests.daggerCompiler(componentFile)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(
+                  "@ProductionComponent may only be applied to an interface or abstract class");
+            });
   }
 
   @Test public void nonModuleModule() {
-    JavaFileObject componentFile = JavaFileObjects.forSourceLines("test.NotAComponent",
+    Source componentFile =
+        CompilerTests.javaSource("test.NotAComponent",
         "package test;",
         "",
         "import dagger.producers.ProductionComponent;",
         "",
         "@ProductionComponent(modules = Object.class)",
         "interface NotAComponent {}");
-    Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts()).compile(componentFile);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining("is not annotated with one of @Module, @ProducerModule");
+    CompilerTests.daggerCompiler(componentFile)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining("is not annotated with one of @Module, @ProducerModule");
+            });
   }
 
   @Test
-  public void dependsOnProductionExecutor() {
-    JavaFileObject moduleFile =
-        JavaFileObjects.forSourceLines(
+  public void dependsOnProductionExecutor() throws Exception {
+    Source moduleFile =
+        CompilerTests.javaSource(
             "test.ExecutorModule",
             "package test;",
             "",
@@ -121,8 +138,8 @@ public class ProductionComponentProcessorTest {
             "    return MoreExecutors.directExecutor();",
             "  }",
             "}");
-    JavaFileObject producerModuleFile =
-        JavaFileObjects.forSourceLines(
+    Source producerModuleFile =
+        CompilerTests.javaSource(
             "test.SimpleModule",
             "package test;",
             "",
@@ -137,8 +154,8 @@ public class ProductionComponentProcessorTest {
             "    return \"\";",
             "  }",
             "}");
-    JavaFileObject componentFile =
-        JavaFileObjects.forSourceLines(
+    Source componentFile =
+        CompilerTests.javaSource(
             "test.SimpleComponent",
             "package test;",
             "",
@@ -155,30 +172,39 @@ public class ProductionComponentProcessorTest {
             "    SimpleComponent build();",
             "  }",
             "}");
-    Compilation compilation =
-        daggerCompiler()
-            .compile(moduleFile, producerModuleFile, componentFile);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining("String may not depend on the production executor")
-        .inFile(componentFile)
-        .onLineContaining("interface SimpleComponent");
 
-    compilation =
-        compilerWithOptions("-Adagger.fullBindingGraphValidation=ERROR")
-            .compile(producerModuleFile);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining("String may not depend on the production executor")
-        .inFile(producerModuleFile)
-        .onLineContaining("class SimpleModule");
+    String errorMessage = "String may not depend on the production executor";
+    CompilerTests.daggerCompiler(moduleFile, producerModuleFile, componentFile)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(errorMessage)
+                  .onSource(componentFile)
+                  .onLineContaining("interface SimpleComponent");
+            });
+
+    // Verify that the error is reported on the module when fullBindingGraphValidation is enabled.
+    CompilerTests.daggerCompiler(producerModuleFile)
+        .withProcessingOptions(
+            ImmutableMap.<String, String>builder()
+                .putAll(compilerMode.processorOptions())
+                .put("dagger.fullBindingGraphValidation", "ERROR")
+                .buildOrThrow())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(errorMessage)
+                  .onSource(producerModuleFile)
+                  .onLineContaining("class SimpleModule");
+            });
     // TODO(dpb): Report at the binding if enclosed in the module.
   }
 
   @Test
-  public void simpleComponent() {
-    JavaFileObject component =
-        JavaFileObjects.forSourceLines(
+  public void simpleComponent() throws Exception {
+    Source component =
+        CompilerTests.javaSource(
             "test.TestClass",
             "package test;",
             "",
@@ -225,114 +251,19 @@ public class ProductionComponentProcessorTest {
             "  }",
             "}");
 
-    Compilation compilation = compilerWithOptions(compilerMode.javacopts()).compile(component);
-    assertThat(compilation).succeeded();
-    assertThat(compilation)
-        .generatedSourceFile("test.DaggerTestClass_SimpleComponent")
-        .containsElementsIn(
-            compilerMode
-                .javaFileBuilder("test.DaggerTestClass_SimpleComponent")
-                .addLines(
-                    "package test;",
-                    "",
-                    GeneratedLines.generatedAnnotations(),
-                    "final class DaggerTestClass_SimpleComponent",
-                    "    implements TestClass.SimpleComponent, CancellationListener {",
-                    "  private Producer<TestClass.A> aEntryPoint;",
-                    "  private Provider<Executor> executorProvider;",
-                    "  private Provider<Executor> productionImplementationExecutorProvider;",
-                    "  private Provider<TestClass.SimpleComponent> simpleComponentProvider;",
-                    "  private Provider<ProductionComponentMonitor> monitorProvider;",
-                    "  private Provider<TestClass.B> bProvider;",
-                    "  private Producer<TestClass.B> bProducer;",
-                    "  private Producer<TestClass.A> aProducer;")
-                .addLinesIn(
-                    DEFAULT_MODE,
-                    "  @SuppressWarnings(\"unchecked\")",
-                    "  private void initialize(",
-                    "      final TestClass.AModule aModuleParam,",
-                    "      final TestClass.BModule bModuleParam) {",
-                    "    this.executorProvider =",
-                    "        TestClass_BModule_ExecutorFactory.create(bModuleParam);",
-                    "    this.productionImplementationExecutorProvider =",
-                    "        DoubleCheck.provider((Provider) executorProvider);",
-                    "    this.simpleComponentProvider = ",
-                    "        InstanceFactory.create((TestClass.SimpleComponent) simpleComponent);",
-                    "    this.monitorProvider =",
-                    "        DoubleCheck.provider(",
-                    "            TestClass_SimpleComponent_MonitoringModule_MonitorFactory.create(",
-                    "                simpleComponentProvider,",
-                    "                SetFactory.<ProductionComponentMonitor.Factory>empty()));",
-                    "    this.bProvider = TestClass_BModule_BFactory.create(",
-                    "        bModuleParam, TestClass_C_Factory.create());",
-                    "    this.bProducer = Producers.producerFromProvider(bProvider);",
-                    "    this.aProducer = TestClass_AModule_AFactory.create(",
-                    "        aModuleParam,",
-                    "        productionImplementationExecutorProvider,",
-                    "        monitorProvider,",
-                    "        bProducer);",
-                    "    this.aEntryPoint = Producers.entryPointViewOf(aProducer, this);",
-                    "  }")
-                .addLinesIn(
-                    FAST_INIT_MODE,
-                    "  @SuppressWarnings(\"unchecked\")",
-                    "  private void initialize(",
-                    "      final TestClass.AModule aModuleParam,",
-                    "      final TestClass.BModule bModuleParam) {",
-                    "    this.executorProvider = new SwitchingProvider<>(simpleComponent, 0);",
-                    "    this.productionImplementationExecutorProvider =",
-                    "        DoubleCheck.provider((Provider) executorProvider);",
-                    "    this.simpleComponentProvider =",
-                    "        InstanceFactory.create((TestClass.SimpleComponent) simpleComponent);",
-                    "    this.monitorProvider = DoubleCheck.provider(",
-                    "        new SwitchingProvider<ProductionComponentMonitor>(",
-                    "            simpleComponent, 1));",
-                    "    this.bProvider = new SwitchingProvider<>(simpleComponent, 2);",
-                    "    this.bProducer = Producers.producerFromProvider(bProvider);",
-                    "    this.aProducer = TestClass_AModule_AFactory.create(",
-                    "        aModuleParam,",
-                    "        productionImplementationExecutorProvider,",
-                    "        monitorProvider,",
-                    "        bProducer);",
-                    "    this.aEntryPoint = Producers.entryPointViewOf(aProducer, this);",
-                    "  }")
-                .addLines(
-                    "  @Override",
-                    "  public ListenableFuture<TestClass.A> a() {",
-                    "    return aEntryPoint.get();",
-                    "  }",
-                    "",
-                    "  @Override",
-                    "  public void onProducerFutureCancelled(boolean mayInterruptIfRunning) {",
-                    "    Producers.cancel(aProducer, mayInterruptIfRunning);",
-                    "    Producers.cancel(bProducer, mayInterruptIfRunning);",
-                    "  }")
-                .addLinesIn(
-                    FAST_INIT_MODE,
-                    "  private static final class SwitchingProvider<T> implements Provider<T> {",
-                    "    @SuppressWarnings(\"unchecked\")",
-                    "    @Override",
-                    "    public T get() {",
-                    "      switch (id) {",
-                    "        case 0: return (T) TestClass_BModule_ExecutorFactory.executor(",
-                    "            simpleComponent.bModule);",
-                    "        case 1: return (T)",
-                    "            TestClass_SimpleComponent_MonitoringModule_MonitorFactory",
-                    "                .monitor(",
-                    "                    simpleComponent.simpleComponentProvider,",
-                    "                    SetFactory.<ProductionComponentMonitor.Factory>empty());",
-                    "        case 2: return (T) TestClass_BModule_BFactory.b(",
-                    "            simpleComponent.bModule, new TestClass.C());",
-                    "        default: throw new AssertionError(id);",
-                    "      }",
-                    "    }",
-                    "  }",
-                    "}")
-                .build());
+    CompilerTests.daggerCompiler(component)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(0);
+              subject.generatedSource(
+                  goldenFileRule.goldenSource("test/DaggerTestClass_SimpleComponent"));
+            });
   }
 
   @Test public void nullableProducersAreNotErrors() {
-    JavaFileObject component = JavaFileObjects.forSourceLines("test.TestClass",
+    Source component =
+        CompilerTests.javaSource("test.TestClass",
         "package test;",
         "",
         "import com.google.common.util.concurrent.ListenableFuture;",
@@ -379,23 +310,25 @@ public class ProductionComponentProcessorTest {
         "    ListenableFuture<A> a();",
         "  }",
         "}");
-    Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts()).compile(component);
-    assertThat(compilation).succeeded();
-    assertThat(compilation)
-        .hadWarningContaining("@Nullable on @Produces methods does not do anything")
-        .inFile(component)
-        .onLine(33);
-    assertThat(compilation)
-        .hadWarningContaining("@Nullable on @Produces methods does not do anything")
-        .inFile(component)
-        .onLine(36);
+    CompilerTests.daggerCompiler(component)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(0);
+              subject.hasWarningCount(2);
+              subject.hasWarningContaining("@Nullable on @Produces methods does not do anything")
+                  .onSource(component)
+                  .onLine(33);
+              subject.hasWarningContaining("@Nullable on @Produces methods does not do anything")
+                  .onSource(component)
+                  .onLine(36);
+            });
   }
 
   @Test
-  public void productionScope_injectConstructor() {
-    JavaFileObject productionScoped =
-        JavaFileObjects.forSourceLines(
+  public void productionScope_injectConstructor() throws Exception {
+    Source productionScoped =
+        CompilerTests.javaSource(
             "test.ProductionScoped",
             "package test;",
             "",
@@ -406,8 +339,8 @@ public class ProductionComponentProcessorTest {
             "class ProductionScoped {",
             "  @Inject ProductionScoped() {}",
             "}");
-    JavaFileObject parent =
-        JavaFileObjects.forSourceLines(
+    Source parent =
+        CompilerTests.javaSource(
             "test.Parent",
             "package test;",
             "",
@@ -417,8 +350,8 @@ public class ProductionComponentProcessorTest {
             "interface Parent {",
             "  Child child();",
             "}");
-    JavaFileObject child =
-        JavaFileObjects.forSourceLines(
+    Source child =
+        CompilerTests.javaSource(
             "test.Child",
             "package test;",
             "",
@@ -428,27 +361,13 @@ public class ProductionComponentProcessorTest {
             "interface Child {",
             "  ProductionScoped productionScoped();",
             "}");
-    Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts())
-            .compile(productionScoped, parent, child);
-    assertThat(compilation).succeeded();
-    assertThat(compilation)
-        .generatedSourceFile("test.DaggerParent")
-        .containsElementsIn(
-            new JavaFileBuilder(compilerMode, "test.DaggerRoot")
-                .addLines(
-                    "package test;",
-                    "",
-                    GeneratedLines.generatedAnnotations(),
-                    "final class DaggerParent implements Parent, CancellationListener {",
-                    "  private static final class ChildImpl",
-                    "      implements Child, CancellationListener {",
-                    "    @Override",
-                    "    public ProductionScoped productionScoped() {",
-                    "      return parent.productionScopedProvider.get();",
-                    "    }",
-                    "  }",
-                    "}")
-                .build());
+
+    CompilerTests.daggerCompiler(productionScoped, parent, child)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(0);
+              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerParent"));
+            });
   }
 }

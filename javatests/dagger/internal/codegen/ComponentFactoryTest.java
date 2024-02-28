@@ -16,16 +16,15 @@
 
 package dagger.internal.codegen;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static dagger.internal.codegen.Compilers.compilerWithOptions;
 import static dagger.internal.codegen.base.ComponentCreatorAnnotation.COMPONENT_FACTORY;
 import static dagger.internal.codegen.binding.ErrorMessages.creatorMessagesFor;
 
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
+import androidx.room.compiler.processing.util.Source;
+import com.google.common.collect.ImmutableList;
 import dagger.internal.codegen.binding.ErrorMessages;
-import java.util.Collection;
-import javax.tools.JavaFileObject;
+import dagger.testing.compile.CompilerTests;
+import dagger.testing.golden.GoldenFileRule;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -35,9 +34,11 @@ import org.junit.runners.Parameterized.Parameters;
 @RunWith(Parameterized.class)
 public class ComponentFactoryTest {
   @Parameters(name = "{0}")
-  public static Collection<Object[]> parameters() {
+  public static ImmutableList<Object[]> parameters() {
     return CompilerMode.TEST_PARAMETERS;
   }
+
+  @Rule public GoldenFileRule goldenFileRule = new GoldenFileRule();
 
   private final CompilerMode compilerMode;
 
@@ -49,9 +50,9 @@ public class ComponentFactoryTest {
       creatorMessagesFor(COMPONENT_FACTORY);
 
   @Test
-  public void testUsesParameterNames() {
-    JavaFileObject moduleFile =
-        JavaFileObjects.forSourceLines(
+  public void testUsesParameterNames() throws Exception {
+    Source moduleFile =
+        CompilerTests.javaSource(
             "test.TestModule",
             "package test;",
             "",
@@ -63,8 +64,8 @@ public class ComponentFactoryTest {
             "  @Provides String string() { return null; }",
             "}");
 
-    JavaFileObject componentFile =
-        JavaFileObjects.forSourceLines(
+    Source componentFile =
+        CompilerTests.javaSource(
             "test.TestComponent",
             "package test;",
             "",
@@ -79,35 +80,20 @@ public class ComponentFactoryTest {
             "    TestComponent newTestComponent(TestModule mod);",
             "  }",
             "}");
-    JavaFileObject generatedComponent =
-        JavaFileObjects.forSourceLines(
-            "test.DaggerTestComponent",
-            "package test;",
-            "",
-            "import dagger.internal.Preconditions;",
-            "",
-            GeneratedLines.generatedAnnotations(),
-            "final class DaggerTestComponent implements TestComponent {",
-            "  private static final class Factory implements TestComponent.Factory {",
-            "    @Override",
-            "    public TestComponent newTestComponent(TestModule mod) {",
-            "      Preconditions.checkNotNull(mod);",
-            "      return new DaggerTestComponent(mod);",
-            "    }",
-            "  }",
-            "}");
-    Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts()).compile(moduleFile, componentFile);
-    assertThat(compilation).succeeded();
-    assertThat(compilation)
-        .generatedSourceFile("test.DaggerTestComponent")
-        .containsElementsIn(generatedComponent);
+
+    CompilerTests.daggerCompiler(moduleFile, componentFile)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(0);
+              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
+            });
   }
 
   @Test
   public void testSetterMethodFails() {
-    JavaFileObject componentFile =
-        JavaFileObjects.forSourceLines(
+    Source componentFile =
+        CompilerTests.javaSource(
             "test.SimpleComponent",
             "package test;",
             "",
@@ -122,19 +108,24 @@ public class ComponentFactoryTest {
             "    Factory set(String s);",
             "  }",
             "}");
-    Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts()).compile(componentFile);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining(String.format(MSGS.twoFactoryMethods(), "create()"))
-        .inFile(componentFile)
-        .onLineContaining("Factory set(String s);");
+    CompilerTests.daggerCompiler(componentFile)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(
+                      String.format(
+                          MSGS.twoFactoryMethods(),
+                          "test.SimpleComponent test.SimpleComponent.Factory.create()"))
+                  .onSource(componentFile)
+                  .onLineContaining("Factory set(String s);");
+            });
   }
 
   @Test
   public void testInheritedSetterMethodFails() {
-    JavaFileObject componentFile =
-        JavaFileObjects.forSourceLines(
+    Source componentFile =
+        CompilerTests.javaSource(
             "test.SimpleComponent",
             "package test;",
             "",
@@ -151,12 +142,17 @@ public class ComponentFactoryTest {
             "  @Component.Factory",
             "  interface Factory extends Parent {}",
             "}");
-    Compilation compilation =
-        compilerWithOptions(compilerMode.javacopts()).compile(componentFile);
-    assertThat(compilation).failed();
-    assertThat(compilation)
-        .hadErrorContaining(String.format(MSGS.twoFactoryMethods(), "create()"))
-        .inFile(componentFile)
-        .onLineContaining("interface Factory");
+    CompilerTests.daggerCompiler(componentFile)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(
+                      String.format(
+                          MSGS.twoFactoryMethods(),
+                          "test.SimpleComponent test.SimpleComponent.Parent.create()"))
+                  .onSource(componentFile)
+                  .onLineContaining("interface Factory");
+            });
   }
 }
