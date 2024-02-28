@@ -16,11 +16,11 @@
 
 package dagger.internal.codegen.binding;
 
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
 import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
 
 import androidx.room.compiler.processing.XMethodType;
+import androidx.room.compiler.processing.XProcessingEnv;
 import androidx.room.compiler.processing.XType;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
@@ -38,15 +38,18 @@ public abstract class MethodSignature {
   abstract ImmutableList<TypeName> thrownTypes();
 
   public static MethodSignature forComponentMethod(
-      ComponentMethodDescriptor componentMethod, XType componentType) {
+      ComponentMethodDescriptor componentMethod,
+      XType componentType,
+      XProcessingEnv processingEnv) {
     XMethodType methodType = componentMethod.methodElement().asMemberOf(componentType);
     return new AutoValue_MethodSignature(
         getSimpleName(componentMethod.methodElement()),
-        toJavac(methodType).getParameterTypes().stream()
-            .map(TypeName::get)
-            .collect(toImmutableList()),
-        toJavac(methodType).getThrownTypes().stream()
-            .map(TypeName::get)
+        methodType.getParameterTypes().stream().map(XType::getTypeName).collect(toImmutableList()),
+        // Using the thrown types of the method element, which should be the same as the method type
+        // since thrown types can't use type variables.
+        // TODO(bcorso): Support getting thrown types from XExecutableType in XProcessing.
+        componentMethod.methodElement().getThrownTypes().stream()
+            .map(XType::getTypeName)
             .collect(toImmutableList()));
   }
 }
