@@ -83,9 +83,10 @@ java_library {
         "//apex_available:platform",
         "com.android.adservices",
         "com.android.extservices",
-        "com.android.ondevicepersonalization",
-        "com.android.healthfitness",
         "com.android.devicelock",
+        "com.android.healthfitness",
+        "com.android.mediaprovider",
+        "com.android.ondevicepersonalization",
     ],
 
     sdk_version: "core_current",
@@ -177,6 +178,7 @@ java_library_host {
         "jsr330",
         "kotlin-stdlib",
         "kotlin-stdlib-jdk8",
+        "kotlinpoet",
         "kotlinx_metadata_jvm",
     ],
 
@@ -187,6 +189,7 @@ java_library_host {
         "auto_value_annotations",
         "auto_value_memoized_extension_annotations",
         "dagger2-android-annotation-stubs",
+        "kotlin_symbol_processing_api",
     ],
 
     plugins: [
@@ -259,8 +262,9 @@ java_library {
     ],
     apex_available: [
         "//apex_available:platform",
-        "com.android.ondevicepersonalization",
         "com.android.healthfitness",
+        "com.android.mediaprovider",
+        "com.android.ondevicepersonalization",
     ],
 }
 
@@ -330,8 +334,9 @@ android_library {
     ],
     apex_available: [
         "//apex_available:platform",
-        "com.android.ondevicepersonalization",
         "com.android.healthfitness",
+        "com.android.mediaprovider",
+        "com.android.ondevicepersonalization",
     ],
 }
 

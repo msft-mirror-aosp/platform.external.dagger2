@@ -16,16 +16,13 @@
 
 package dagger.internal.codegen.binding;
 
-import static androidx.room.compiler.processing.XElementKt.isConstructor;
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static dagger.internal.codegen.binding.SourceFiles.simpleVariableName;
-import static dagger.internal.codegen.xprocessing.XElements.asConstructor;
+import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
 import static dagger.internal.codegen.xprocessing.XElements.hasAnyAnnotation;
 import static dagger.internal.codegen.xprocessing.XTypeElements.isNested;
 import static dagger.internal.codegen.xprocessing.XTypes.isDeclared;
-import static kotlin.streams.jdk8.StreamsKt.asStream;
 
 import androidx.room.compiler.processing.XElement;
 import androidx.room.compiler.processing.XMethodElement;
@@ -35,6 +32,7 @@ import com.google.auto.value.AutoValue;
 import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.TypeName;
 import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.xprocessing.XTypeElements;
 import dagger.spi.model.BindingKind;
 import dagger.spi.model.Key;
 import java.util.Optional;
@@ -151,7 +149,7 @@ public abstract class ComponentRequirement {
     if (typeElement().isKotlinObject() || typeElement().isCompanionObject()) {
       return false;
     }
-    return asStream(typeElement().getAllNonPrivateInstanceMethods())
+    return XTypeElements.getAllNonPrivateInstanceMethods(typeElement()).stream()
         .filter(this::isBindingMethod)
         .anyMatch(method -> !method.isAbstract() && !method.isStatic());
   }
@@ -183,51 +181,49 @@ public abstract class ComponentRequirement {
 
   public static ComponentRequirement forDependency(XType type) {
     checkArgument(isDeclared(checkNotNull(type)));
-    ComponentRequirement requirement =
-        new AutoValue_ComponentRequirement(
-            Kind.DEPENDENCY,
-            type.getTypeName(),
-            Optional.empty(),
-            Optional.empty(),
-            simpleVariableName(type.getTypeElement().getClassName()));
-    requirement.type = type;
-    return requirement;
+    return create(Kind.DEPENDENCY, type);
   }
 
   public static ComponentRequirement forModule(XType type) {
     checkArgument(isDeclared(checkNotNull(type)));
-    ComponentRequirement requirement =
-        new AutoValue_ComponentRequirement(
-            Kind.MODULE,
-            type.getTypeName(),
-            Optional.empty(),
-            Optional.empty(),
-            simpleVariableName(type.getTypeElement().getClassName()));
-    requirement.type = type;
-    return requirement;
-  }
-
-  static ComponentRequirement forBoundInstance(
-      Key key, boolean nullable, XElement elementForVariableName) {
-    ComponentRequirement requirement =
-        new AutoValue_ComponentRequirement(
-            Kind.BOUND_INSTANCE,
-            key.type().xprocessing().getTypeName(),
-            nullable ? Optional.of(NullPolicy.ALLOW) : Optional.empty(),
-            Optional.of(key),
-            toJavac(elementForVariableName).getSimpleName().toString());
-    requirement.type = key.type().xprocessing();
-    return requirement;
+    return create(Kind.MODULE, type);
   }
 
   public static ComponentRequirement forBoundInstance(ContributionBinding binding) {
     checkArgument(binding.kind().equals(BindingKind.BOUND_INSTANCE));
+    return forBoundInstance(
+        binding.key(), binding.nullableType().isPresent(), binding.bindingElement().get());
+  }
+
+  static ComponentRequirement forBoundInstance(
+      Key key, boolean nullable, XElement elementForVariableName) {
+    return create(
+        Kind.BOUND_INSTANCE,
+        key.type().xprocessing(),
+        nullable ? Optional.of(NullPolicy.ALLOW) : Optional.empty(),
+        Optional.of(key),
+        getSimpleName(elementForVariableName));
+  }
+
+  private static ComponentRequirement create(Kind kind, XType type) {
+    return create(
+        kind,
+        type,
+        Optional.empty(),
+        Optional.empty(),
+        simpleVariableName(type.getTypeElement().getClassName()));
+  }
+
+  private static ComponentRequirement create(
+      Kind kind,
+      XType type,
+      Optional<NullPolicy> overrideNullPolicy,
+      Optional<Key> key,
+      String variableName) {
     ComponentRequirement requirement =
-        forBoundInstance(
-            binding.key(),
-            binding.nullableType().isPresent(),
-            binding.bindingElement().get());
-    requirement.type = binding.key().type().xprocessing();
+        new AutoValue_ComponentRequirement(
+            kind, type.getTypeName(), overrideNullPolicy, key, variableName);
+    requirement.type = type;
     return requirement;
   }
 
@@ -237,42 +233,19 @@ public abstract class ComponentRequirement {
    */
   // TODO(bcorso): Should this method throw if its called knowing that an instance is not needed?
   public static boolean componentCanMakeNewInstances(XTypeElement typeElement) {
-    // TODO(bcorso): Investigate how we should replace this in XProcessing. It's not clear what the
-    // complete set of kinds are in XProcessing and if they're mutually exclusive. For example,
-    // does XTypeElement#isClass() cover XTypeElement#isDataClass(), etc?
-    switch (toJavac(typeElement).getKind()) {
-      case CLASS:
-        break;
-      case ENUM:
-      case ANNOTATION_TYPE:
-      case INTERFACE:
-        return false;
-      default:
-        throw new AssertionError("TypeElement cannot have kind: " + toJavac(typeElement).getKind());
-    }
-
-    if (typeElement.isAbstract()) {
-      return false;
-    }
-
-    if (requiresEnclosingInstance(typeElement)) {
-      return false;
-    }
-
-    for (XElement enclosed : typeElement.getEnclosedElements()) {
-      if (isConstructor(enclosed)
-          && asConstructor(enclosed).getParameters().isEmpty()
-          && !asConstructor(enclosed).isPrivate()) {
-        return true;
-      }
-    }
-
     // TODO(gak): still need checks for visibility
-
-    return false;
+    return typeElement.isClass()
+        && !typeElement.isAbstract()
+        && !requiresEnclosingInstance(typeElement)
+        && hasVisibleDefaultConstructor(typeElement);
   }
 
   private static boolean requiresEnclosingInstance(XTypeElement typeElement) {
     return isNested(typeElement) && !typeElement.isStatic();
+  }
+
+  private static boolean hasVisibleDefaultConstructor(XTypeElement typeElement) {
+    return typeElement.getConstructors().stream()
+        .anyMatch(constructor -> !constructor.isPrivate() && constructor.getParameters().isEmpty());
   }
 }
