@@ -38,7 +38,7 @@ android_library(
         "//java/dagger/hilt/android/internal/managers",
         "//java/dagger/hilt/android/internal/managers:component_supplier",
         "//java/dagger/hilt/android/internal/modules",
-        "//java/dagger/hilt/android/lifecycle",
+        "//java/dagger/hilt/android/lifecycle:hilt_view_model",
         "//java/dagger/hilt/codegen:originating_element",
         "//java/dagger/hilt/internal:component_entry_point",
         "//java/dagger/hilt/internal:component_manager",
@@ -100,10 +100,23 @@ android_library(
 
 android_library(
     name = "activity_retained_lifecycle",
-    srcs = ["ActivityRetainedLifecycle.java"],
+    srcs = [
+        "ActivityRetainedLifecycle.java",
+    ],
     deps = [
         ":package_info",
-        "@maven//:androidx_annotation_annotation",
+        "//java/dagger/hilt/android/lifecycle:retained_lifecycle",
+    ],
+)
+
+android_library(
+    name = "view_model_lifecycle",
+    srcs = [
+        "ViewModelLifecycle.java",
+    ],
+    deps = [
+        ":package_info",
+        "//java/dagger/hilt/android/lifecycle:retained_lifecycle",
     ],
 )
 
@@ -169,6 +182,7 @@ gen_maven_artifact(
         "//java/dagger/hilt/android:hilt_android_app",
         "//java/dagger/hilt/android:early_entry_point",
         "//java/dagger/hilt/android:package_info",
+        "//java/dagger/hilt/android:view_model_lifecycle",
         "//java/dagger/hilt/android/components",
         "//java/dagger/hilt/android/components:package_info",
         "//java/dagger/hilt/android/flags:fragment_get_context_fix",
@@ -182,7 +196,9 @@ gen_maven_artifact(
         "//java/dagger/hilt/android/internal/migration:has_custom_inject",
         "//java/dagger/hilt/android/internal/migration:injected_by_hilt",
         "//java/dagger/hilt/android/internal/modules",
-        "//java/dagger/hilt/android/lifecycle",
+        "//java/dagger/hilt/android/lifecycle:hilt_view_model",
+        "//java/dagger/hilt/android/lifecycle:package_info",
+        "//java/dagger/hilt/android/lifecycle:retained_lifecycle",
         "//java/dagger/hilt/android/migration:custom_inject",
         "//java/dagger/hilt/android/migration:optional_inject",
         "//java/dagger/hilt/android/migration:package_info",
@@ -214,9 +230,9 @@ gen_maven_artifact(
     ],
     artifact_target_maven_deps_banned = [
         "com.google.guava:guava",
-        "javax.annotation:jsr250-api",
+        "javax.annotation:javax.annotation-api",
     ],
-    javadoc_android_api_level = 30,
+    javadoc_android_api_level = 32,
     javadoc_exclude_packages = [
         "dagger.hilt.android.internal",
     ],

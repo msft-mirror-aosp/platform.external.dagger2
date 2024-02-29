@@ -31,10 +31,9 @@ import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import dagger.internal.codegen.javapoet.TypeNames;
 import dagger.spi.model.Key;
-import javax.lang.model.type.TypeMirror;
 
 /**
- * Information about an {@code Optional} {@link TypeMirror}.
+ * Information about an {@code Optional} type.
  *
  * <p>{@link com.google.common.base.Optional} and {@link java.util.Optional} are supported.
  */
@@ -69,6 +68,11 @@ public abstract class OptionalType {
 
     private static OptionalKind of(XTypeElement type) {
       return OPTIONAL_KIND_BY_CLASS_NAME.get(type.getClassName());
+    }
+
+    /** Returns the {@link ClassName} of this optional kind. */
+    public ClassName className() {
+      return className;
     }
 
     /** Returns {@code valueType} wrapped in the correct class. */
