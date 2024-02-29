@@ -19,6 +19,7 @@ package dagger.internal.codegen.binding;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.google.common.base.CaseFormat.UPPER_UNDERSCORE;
 
+import androidx.room.compiler.processing.XProcessingEnv;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.ParameterizedTypeName;
@@ -26,24 +27,27 @@ import com.squareup.javapoet.TypeName;
 import dagger.internal.codegen.base.RequestKinds;
 import dagger.internal.codegen.javapoet.Expression;
 import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.spi.model.DependencyRequest;
 import dagger.spi.model.RequestKind;
 import java.util.Optional;
-import javax.lang.model.type.TypeMirror;
 
 /** One of the core types initialized as fields in a generated component. */
 public enum FrameworkType {
   /** A {@link javax.inject.Provider}. */
   PROVIDER {
     @Override
-    public CodeBlock to(RequestKind requestKind, CodeBlock from) {
+    public CodeBlock to(
+        RequestKind requestKind,
+        CodeBlock from) {
       switch (requestKind) {
         case INSTANCE:
           return CodeBlock.of("$L.get()", from);
 
         case LAZY:
-          return CodeBlock.of("$T.lazy($L)", TypeNames.DOUBLE_CHECK, from);
+          return CodeBlock.of(
+              "$T.lazy($L)",
+              TypeNames.DOUBLE_CHECK,
+              from);
 
         case PROVIDER:
           return from;
@@ -56,11 +60,18 @@ public enum FrameworkType {
 
         case FUTURE:
           return CodeBlock.of(
-              "$T.immediateFuture($L)", TypeNames.FUTURES, to(RequestKind.INSTANCE, from));
+              "$T.immediateFuture($L)",
+              TypeNames.FUTURES,
+              to(
+                  RequestKind.INSTANCE,
+                  from));
 
         case PRODUCED:
           return CodeBlock.of(
-              "$T.successful($L)", TypeNames.PRODUCED, to(RequestKind.INSTANCE, from));
+              "$T.successful($L)",
+              TypeNames.PRODUCED,
+              to(
+                  RequestKind.INSTANCE, from));
 
         default:
           throw new IllegalArgumentException(
@@ -69,27 +80,30 @@ public enum FrameworkType {
     }
 
     @Override
-    public Expression to(RequestKind requestKind, Expression from, DaggerTypes types) {
-      CodeBlock codeBlock = to(requestKind, from.codeBlock());
+    public Expression to(
+        RequestKind requestKind,
+        Expression from,
+        XProcessingEnv processingEnv) {
+      CodeBlock codeBlock = to(
+          requestKind,
+          from.codeBlock());
       switch (requestKind) {
         case INSTANCE:
-          return Expression.create(types.unwrapTypeOrObject(from.type()), codeBlock);
+          return Expression.create(from.type().unwrapType(), codeBlock);
 
         case PROVIDER:
           return from;
 
         case PROVIDER_OF_LAZY:
-          TypeMirror lazyType = types.rewrapType(from.type(), TypeNames.LAZY);
-          return Expression.create(types.wrapType(lazyType, TypeNames.PROVIDER), codeBlock);
+          return Expression.create(
+              from.type().rewrapType(TypeNames.LAZY).wrapType(TypeNames.PROVIDER), codeBlock);
 
         case FUTURE:
-          return Expression.create(
-              types.rewrapType(from.type(), TypeNames.LISTENABLE_FUTURE), codeBlock);
+          return Expression.create(from.type().rewrapType(TypeNames.LISTENABLE_FUTURE), codeBlock);
 
         default:
           return Expression.create(
-              types.rewrapType(from.type(), RequestKinds.frameworkClassName(requestKind)),
-              codeBlock);
+              from.type().rewrapType(RequestKinds.frameworkClassName(requestKind)), codeBlock);
       }
     }
   },
@@ -97,7 +111,9 @@ public enum FrameworkType {
   /** A {@link dagger.producers.Producer}. */
   PRODUCER_NODE {
     @Override
-    public CodeBlock to(RequestKind requestKind, CodeBlock from) {
+    public CodeBlock to(
+        RequestKind requestKind,
+        CodeBlock from) {
       switch (requestKind) {
         case FUTURE:
           return CodeBlock.of("$L.get()", from);
@@ -112,15 +128,22 @@ public enum FrameworkType {
     }
 
     @Override
-    public Expression to(RequestKind requestKind, Expression from, DaggerTypes types) {
+    public Expression to(
+        RequestKind requestKind,
+        Expression from,
+        XProcessingEnv processingEnv) {
       switch (requestKind) {
         case FUTURE:
           return Expression.create(
-              types.rewrapType(from.type(), TypeNames.LISTENABLE_FUTURE),
-              to(requestKind, from.codeBlock()));
+              from.type().rewrapType(TypeNames.LISTENABLE_FUTURE),
+              to(
+                  requestKind,
+                  from.codeBlock()));
 
         case PRODUCER:
-          return Expression.create(from.type(), to(requestKind, from.codeBlock()));
+          return Expression.create(from.type(), to(
+              requestKind,
+              from.codeBlock()));
 
         default:
           throw new IllegalArgumentException(
@@ -191,7 +214,9 @@ public enum FrameworkType {
    * @throws IllegalArgumentException if a valid expression cannot be generated for {@code
    *     requestKind}
    */
-  public abstract CodeBlock to(RequestKind requestKind, CodeBlock from);
+  public abstract CodeBlock to(
+      RequestKind requestKind,
+      CodeBlock from);
 
   /**
    * Returns an {@link Expression} that evaluates to a requested object given an expression that
@@ -203,7 +228,10 @@ public enum FrameworkType {
    * @throws IllegalArgumentException if a valid expression cannot be generated for {@code
    *     requestKind}
    */
-  public abstract Expression to(RequestKind requestKind, Expression from, DaggerTypes types);
+  public abstract Expression to(
+      RequestKind requestKind,
+      Expression from,
+      XProcessingEnv processingEnv);
 
   @Override
   public String toString() {
