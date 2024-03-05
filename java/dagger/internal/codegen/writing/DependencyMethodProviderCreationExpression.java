@@ -17,6 +17,8 @@
 package dagger.internal.codegen.writing;
 
 import static androidx.room.compiler.processing.XElementKt.isMethod;
+import static com.google.common.base.CaseFormat.LOWER_CAMEL;
+import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.squareup.javapoet.MethodSpec.constructorBuilder;
@@ -91,7 +93,7 @@ final class DependencyMethodProviderCreationExpression
         ComponentProvisionRequestRepresentation.maybeCheckForNull(
             binding,
             compilerOptions,
-            CodeBlock.of("$N.$N()", dependency().variableName(), getSimpleName(provisionMethod)));
+            CodeBlock.of("$N.$N()", dependency().variableName(), provisionMethod.getJvmName()));
     ClassName dependencyClassName = dependency().typeElement().getClassName();
     TypeName keyType = binding.key().type().xprocessing().getTypeName();
     MethodSpec.Builder getMethod =
@@ -112,9 +114,8 @@ final class DependencyMethodProviderCreationExpression
         componentShard
             .name()
             .nestedClass(
-                dependency().typeElement().getQualifiedName().replace('.', '_')
-                    + "_"
-                    + getSimpleName(provisionMethod));
+                componentShard.getUniqueClassName(
+                    LOWER_CAMEL.to(UPPER_CAMEL, getSimpleName(provisionMethod) + "Provider")));
     componentShard.addType(
         COMPONENT_PROVISION_FACTORY,
         classBuilder(factoryClassName)

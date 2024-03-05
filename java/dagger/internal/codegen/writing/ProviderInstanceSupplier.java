@@ -16,8 +16,6 @@
 
 package dagger.internal.codegen.writing;
 
-import static dagger.internal.codegen.writing.BindingRepresentations.scope;
-
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
 import dagger.assisted.AssistedInject;
@@ -32,9 +30,9 @@ final class ProviderInstanceSupplier implements FrameworkInstanceSupplier {
   ProviderInstanceSupplier(
       @Assisted ProvisionBinding binding,
       ComponentImplementation componentImplementation,
-      FrameworkInstanceBindingRepresentation.Factory frameworkInstanceBindingRepresentationFactory,
       UnscopedFrameworkInstanceCreationExpressionFactory
-          unscopedFrameworkInstanceCreationExpressionFactory) {
+          unscopedFrameworkInstanceCreationExpressionFactory,
+      BindingRepresentations bindingRepresentations) {
     FrameworkInstanceCreationExpression frameworkInstanceCreationExpression =
         unscopedFrameworkInstanceCreationExpressionFactory.create(binding);
     this.frameworkInstanceSupplier =
@@ -42,7 +40,7 @@ final class ProviderInstanceSupplier implements FrameworkInstanceSupplier {
             componentImplementation,
             binding,
             binding.scope().isPresent()
-                ? scope(binding, frameworkInstanceCreationExpression)
+                ? bindingRepresentations.scope(binding, frameworkInstanceCreationExpression)
                 : frameworkInstanceCreationExpression);
   }
 
