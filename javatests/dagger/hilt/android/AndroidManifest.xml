@@ -66,7 +66,35 @@
         android:exported="false"
         tools:ignore="MissingClass"/>
     <activity
+        android:name=".ViewModelAssistedTest$TestConfigChangeActivity"
+        android:exported="false"
+        tools:ignore="MissingClass"/>
+    <activity
+        android:name=".ViewModelAssistedTest$TestKeyedViewModelActivity"
+        android:exported="false"
+        tools:ignore="MissingClass"/>
+    <activity
+        android:name=".ViewModelAssistedTest$TestNoCreationCallbacksActivity"
+        android:exported="false"
+        tools:ignore="MissingClass"/>
+    <activity
+        android:name=".ViewModelAssistedTest$TestNoFactoryActivity"
+        android:exported="false"
+        tools:ignore="MissingClass"/>
+    <activity
+        android:name=".ViewModelAssistedTest$TestFragmentArgsActivity"
+        android:exported="false"
+        tools:ignore="MissingClass"/>
+    <activity
+        android:name=".ViewModelAssistedTest$TestIncompatibleFactoriesActivity"
+        android:exported="false"
+        tools:ignore="MissingClass"/>
+    <activity
         android:name=".ViewModelSavedStateOwnerTest$TestActivity"
+        android:exported="false"
+        tools:ignore="MissingClass"/>
+    <activity
+        android:name=".ViewModelSavedStateOwnerTest$ErrorTestActivity"
         android:exported="false"
         tools:ignore="MissingClass"/>
     <activity

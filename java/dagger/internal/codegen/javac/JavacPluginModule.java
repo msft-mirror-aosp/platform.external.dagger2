@@ -24,15 +24,13 @@ import com.sun.tools.javac.util.Context;
 import dagger.Binds;
 import dagger.Module;
 import dagger.Provides;
-import dagger.internal.codegen.binding.BindingGraphFactory;
-import dagger.internal.codegen.binding.ComponentDescriptorFactory;
 import dagger.internal.codegen.compileroption.CompilerOptions;
 import javax.lang.model.util.Elements; // ALLOW_TYPES_ELEMENTS
 import javax.lang.model.util.Types; // ALLOW_TYPES_ELEMENTS
 
 /**
- * A module that provides a {@link BindingGraphFactory} and {@link ComponentDescriptorFactory} for
- * use in {@code javac} plugins. Requires a binding for the {@code javac} {@link Context}.
+ * A module that provides a {@link XMessager}, {@link XProcessingEnv}, and {@link CompilerOptions}
+ * for use in {@code javac} plugins. Requires a binding for the {@code javac} {@link Context}.
  */
 @Module(includes = JavacPluginModule.BindsModule.class)
 public final class JavacPluginModule {

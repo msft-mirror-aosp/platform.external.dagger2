@@ -15,8 +15,8 @@
 # Description:
 #   Tests for internal code for implementing Hilt processors.
 
-load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_jvm_library")
 load("//java/dagger/testing/compile:macros.bzl", "kt_compiler_test")
+load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_jvm_library")
 
 package(default_visibility = ["//:src"])
 
@@ -33,34 +33,8 @@ kt_compiler_test(
         "//java/dagger/hilt/android/testing/compile",
         "//java/dagger/internal/codegen/xprocessing",
         "//java/dagger/internal/codegen/xprocessing:xprocessing-testing",
+        "//third_party/java/guava/collect",
         "//third_party/java/junit",
-    ],
-)
-
-java_test(
-    name = "ViewModelGeneratorTest",
-    runtime_deps = [
-        ":ViewModelGeneratorTestLib",
-        "//java/dagger/hilt/android/lifecycle:hilt_view_model",
-        "//third_party/java/compile_testing",
-        "//third_party/java/truth",
-        "@androidsdk//:platforms/android-32/android.jar",
-        "@maven//:androidx_lifecycle_lifecycle_viewmodel",
-        "@maven//:androidx_lifecycle_lifecycle_viewmodel_savedstate",
-    ],
-)
-
-kt_jvm_library(
-    name = "ViewModelGeneratorTestLib",
-    srcs = [
-        "ViewModelGeneratorTest.kt",
-    ],
-    deps = [
-        ":test_utils",
-        "//java/dagger/hilt/android/processor/internal/viewmodel:processor_lib",
-        "//third_party/java/compile_testing",
-        "//third_party/java/junit",
-        "//third_party/java/truth",
     ],
 )
 
@@ -79,13 +53,50 @@ kt_compiler_test(
         "//java/dagger/hilt/android:android_entry_point",
         "//java/dagger/hilt/android:hilt_android_app",
     ],
+    resources = glob(["goldens/*"]),
     deps = [
         ":test_utils",
         "//:compiler_internals",
         "//java/dagger/hilt/android/processor/internal/viewmodel:processor_lib",
         "//java/dagger/hilt/android/processor/internal/viewmodel:validation_plugin_lib",
         "//java/dagger/hilt/android/testing/compile",
+        "//java/dagger/internal/codegen/xprocessing",
+        "//java/dagger/internal/codegen/xprocessing:xprocessing-testing",
+        "//java/dagger/testing/golden",
         "//third_party/java/compile_testing",
+        "//third_party/java/guava/collect",
+        "//third_party/java/junit",
+        "//third_party/java/truth",
+    ],
+)
+
+kt_compiler_test(
+    name = "ViewModelValidationPluginWithAssistedInjectTest",
+    srcs = [
+        "ViewModelValidationPluginWithAssistedInjectTest.kt",
+    ],
+    compiler_deps = [
+        "@androidsdk//:platforms/android-32/android.jar",
+        "@maven//:androidx_lifecycle_lifecycle_viewmodel",
+        "@maven//:androidx_lifecycle_lifecycle_viewmodel_savedstate",
+        "//third_party/java/compile_testing",
+        "//third_party/java/truth",
+        "//java/dagger/hilt/android/lifecycle:hilt_view_model",
+        "//java/dagger/hilt/android:android_entry_point",
+        "//java/dagger/hilt/android:hilt_android_app",
+    ],
+    resources = glob(["goldens/*"]),
+    deps = [
+        ":test_utils",
+        "//:compiler_internals",
+        "//java/dagger/hilt/android/processor/internal/viewmodel:processor_lib",
+        "//java/dagger/hilt/android/processor/internal/viewmodel:validation_plugin_lib",
+        "//java/dagger/hilt/android/testing/compile",
+        "//java/dagger/internal/codegen/xprocessing",
+        "//java/dagger/internal/codegen/xprocessing:xprocessing-testing",
+        "//java/dagger/testing/golden",
+        "//third_party/java/compile_testing",
+        "//third_party/java/guava/collect",
         "//third_party/java/junit",
         "//third_party/java/truth",
     ],
@@ -97,6 +108,6 @@ kt_jvm_library(
         "TestUtils.kt",
     ],
     deps = [
-        "//third_party/java/compile_testing",
+        "//java/dagger/hilt/android/testing/compile",
     ],
 )

@@ -20,7 +20,8 @@ import javax.inject.Provider;
     "unchecked",
     "rawtypes",
     "KotlinInternal",
-    "KotlinInternalInJava"
+    "KotlinInternalInJava",
+    "cast"
 })
 public final class TestModule_ProduceStringFactory extends AbstractProducesMethodProducer<Void, String> {
   private final TestModule module;
