@@ -16,55 +16,29 @@
 
 package dagger.spi.model;
 
-import com.google.auto.common.AnnotationMirrors;
-import com.google.auto.value.AutoValue;
 import com.google.devtools.ksp.symbol.KSAnnotation;
-import javax.annotation.Nullable;
+import com.google.errorprone.annotations.DoNotMock;
 import javax.lang.model.element.AnnotationMirror;
 
 /** Wrapper type for an annotation. */
-@AutoValue
+@DoNotMock("Only use real implementations created by Dagger")
 public abstract class DaggerAnnotation {
-  public static DaggerAnnotation fromJavac(
-      DaggerTypeElement annotationTypeElement, AnnotationMirror annotation) {
-    return new AutoValue_DaggerAnnotation(annotationTypeElement, annotation, null);
-  }
-
-  public static DaggerAnnotation fromKsp(
-      DaggerTypeElement annotationTypeElement, KSAnnotation ksp) {
-    return new AutoValue_DaggerAnnotation(annotationTypeElement, null, ksp);
-  }
-
   public abstract DaggerTypeElement annotationTypeElement();
 
   /**
-   * java representation for the annotation, returns {@code null} if the annotation isn't a java
-   * element.
+   * Returns the Javac representation for the annotation.
+   *
+   * @throws IllegalStateException if the current backend isn't Javac.
    */
-  @Nullable
-  public abstract AnnotationMirror java();
+  public abstract AnnotationMirror javac();
 
-  /** KSP declaration for the annotation, returns {@code null} not using KSP. */
-  @Nullable
+  /**
+   * Returns the KSP representation for the annotation.
+   *
+   * @throws IllegalStateException if the current backend isn't KSP.
+   */
   public abstract KSAnnotation ksp();
 
-  public DaggerProcessingEnv.Backend backend() {
-    if (java() != null) {
-      return DaggerProcessingEnv.Backend.JAVAC;
-    } else if (ksp() != null) {
-      return DaggerProcessingEnv.Backend.KSP;
-    }
-    throw new AssertionError("Unexpected backend");
-  }
-
-  @Override
-  public final String toString() {
-    switch (backend()) {
-      case JAVAC:
-        return AnnotationMirrors.toString(java());
-      case KSP:
-        return ksp().toString();
-    }
-    throw new IllegalStateException(String.format("Backend %s not supported yet.", backend()));
-  }
+  /** Returns the backend used in this compilation. */
+  public abstract DaggerProcessingEnv.Backend backend();
 }

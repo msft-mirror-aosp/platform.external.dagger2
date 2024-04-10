@@ -26,39 +26,61 @@ local_repository(
 )
 
 #############################
-# Load Bazel-Common repository
-#############################
-
-http_archive(
-    name = "google_bazel_common",
-    sha256 = "60a9aebe25f476646f61c041d1679a9b21076deffbd51526838c7f24d6468ac0",
-    strip_prefix = "bazel-common-227a23a508a2fab0fa67ffe2d9332ae536a40edc",
-    urls = ["https://github.com/google/bazel-common/archive/227a23a508a2fab0fa67ffe2d9332ae536a40edc.zip"],
-)
-
-load("@google_bazel_common//:workspace_defs.bzl", "google_common_workspace_rules")
-
-google_common_workspace_rules()
-
-#############################
 # Load Bazel Skylib rules
 #############################
 
-BAZEL_SKYLIB_VERSION = "1.2.1"
+BAZEL_SKYLIB_VERSION = "1.5.0"
 
-BAZEL_SKYLIB_SHA = "f7be3474d42aae265405a592bb7da8e171919d74c16f082a5457840f06054728"
+BAZEL_SKYLIB_SHA = "cd55a062e763b9349921f0f5db8c3933288dc8ba4f76dd9416aac68acee3cb94"
 
 http_archive(
     name = "bazel_skylib",
     sha256 = BAZEL_SKYLIB_SHA,
     urls = [
-        "https://github.com/bazelbuild/bazel-skylib/releases/download/{version}/bazel-skylib-{version}.tar.gz".format(version = BAZEL_SKYLIB_VERSION),
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/%s/bazel-skylib-%s.tar.gz" % (BAZEL_SKYLIB_VERSION, BAZEL_SKYLIB_VERSION),
+        "https://github.com/bazelbuild/bazel-skylib/releases/download/%s/bazel-skylib-%s.tar.gz" % (BAZEL_SKYLIB_VERSION, BAZEL_SKYLIB_VERSION),
     ],
 )
 
 load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
 
 bazel_skylib_workspace()
+
+####################################################
+# Load Protobuf repository (needed by bazel-common)
+####################################################
+
+http_archive(
+    name = "rules_proto",
+    # output from `sha256sum` on the downloaded tar.gz file
+    sha256 = "66bfdf8782796239d3875d37e7de19b1d94301e8972b3cbd2446b332429b4df1",
+    strip_prefix = "rules_proto-4.0.0",
+    urls = [
+        "https://mirror.bazel.build/github.com/bazelbuild/rules_proto/archive/refs/tags/4.0.0.tar.gz",
+        "https://github.com/bazelbuild/rules_proto/archive/refs/tags/4.0.0.tar.gz",
+    ],
+)
+
+load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies", "rules_proto_toolchains")
+
+rules_proto_dependencies()
+
+rules_proto_toolchains()
+
+#############################
+# Load Bazel-Common repository
+#############################
+
+http_archive(
+    name = "google_bazel_common",
+    sha256 = "82a49fb27c01ad184db948747733159022f9464fc2e62da996fa700594d9ea42",
+    strip_prefix = "bazel-common-2a6b6406e12208e02b2060df0631fb30919080f3",
+    urls = ["https://github.com/google/bazel-common/archive/2a6b6406e12208e02b2060df0631fb30919080f3.zip"],
+)
+
+load("@google_bazel_common//:workspace_defs.bzl", "google_common_workspace_rules")
+
+google_common_workspace_rules()
 
 #############################
 # Load Protobuf dependencies
@@ -107,9 +129,9 @@ robolectric_repositories()
 # Load Kotlin repository
 #############################
 
-RULES_KOTLIN_TAG = "v1.8-RC-1"
+RULES_KOTLIN_TAG = "v1.8"
 
-RULES_KOTLIN_SHA = "1779628569eb3b0fe97a3fb5c3ed8090e6503e425600b401c7b1afb6b23a3098"
+RULES_KOTLIN_SHA = "01293740a16e474669aba5b5a1fe3d368de5832442f164e4fbfc566815a8bc3a"
 
 http_archive(
     name = "io_bazel_rules_kotlin",
@@ -119,10 +141,10 @@ http_archive(
 
 load("@io_bazel_rules_kotlin//kotlin:repositories.bzl", "kotlin_repositories", "kotlinc_version")
 
-KOTLIN_VERSION = "1.8.0"
+KOTLIN_VERSION = "1.9.20"
 
 # Get from https://github.com/JetBrains/kotlin/releases/
-KOTLINC_RELEASE_SHA = "0bb9419fac9832a56a3a19cad282f8f2d6f1237d2d467dc8dfe9bd4a2a43c42e"
+KOTLINC_RELEASE_SHA = "15a8a2825b74ccf6c44e04e97672db802d2df75ce2fbb63ef0539bf3ae5006f0"
 
 kotlin_repositories(
     compiler_release = kotlinc_version(
@@ -139,9 +161,9 @@ kt_register_toolchains()
 # Load Maven dependencies
 #############################
 
-RULES_JVM_EXTERNAL_TAG = "4.2"
+RULES_JVM_EXTERNAL_TAG = "4.5"
 
-RULES_JVM_EXTERNAL_SHA = "cd1a77b7b02e8e008439ca76fd34f5b07aecb8c752961f9640dea15e9e5ba1ca"
+RULES_JVM_EXTERNAL_SHA = "b17d7388feb9bfa7f2fa09031b32707df529f26c91ab9e5d909eb1676badd9a6"
 
 http_archive(
     name = "rules_jvm_external",
@@ -159,7 +181,7 @@ AUTO_COMMON_VERSION = "1.2.1"
 # NOTE(bcorso): Even though we set the version here, our Guava version in
 #  processor code will use whatever version is built into JavaBuilder, which is
 #  tied to the version of Bazel we're using.
-GUAVA_VERSION = "27.1"
+GUAVA_VERSION = "33.0.0"
 
 GRPC_VERSION = "1.2.0"
 
@@ -171,11 +193,12 @@ CHECKER_FRAMEWORK_VERSION = "2.5.3"
 
 ERROR_PRONE_VERSION = "2.14.0"
 
-KSP_VERSION = KOTLIN_VERSION + "-1.0.9"
+KSP_VERSION = KOTLIN_VERSION + "-1.0.14"
 
 maven_install(
     artifacts = [
         "androidx.annotation:annotation:1.1.0",
+        "androidx.annotation:annotation-experimental:1.3.1",
         "androidx.appcompat:appcompat:1.3.1",
         "androidx.activity:activity:1.5.1",
         "androidx.fragment:fragment:1.5.1",
@@ -220,7 +243,7 @@ maven_install(
         "com.google.guava:guava-beta-checker:1.0",
         "com.google.protobuf:protobuf-java:3.7.0",
         "com.google.testing.compile:compile-testing:0.18",
-        "com.google.truth:truth:1.1",
+        "com.google.truth:truth:1.4.0",
         "com.squareup:javapoet:1.13.0",
         "com.squareup:kotlinpoet:1.11.0",
         "io.github.java-diff-utils:java-diff-utils:4.11",
@@ -246,6 +269,7 @@ maven_install(
         "org.jetbrains.kotlin:kotlin-daemon-embeddable:%s" % KOTLIN_VERSION,
         "org.jetbrains.kotlin:kotlin-stdlib:%s" % KOTLIN_VERSION,
         "org.jetbrains.kotlinx:kotlinx-metadata-jvm:0.6.2",
+        "org.jspecify:jspecify:0.3.0",
         "org.mockito:mockito-core:2.28.2",
         "org.objenesis:objenesis:1.0",
         "org.robolectric:robolectric:4.4",

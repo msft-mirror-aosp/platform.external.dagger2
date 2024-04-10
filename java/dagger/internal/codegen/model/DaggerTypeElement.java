@@ -32,7 +32,7 @@ public abstract class DaggerTypeElement {
 
   public abstract XTypeElement xprocessing();
 
-  public TypeElement java() {
+  public TypeElement javac() {
     return toJavac(xprocessing());
   }
 

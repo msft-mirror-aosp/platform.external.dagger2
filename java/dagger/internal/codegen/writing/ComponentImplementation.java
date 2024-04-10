@@ -42,6 +42,7 @@ import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
 import static javax.tools.Diagnostic.Kind.ERROR;
 
+import androidx.room.compiler.processing.XExecutableParameterElement;
 import androidx.room.compiler.processing.XMessager;
 import androidx.room.compiler.processing.XMethodElement;
 import androidx.room.compiler.processing.XProcessingEnv;
@@ -72,9 +73,9 @@ import dagger.internal.codegen.binding.Binding;
 import dagger.internal.codegen.binding.BindingGraph;
 import dagger.internal.codegen.binding.BindingNode;
 import dagger.internal.codegen.binding.BindingRequest;
+import dagger.internal.codegen.binding.CancellationPolicy;
 import dagger.internal.codegen.binding.ComponentCreatorDescriptor;
 import dagger.internal.codegen.binding.ComponentDescriptor;
-import dagger.internal.codegen.binding.ComponentDescriptor.CancellationPolicy;
 import dagger.internal.codegen.binding.ComponentDescriptor.ComponentMethodDescriptor;
 import dagger.internal.codegen.binding.ComponentRequirement;
 import dagger.internal.codegen.binding.KeyVariableNamer;
@@ -111,15 +112,10 @@ public final class ComponentImplementation {
   /** Compiler Modes. */
   public enum CompilerMode {
     DEFAULT,
-    FAST_INIT,
-    EXPERIMENTAL_MERGED_MODE;
+    FAST_INIT;
 
     public boolean isFastInit() {
       return this == CompilerMode.FAST_INIT;
-    }
-
-    public boolean isExperimentalMergedMode() {
-      return this == CompilerMode.EXPERIMENTAL_MERGED_MODE;
     }
   }
 
@@ -311,11 +307,7 @@ public final class ComponentImplementation {
     this.messager = messager;
     XTypeElement typeElement = rootComponentImplementation().componentDescriptor().typeElement();
     this.compilerMode =
-        compilerOptions.fastInit(typeElement)
-            ? CompilerMode.FAST_INIT
-            : (compilerOptions.experimentalMergedMode(typeElement)
-                ? CompilerMode.EXPERIMENTAL_MERGED_MODE
-                : CompilerMode.DEFAULT);
+        compilerOptions.fastInit(typeElement) ? CompilerMode.FAST_INIT : CompilerMode.DEFAULT;
   }
 
   /**
@@ -464,7 +456,7 @@ public final class ComponentImplementation {
     private final UniqueNameSet assistedParamNames = new UniqueNameSet();
     private final List<CodeBlock> initializations = new ArrayList<>();
     private final SwitchingProviders switchingProviders;
-    private final ExperimentalSwitchingProviders experimentalSwitchingProviders;
+    private final LazyClassKeyProviders lazyClassKeyProviders;
     private final Map<Key, CodeBlock> cancellations = new LinkedHashMap<>();
     private final Map<XVariableElement, String> uniqueAssistedName = new LinkedHashMap<>();
     private final List<CodeBlock> componentRequirementInitializations = new ArrayList<>();
@@ -481,9 +473,7 @@ public final class ComponentImplementation {
     private ShardImplementation(ClassName name) {
       this.name = name;
       this.switchingProviders = new SwitchingProviders(this, processingEnv);
-      this.experimentalSwitchingProviders =
-          new ExperimentalSwitchingProviders(this, componentRequestRepresentationsProvider);
-
+      this.lazyClassKeyProviders = new LazyClassKeyProviders(this);
       if (graph.componentDescriptor().isProduction()) {
         claimMethodName(CANCELLATION_LISTENER_METHOD_NAME);
       }
@@ -517,9 +507,8 @@ public final class ComponentImplementation {
       return switchingProviders;
     }
 
-    /** Returns the {@link ExperimentalSwitchingProviders} class for this shard. */
-    public ExperimentalSwitchingProviders getExperimentalSwitchingProviders() {
-      return experimentalSwitchingProviders;
+    public LazyClassKeyProviders getLazyClassKeyProviders() {
+      return lazyClassKeyProviders;
     }
 
     /** Returns the {@link ComponentImplementation} that owns this shard. */
@@ -665,12 +654,12 @@ public final class ComponentImplementation {
       return assistedParamNames.getUniqueName(name);
     }
 
-    public String getUniqueFieldNameForAssistedParam(XVariableElement element) {
-      if (uniqueAssistedName.containsKey(element)) {
-        return uniqueAssistedName.get(element);
+    public String getUniqueFieldNameForAssistedParam(XExecutableParameterElement parameter) {
+      if (uniqueAssistedName.containsKey(parameter)) {
+        return uniqueAssistedName.get(parameter);
       }
-      String name = getUniqueAssistedParamName(getSimpleName(element));
-      uniqueAssistedName.put(element, name);
+      String name = getUniqueAssistedParamName(parameter.getJvmName());
+      uniqueAssistedName.put(parameter, name);
       return name;
     }
 

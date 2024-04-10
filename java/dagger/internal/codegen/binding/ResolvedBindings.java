@@ -27,6 +27,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Multimap;
+import dagger.internal.codegen.model.ComponentPath;
 import dagger.internal.codegen.model.Key;
 
 /**
@@ -40,6 +41,9 @@ import dagger.internal.codegen.model.Key;
  */
 @AutoValue
 abstract class ResolvedBindings {
+  /** The component path for the resolved bindings. */
+  abstract ComponentPath componentPath();
+
   /** The binding key for which the {@link #bindings()} have been resolved. */
   abstract Key key();
 
@@ -127,12 +131,14 @@ abstract class ResolvedBindings {
 
   /** Creates a {@link ResolvedBindings} for contribution bindings. */
   static ResolvedBindings forContributionBindings(
+      ComponentPath componentPath,
       Key key,
       Multimap<XTypeElement, ContributionBinding> contributionBindings,
       Iterable<MultibindingDeclaration> multibindings,
       Iterable<SubcomponentDeclaration> subcomponentDeclarations,
       Iterable<OptionalBindingDeclaration> optionalBindingDeclarations) {
     return new AutoValue_ResolvedBindings(
+        componentPath,
         key,
         ImmutableSetMultimap.copyOf(contributionBindings),
         ImmutableMap.of(),
@@ -145,10 +151,12 @@ abstract class ResolvedBindings {
    * Creates a {@link ResolvedBindings} for members injection bindings.
    */
   static ResolvedBindings forMembersInjectionBinding(
+      ComponentPath componentPath,
       Key key,
       ComponentDescriptor owningComponent,
       MembersInjectionBinding ownedMembersInjectionBinding) {
     return new AutoValue_ResolvedBindings(
+        componentPath,
         key,
         ImmutableSetMultimap.of(),
         ImmutableMap.of(owningComponent.typeElement(), ownedMembersInjectionBinding),
@@ -160,8 +168,9 @@ abstract class ResolvedBindings {
   /**
    * Creates a {@link ResolvedBindings} appropriate for when there are no bindings for the key.
    */
-  static ResolvedBindings noBindings(Key key) {
+  static ResolvedBindings noBindings(ComponentPath componentPath, Key key) {
     return new AutoValue_ResolvedBindings(
+        componentPath,
         key,
         ImmutableSetMultimap.of(),
         ImmutableMap.of(),

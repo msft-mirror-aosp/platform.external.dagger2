@@ -33,13 +33,13 @@ import dagger.internal.codegen.base.OptionalType.OptionalKind;
 import dagger.internal.codegen.binding.ProvisionBinding;
 import dagger.internal.codegen.javapoet.Expression;
 import dagger.internal.codegen.model.DependencyRequest;
+import dagger.internal.codegen.model.RequestKind;
 
 /** A binding expression for optional bindings. */
 final class OptionalRequestRepresentation extends RequestRepresentation {
   private final ProvisionBinding binding;
   private final ComponentRequestRepresentations componentRequestRepresentations;
   private final XProcessingEnv processingEnv;
-  private final boolean isExperimentalMergedMode;
 
   @AssistedInject
   OptionalRequestRepresentation(
@@ -50,8 +50,6 @@ final class OptionalRequestRepresentation extends RequestRepresentation {
     this.binding = binding;
     this.componentRequestRepresentations = componentRequestRepresentations;
     this.processingEnv = processingEnv;
-    this.isExperimentalMergedMode =
-        componentImplementation.compilerMode().isExperimentalMergedMode();
   }
 
   @Override
@@ -78,18 +76,15 @@ final class OptionalRequestRepresentation extends RequestRepresentation {
     DependencyRequest dependency = getOnlyElement(binding.dependencies());
 
     CodeBlock dependencyExpression =
-        isExperimentalMergedMode
-            ? componentRequestRepresentations
-                .getExperimentalSwitchingProviderDependencyRepresentation(
-                    bindingRequest(dependency))
-                .getDependencyExpression(dependency.kind(), binding)
-                .codeBlock()
-            : componentRequestRepresentations
-                .getDependencyExpression(bindingRequest(dependency), requestingClass)
-                .codeBlock();
+        componentRequestRepresentations
+            .getDependencyExpression(bindingRequest(dependency), requestingClass)
+            .codeBlock();
 
-    return isTypeAccessibleFrom(
-            dependency.key().type().xprocessing(), requestingClass.packageName())
+    boolean needsObjectExpression = !isTypeAccessibleFrom(
+        dependency.key().type().xprocessing(), requestingClass.packageName())
+        || (isPreJava8SourceVersion(processingEnv) && dependency.kind() == RequestKind.PROVIDER);
+
+    return !needsObjectExpression
         ? Expression.create(
             binding.key().type().xprocessing(),
             optionalKind.presentExpression(dependencyExpression))

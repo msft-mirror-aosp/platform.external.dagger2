@@ -39,7 +39,7 @@ public abstract class DaggerType {
     return equivalenceWrapper().get();
   }
 
-  public TypeMirror java() {
+  public TypeMirror javac() {
     return toJavac(xprocessing());
   }
 

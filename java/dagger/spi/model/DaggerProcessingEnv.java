@@ -16,50 +16,41 @@
 
 package dagger.spi.model;
 
-import com.google.auto.value.AutoValue;
 import com.google.devtools.ksp.processing.Resolver;
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment;
-import javax.annotation.Nullable;
+import com.google.errorprone.annotations.DoNotMock;
 import javax.annotation.processing.ProcessingEnvironment;
 
 /** Wrapper type for an element. */
-@AutoValue
+@DoNotMock("Only use real implementations created by Dagger")
 public abstract class DaggerProcessingEnv {
   /** Represents a type of backend used for compilation. */
-  public enum Backend { JAVAC, KSP }
-
-  public static boolean isJavac(Backend backend) {
-    return backend.equals(Backend.JAVAC);
-  }
-
-  public static DaggerProcessingEnv fromJavac(ProcessingEnvironment env) {
-    return new AutoValue_DaggerProcessingEnv(env, null, null);
-  }
-
-  public static DaggerProcessingEnv fromKsp(SymbolProcessorEnvironment env, Resolver resolver) {
-    return new AutoValue_DaggerProcessingEnv(null, env, resolver);
+  public enum Backend {
+    JAVAC,
+    KSP
   }
 
   /**
-   * Java representation for the processing environment, returns {@code null} not using java
-   * annotation processor.
+   * Returns the Javac representation for the processing environment.
+   *
+   * @throws IllegalStateException if the current backend isn't Javac.
    */
-  @Nullable
-  public abstract ProcessingEnvironment java();
+  public abstract ProcessingEnvironment javac();
 
-  @Nullable
+  /**
+   * Returns the KSP representation for the processing environment.
+   *
+   * @throws IllegalStateException if the current backend isn't KSP.
+   */
   public abstract SymbolProcessorEnvironment ksp();
 
-  @Nullable
+  /**
+   * Returns the KSP representation for the resolver.
+   *
+   * @throws IllegalStateException if the current backend isn't KSP.
+   */
   public abstract Resolver resolver();
 
   /** Returns the backend used in this compilation. */
-  public DaggerProcessingEnv.Backend backend() {
-    if (java() != null) {
-      return DaggerProcessingEnv.Backend.JAVAC;
-    } else if (ksp() != null) {
-      return DaggerProcessingEnv.Backend.KSP;
-    }
-    throw new AssertionError("Unexpected backend");
-  }
+  public abstract DaggerProcessingEnv.Backend backend();
 }

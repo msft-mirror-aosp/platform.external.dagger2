@@ -117,7 +117,7 @@ public final class HiltCompilerTests {
             .collect(toMap((Processor e) -> e.getClass(), (Processor e) -> e));
 
     // Adds extra processors, and allows overriding any processors of the same class.
-    extraProcessors.stream().forEach(processor -> processors.put(processor.getClass(), processor));
+    extraProcessors.forEach(processor -> processors.put(processor.getClass(), processor));
 
     return CompilerTests.compiler().withProcessors(processors.values());
   }
@@ -191,9 +191,9 @@ public final class HiltCompilerTests {
   private static ImmutableList<SymbolProcessorProvider> kspDefaultProcessors() {
     // TODO(bcorso): Add the rest of the KSP processors here.
     return ImmutableList.of(
-        new KspAndroidEntryPointProcessor.Provider(),
-        new KspAliasOfProcessor.Provider(),
         new KspAggregatedDepsProcessor.Provider(),
+        new KspAliasOfProcessor.Provider(),
+        new KspAndroidEntryPointProcessor.Provider(),
         new KspComponentProcessor.Provider(),
         new KspComponentTreeDepsProcessor.Provider(),
         new KspCustomTestApplicationProcessor.Provider(),
@@ -279,16 +279,14 @@ public final class HiltCompilerTests {
               "-P", "plugin:org.jetbrains.kotlin.kapt3:correctErrorTypes=true"),
           /* config= */ HiltProcessingEnvConfigs.CONFIGS,
           /* javacProcessors= */ ImmutableList.<Processor>builder()
-              .addAll(defaultProcessors())
-              .addAll(additionalJavacProcessors())
+              .addAll(mergeProcessors(defaultProcessors(), additionalJavacProcessors()))
               .addAll(
                   processingSteps().stream()
                       .map(HiltCompilerProcessors.JavacProcessor::new)
                       .collect(toImmutableList()))
               .build(),
           /* symbolProcessorProviders= */ ImmutableList.<SymbolProcessorProvider>builder()
-              .addAll(kspDefaultProcessors())
-              .addAll(additionalKspProcessors())
+              .addAll(mergeProcessors(kspDefaultProcessors(), additionalKspProcessors()))
               .addAll(
                   processingSteps().stream()
                       .map(HiltCompilerProcessors.KspProcessor.Provider::new)
@@ -298,6 +296,15 @@ public final class HiltCompilerTests {
             onCompilationResult.accept(result);
             return null;
           });
+    }
+
+    private static <T> ImmutableList<T> mergeProcessors(
+        Collection<T> defaultProcessors, Collection<T> extraProcessors) {
+      Map<Class<?>, T> processors =
+          defaultProcessors.stream().collect(toMap((T e) -> e.getClass(), (T e) -> e));
+      // Adds extra processors, and allows overriding any processors of the same class.
+      extraProcessors.forEach(processor -> processors.put(processor.getClass(), processor));
+      return ImmutableList.copyOf(processors.values());
     }
 
     /** Used to build a {@link HiltCompiler}. */

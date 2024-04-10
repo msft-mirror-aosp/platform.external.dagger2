@@ -57,9 +57,7 @@ java_library(
         "ProcessorErrors.java",
     ],
     deps = [
-        "//java/dagger/internal/codegen/extension",
         "//java/dagger/internal/codegen/xprocessing",
-        "//third_party/java/auto:common",
         "//third_party/java/error_prone:annotations",
         "//third_party/java/guava/base",
         "//third_party/java/guava/collect",
@@ -83,6 +81,20 @@ java_library(
         "//third_party/java/javapoet",
         "@maven//:com_google_devtools_ksp_symbol_processing_api",
         "@maven//:org_jetbrains_kotlin_kotlin_stdlib",
+    ],
+)
+
+java_library(
+    name = "method_signature",
+    srcs = [
+        "MethodSignature.java",
+    ],
+    deps = [
+        "//java/dagger/internal/codegen/extension",
+        "//java/dagger/internal/codegen/xprocessing",
+        "//third_party/java/auto:value",
+        "//third_party/java/guava/collect",
+        "//third_party/java/javapoet",
     ],
 )
 

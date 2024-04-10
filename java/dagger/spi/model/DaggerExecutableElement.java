@@ -16,59 +16,27 @@
 
 package dagger.spi.model;
 
-import com.google.auto.value.AutoValue;
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration;
-import javax.annotation.Nullable;
+import com.google.errorprone.annotations.DoNotMock;
 import javax.lang.model.element.ExecutableElement;
 
 /** Wrapper type for an executable element. */
-@AutoValue
+@DoNotMock("Only use real implementations created by Dagger")
 public abstract class DaggerExecutableElement {
-  public static DaggerExecutableElement fromJava(ExecutableElement executableElement) {
-    return new AutoValue_DaggerExecutableElement(executableElement, null);
-  }
-
-  public static DaggerExecutableElement fromKsp(KSFunctionDeclaration declaration) {
-    return new AutoValue_DaggerExecutableElement(null, declaration);
-  }
+  /**
+   * Returns the Javac representation for the executable element.
+   *
+   * @throws IllegalStateException if the current backend isn't Javac.
+   */
+  public abstract ExecutableElement javac();
 
   /**
-   * Java representation for the element, returns {@code null} not using java annotation processor.
+   * Returns the KSP representation for the executable element.
+   *
+   * @throws IllegalStateException if the current backend isn't KSP.
    */
-  @Nullable
-  public abstract ExecutableElement java();
-
-  /** KSP declaration for the element, returns {@code null} not using KSP. */
-  @Nullable
   public abstract KSFunctionDeclaration ksp();
 
-  public DaggerProcessingEnv.Backend backend() {
-    if (java() != null) {
-      return DaggerProcessingEnv.Backend.JAVAC;
-    } else if (ksp() != null) {
-      return DaggerProcessingEnv.Backend.KSP;
-    }
-    throw new AssertionError("Unexpected backend");
-  }
-
-  @Override
-  public final String toString() {
-    switch (backend()) {
-      case JAVAC:
-        return java().toString();
-      case KSP:
-        return ksp().toString();
-    }
-    throw new IllegalStateException(String.format("Backend %s not supported yet.", backend()));
-  }
-
-  String simpleName() {
-    switch (backend()) {
-      case JAVAC:
-        return java().getSimpleName().toString();
-      case KSP:
-        return ksp().getSimpleName().toString();
-    }
-    throw new IllegalStateException(String.format("Backend %s not supported yet.", backend()));
-  }
+  /** Returns the backend used in this compilation. */
+  public abstract DaggerProcessingEnv.Backend backend();
 }

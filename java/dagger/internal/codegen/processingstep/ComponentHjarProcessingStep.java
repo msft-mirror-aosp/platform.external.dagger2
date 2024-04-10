@@ -28,7 +28,6 @@ import com.squareup.javapoet.ClassName;
 import dagger.internal.codegen.base.SourceFileGenerator;
 import dagger.internal.codegen.binding.BindingGraph;
 import dagger.internal.codegen.binding.ComponentDescriptor;
-import dagger.internal.codegen.binding.ComponentDescriptorFactory;
 import dagger.internal.codegen.validation.ComponentCreatorValidator;
 import dagger.internal.codegen.validation.ComponentValidator;
 import dagger.internal.codegen.validation.ValidationReport;
@@ -52,7 +51,7 @@ final class ComponentHjarProcessingStep extends TypeCheckingProcessingStep<XType
   private final XMessager messager;
   private final ComponentValidator componentValidator;
   private final ComponentCreatorValidator creatorValidator;
-  private final ComponentDescriptorFactory componentDescriptorFactory;
+  private final ComponentDescriptor.Factory componentDescriptorFactory;
   private final SourceFileGenerator<ComponentDescriptor> componentGenerator;
 
   @Inject
@@ -60,7 +59,7 @@ final class ComponentHjarProcessingStep extends TypeCheckingProcessingStep<XType
       XMessager messager,
       ComponentValidator componentValidator,
       ComponentCreatorValidator creatorValidator,
-      ComponentDescriptorFactory componentDescriptorFactory,
+      ComponentDescriptor.Factory componentDescriptorFactory,
       SourceFileGenerator<ComponentDescriptor> componentGenerator) {
     this.messager = messager;
     this.componentValidator = componentValidator;

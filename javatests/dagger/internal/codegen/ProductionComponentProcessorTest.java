@@ -202,6 +202,51 @@ public class ProductionComponentProcessorTest {
   }
 
   @Test
+  public void dependsOnProductionSubcomponentWithPluginsVisitFullBindingGraphs() throws Exception {
+    Source myComponent =
+        CompilerTests.javaSource(
+            "test.MyComponent",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "",
+            "@Component(modules = MyModule.class)",
+            "interface MyComponent {}");
+    Source myModule =
+        CompilerTests.javaSource(
+            "test.MyModule",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "import dagger.Module;",
+            "",
+            "@Module(subcomponents = MyProductionSubcomponent.class)",
+            "interface MyModule {}");
+    Source myProductionSubcomponent =
+        CompilerTests.javaSource(
+            "test.MyProductionSubcomponent",
+            "package test;",
+            "",
+            "import dagger.producers.ProductionSubcomponent;",
+            "",
+            "@ProductionSubcomponent",
+            "interface MyProductionSubcomponent {",
+            "  @ProductionSubcomponent.Builder",
+            "  interface Builder {",
+            "    MyProductionSubcomponent build();",
+            "  }",
+            "}");
+
+    CompilerTests.daggerCompiler(myComponent, myModule, myProductionSubcomponent)
+        .withProcessingOptions(
+            ImmutableMap.<String, String>builder()
+                .putAll(compilerMode.processorOptions())
+                .put("dagger.pluginsVisitFullBindingGraphs", "ENABLED")
+                .buildOrThrow())
+        .compile(subject -> subject.hasErrorCount(0));
+  }
+
+  @Test
   public void simpleComponent() throws Exception {
     Source component =
         CompilerTests.javaSource(

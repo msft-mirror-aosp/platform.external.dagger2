@@ -64,6 +64,7 @@ import javax.tools.Diagnostic.Kind;
  */
 @Singleton
 public final class InjectValidator implements ClearableCache {
+
   private final XProcessingEnv processingEnv;
   private final CompilerOptions compilerOptions;
   private final DependencyRequestValidator dependencyRequestValidator;
@@ -294,6 +295,15 @@ public final class InjectValidator implements ClearableCache {
     if (fieldElement.isStatic()) {
       builder.addItem(
           "Dagger does not support injection into static fields",
+          staticMemberDiagnosticKind(),
+          fieldElement);
+    }
+
+    if (fieldElement.isProtected()
+        && fieldElement.getEnclosingElement().isFromKotlin()
+        ) {
+      builder.addItem(
+          "Dagger injector does not have access to kotlin protected fields",
           staticMemberDiagnosticKind(),
           fieldElement);
     }

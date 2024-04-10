@@ -23,6 +23,7 @@ plugins {
 test {
     systemProperty 'dagger_version', "$dagger_version"
     systemProperty 'kotlin_version', "$kotlin_version"
+    systemProperty 'ksp_version', "$ksp_version"
 }
 
 dependencies {

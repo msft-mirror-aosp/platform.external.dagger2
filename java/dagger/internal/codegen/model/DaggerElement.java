@@ -31,7 +31,7 @@ public abstract class DaggerElement {
 
   public abstract XElement xprocessing();
 
-  public Element java() {
+  public Element javac() {
     return toJavac(xprocessing());
   }
 

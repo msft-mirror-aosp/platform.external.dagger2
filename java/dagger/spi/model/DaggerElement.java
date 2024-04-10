@@ -16,49 +16,27 @@
 
 package dagger.spi.model;
 
-import com.google.auto.value.AutoValue;
 import com.google.devtools.ksp.symbol.KSAnnotated;
-import javax.annotation.Nullable;
+import com.google.errorprone.annotations.DoNotMock;
 import javax.lang.model.element.Element;
 
 /** Wrapper type for an element. */
-@AutoValue
+@DoNotMock("Only use real implementations created by Dagger")
 public abstract class DaggerElement {
-  public static DaggerElement fromJavac(Element element) {
-    return new AutoValue_DaggerElement(element, null);
-  }
-
-  public static DaggerElement fromKsp(KSAnnotated ksp) {
-    return new AutoValue_DaggerElement(null, ksp);
-  }
+  /**
+   * Returns the Javac representation for the element.
+   *
+   * @throws IllegalStateException if the current backend isn't Javac.
+   */
+  public abstract Element javac();
 
   /**
-   * Java representation for the element, returns {@code null} not using java annotation processor.
+   * Returns the KSP representation for the element.
+   *
+   * @throws IllegalStateException if the current backend isn't KSP.
    */
-  @Nullable
-  public abstract Element java();
-
-  /** KSP declaration for the element, returns {@code null} not using KSP. */
-  @Nullable
   public abstract KSAnnotated ksp();
 
-  public DaggerProcessingEnv.Backend backend() {
-    if (java() != null) {
-      return DaggerProcessingEnv.Backend.JAVAC;
-    } else if (ksp() != null) {
-      return DaggerProcessingEnv.Backend.KSP;
-    }
-    throw new AssertionError("Unexpected backend");
-  }
-
-  @Override
-  public final String toString() {
-    switch (backend()) {
-      case JAVAC:
-        return java().toString();
-      case KSP:
-        return ksp().toString();
-    }
-    throw new IllegalStateException(String.format("Backend %s not supported yet.", backend()));
-  }
+  /** Returns the backend used in this compilation. */
+  public abstract DaggerProcessingEnv.Backend backend();
 }

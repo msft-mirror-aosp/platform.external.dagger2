@@ -19,7 +19,8 @@ import javax.annotation.processing.Generated;
     "unchecked",
     "rawtypes",
     "KotlinInternal",
-    "KotlinInternalInJava"
+    "KotlinInternalInJava",
+    "cast"
 })
 public final class ParameterizedModule_ProvideMapStringNumberFactory implements Factory<Map<String, Number>> {
   @Override

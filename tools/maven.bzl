@@ -15,10 +15,10 @@
 """Macros to simplify generating maven files.
 """
 
+load("@google_bazel_common//tools/jarjar:jarjar.bzl", "jarjar_library")
+load("@google_bazel_common//tools/javadoc:javadoc.bzl", "javadoc_library")
 load("@google_bazel_common//tools/maven:pom_file.bzl", default_pom_file = "pom_file")
 load(":maven_info.bzl", "MavenInfo", "collect_maven_info")
-load("@google_bazel_common//tools/javadoc:javadoc.bzl", "javadoc_library")
-load("@google_bazel_common//tools/jarjar:jarjar.bzl", "jarjar_library")
 
 SHADED_MAVEN_DEPS = [
     "com.google.auto:auto-common",
@@ -66,6 +66,8 @@ def gen_maven_artifact(
         shaded_deps = None,
         manifest = None,
         lint_deps = None,
+        proguard_and_r8_specs = None,
+        r8_specs = None,
         proguard_specs = None):
     _gen_maven_artifact(
         name,
@@ -85,6 +87,8 @@ def gen_maven_artifact(
         shaded_deps,
         manifest,
         lint_deps,
+        proguard_and_r8_specs,
+        r8_specs,
         proguard_specs
     )
 
@@ -106,6 +110,8 @@ def _gen_maven_artifact(
         shaded_deps,
         manifest,
         lint_deps,
+        proguard_and_r8_specs,
+        r8_specs,
         proguard_specs):
     """Generates the files required for a maven artifact.
 
@@ -140,7 +146,12 @@ def _gen_maven_artifact(
       shaded_deps: The shaded deps for the jarjar.
       manifest: The AndroidManifest.xml to bundle in when packaing an 'aar'.
       lint_deps: The lint targets to be bundled in when packaging an 'aar'.
-      proguard_specs: The proguard spec files to be bundled in when packaging an 'aar'
+      proguard_and_r8_specs: The proguard spec files to be bundled in when
+                             packaging an 'aar', which will be applied in
+                             both r8 and proguard.
+      r8_specs: The proguard spec files to be used only for r8 when packaging an 'jar'.
+      proguard_specs: The proguard spec files to be used only for proguard not r8 when
+                           packaging an 'jar'.
     """
 
     _validate_maven_deps(
@@ -189,11 +200,11 @@ def _gen_maven_artifact(
         else:
             lint_jar_name = None
 
-        if proguard_specs:
+        if proguard_and_r8_specs:
             # Concatenate all proguard rules since an aar only contains a single proguard.txt
             native.genrule(
                 name = name + "-proguard",
-                srcs = proguard_specs,
+                srcs = proguard_and_r8_specs,
                 outs = [name + "-proguard.txt"],
                 cmd = "cat $(SRCS) > $@",
             )
@@ -217,11 +228,45 @@ def _gen_maven_artifact(
             cmd = "cp $< $@",
         )
     else:
+        # (TODO/322873492) add support for passing in general proguard rule.
+        if r8_specs:
+            # Concatenate all r8 rules.
+            native.genrule(
+                name = name + "-r8",
+                srcs = r8_specs,
+                outs = [name + "-r8.txt"],
+                cmd = "cat $(SRCS) > $@",
+            )
+            r8_file = name + "-r8.txt"
+        else:
+            r8_file = None
+
+        if proguard_specs:
+            # Concatenate all proguard only rules.
+            native.genrule(
+                name = name + "-proguard-only",
+                srcs = proguard_specs,
+                outs = [name + "-proguard-only.txt"],
+                cmd = "cat $(SRCS) > $@",
+            )
+            proguard_only_file = name + "-proguard-only.txt"
+        else:
+            proguard_only_file = None
+
         jarjar_library(
-            name = name,
+            name = name + "-classes",
             testonly = testonly,
             jars = artifact_targets + shaded_deps,
             merge_meta_inf_files = merge_meta_inf_files,
+        )
+        jar_name = name + "-classes.jar"
+
+        # Include r8 and proguard rules to dagger jar if there is one.
+        _package_r8_and_proguard_rule(
+            name = name,
+            artifactJar = jar_name,
+            r8Spec = r8_file,
+            proguardSpec = proguard_only_file,
         )
 
     jarjar_library(
@@ -403,5 +448,60 @@ _package_android_library = rule(
     },
     outputs = {
         "aar": "%{name}.aar",
+    },
+)
+
+def _package_r8_and_proguard_rule_impl(ctx):
+    inputs = [ctx.file.artifactJar]
+    if ctx.file.r8Spec:
+        inputs.append(ctx.file.r8Spec)
+    if ctx.file.proguardSpec:
+        inputs.append(ctx.file.proguardSpec)
+    ctx.actions.run_shell(
+        inputs = inputs,
+        outputs = [ctx.outputs.jar],
+        command = """
+            TMPDIR="$(mktemp -d)"
+            cp {artifactJar} $TMPDIR/artifact.jar
+            if [[ -a {r8Spec} ]]; then
+                mkdir -p META-INF/com.android.tools/r8
+                cp {r8Spec} META-INF/com.android.tools/r8/r8.pro
+                jar uf $TMPDIR/artifact.jar META-INF/
+            fi
+            if [[ -a {proguardSpec} ]]; then
+                mkdir -p META-INF/com.android.tools/proguard
+                cp {proguardSpec} META-INF/com.android.tools/proguard/proguard.pro
+                jar uf $TMPDIR/artifact.jar META-INF/
+            fi
+            cp $TMPDIR/artifact.jar {outputFile}
+            """.format(
+            artifactJar = ctx.file.artifactJar.path,
+            r8Spec = ctx.file.r8Spec.path if ctx.file.r8Spec else "none",
+            proguardSpec = ctx.file.proguardSpec.path if ctx.file.proguardSpec else "none",
+            outputFile = ctx.outputs.jar.path,
+        ),
+    )
+
+_package_r8_and_proguard_rule = rule(
+    implementation = _package_r8_and_proguard_rule_impl,
+    attrs = {
+        "artifactJar": attr.label(
+            doc = "The library artifact jar to be updated.",
+            allow_single_file = True,
+            mandatory = True,
+        ),
+        "r8Spec": attr.label(
+            doc = "The r8.txt file to be merged with the artifact jar",
+            allow_single_file = True,
+            mandatory = False,
+        ),
+        "proguardSpec": attr.label(
+            doc = "The proguard-only.txt file to be merged with the artifact jar",
+            allow_single_file = True,
+            mandatory = False,
+        ),
+    },
+    outputs = {
+        "jar": "%{name}.jar",
     },
 )

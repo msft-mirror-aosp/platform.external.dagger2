@@ -31,13 +31,13 @@ java_library(
         "//java/dagger/internal/codegen/javac",
         "//java/dagger/internal/codegen/javapoet",
         "//java/dagger/internal/codegen/kotlin",
-        "//java/dagger/internal/codegen/langmodel",
         "//java/dagger/internal/codegen/model",
         "//java/dagger/internal/codegen/validation",
         "//java/dagger/internal/codegen/xprocessing",
         "//third_party/java/auto:service",
         "//third_party/java/error_prone:annotations",
         "//third_party/java/guava/collect",
+        "//third_party/java/jsr330_inject",
     ],
 )
 

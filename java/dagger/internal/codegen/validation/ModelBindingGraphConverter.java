@@ -134,8 +134,8 @@ public final class ModelBindingGraphConverter {
   }
 
   private static Key toModel(dagger.internal.codegen.model.Key key) {
-    return Key.builder(key.type().java())
-        .qualifier(key.qualifier().map(DaggerAnnotation::java))
+    return Key.builder(key.type().javac())
+        .qualifier(key.qualifier().map(DaggerAnnotation::javac))
         .multibindingContributionIdentifier(
             key.multibindingContributionIdentifier().isPresent()
                 ? Optional.of(toModel(key.multibindingContributionIdentifier().get()))
@@ -159,17 +159,17 @@ public final class ModelBindingGraphConverter {
             .key(toModel(request.key()))
             .isNullable(request.isNullable());
 
-    request.requestElement().ifPresent(e -> builder.requestElement(e.java()));
+    request.requestElement().ifPresent(e -> builder.requestElement(e.javac()));
     return builder.build();
   }
 
   private static Scope toModel(dagger.internal.codegen.model.Scope scope) {
-    return Scope.scope(scope.scopeAnnotation().java());
+    return Scope.scope(scope.scopeAnnotation().javac());
   }
 
   private static ComponentPath toModel(dagger.internal.codegen.model.ComponentPath path) {
     return ComponentPath.create(
-        path.components().stream().map(DaggerTypeElement::java).collect(toImmutableList()));
+        path.components().stream().map(DaggerTypeElement::javac).collect(toImmutableList()));
   }
 
   private static dagger.internal.codegen.model.BindingGraph.ComponentNode toInternal(
@@ -232,8 +232,8 @@ public final class ModelBindingGraphConverter {
           binding.dependencies().stream()
               .map(ModelBindingGraphConverter::toModel)
               .collect(toImmutableSet()),
-          binding.bindingElement().map(DaggerElement::java),
-          binding.contributingModule().map(DaggerTypeElement::java),
+          binding.bindingElement().map(DaggerElement::javac),
+          binding.contributingModule().map(DaggerTypeElement::javac),
           binding.requiresModuleInstance(),
           binding.scope().map(ModelBindingGraphConverter::toModel),
           binding.isNullable(),
@@ -291,7 +291,7 @@ public final class ModelBindingGraphConverter {
     static ChildFactoryMethodEdge create(
         dagger.internal.codegen.model.BindingGraph.ChildFactoryMethodEdge childFactoryMethodEdge) {
       return new AutoValue_ModelBindingGraphConverter_ChildFactoryMethodEdgeImpl(
-          childFactoryMethodEdge.factoryMethod().java(), childFactoryMethodEdge);
+          childFactoryMethodEdge.factoryMethod().javac(), childFactoryMethodEdge);
     }
 
     abstract dagger.internal.codegen.model.BindingGraph.ChildFactoryMethodEdge delegate();
@@ -310,7 +310,7 @@ public final class ModelBindingGraphConverter {
             subcomponentCreatorBindingEdge) {
       return new AutoValue_ModelBindingGraphConverter_SubcomponentCreatorBindingEdgeImpl(
           subcomponentCreatorBindingEdge.declaringModules().stream()
-              .map(DaggerTypeElement::java)
+              .map(DaggerTypeElement::javac)
               .collect(toImmutableSet()),
           subcomponentCreatorBindingEdge);
     }

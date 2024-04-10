@@ -53,6 +53,16 @@ public final class TypeNames {
   public static final ClassName SUBCOMPONENT_FACTORY = SUBCOMPONENT.nestedClass("Factory");
 
   // Dagger Internal classnames
+  public static final ClassName IDENTIFIER_NAME_STRING =
+      ClassName.get("dagger.internal", "IdentifierNameString");
+  public static final ClassName KEEP_FIELD_TYPE = ClassName.get("dagger.internal", "KeepFieldType");
+  public static final ClassName LAZY_CLASS_KEY =
+      ClassName.get("dagger.multibindings", "LazyClassKey");
+  public static final ClassName LAZY_CLASS_KEY_MAP =
+      ClassName.get("dagger.internal", "LazyClassKeyMap");
+  public static final ClassName LAZY_CLASS_KEY_MAP_FACTORY =
+      ClassName.get("dagger.internal", "LazyClassKeyMap", "Factory");
+
   public static final ClassName DELEGATE_FACTORY =
       ClassName.get("dagger.internal", "DelegateFactory");
   public static final ClassName DOUBLE_CHECK = ClassName.get("dagger.internal", "DoubleCheck");
@@ -62,6 +72,7 @@ public final class TypeNames {
       ClassName.get("dagger.internal", "InjectedFieldSignature");
   public static final ClassName INSTANCE_FACTORY =
       ClassName.get("dagger.internal", "InstanceFactory");
+  public static final ClassName MAP_BUILDER = ClassName.get("dagger.internal", "MapBuilder");
   public static final ClassName MAP_FACTORY = ClassName.get("dagger.internal", "MapFactory");
   public static final ClassName MAP_PROVIDER_FACTORY =
       ClassName.get("dagger.internal", "MapProviderFactory");
@@ -69,6 +80,8 @@ public final class TypeNames {
   public static final ClassName MEMBERS_INJECTORS =
       ClassName.get("dagger.internal", "MembersInjectors");
   public static final ClassName PROVIDER = ClassName.get("javax.inject", "Provider");
+  public static final ClassName DAGGER_PROVIDER = ClassName.get("dagger.internal", "Provider");
+  public static final ClassName DAGGER_PROVIDERS = ClassName.get("dagger.internal", "Providers");
   public static final ClassName PROVIDER_OF_LAZY =
       ClassName.get("dagger.internal", "ProviderOfLazy");
   public static final ClassName SCOPE_METADATA = ClassName.get("dagger.internal", "ScopeMetadata");
@@ -81,6 +94,8 @@ public final class TypeNames {
   // Dagger Producers classnames
   public static final ClassName ABSTRACT_PRODUCER =
       ClassName.get("dagger.producers.internal", "AbstractProducer");
+  public static final ClassName ABSTRACT_PRODUCES_METHOD_PRODUCER =
+      ClassName.get("dagger.producers.internal", "AbstractProducesMethodProducer");
   public static final ClassName CANCELLATION_LISTENER =
       ClassName.get("dagger.producers.internal", "CancellationListener");
   public static final ClassName CANCELLATION_POLICY =
@@ -138,6 +153,8 @@ public final class TypeNames {
   public static final ClassName ERROR = ClassName.get("java.lang", "Error");
   public static final ClassName EXCEPTION = ClassName.get("java.lang", "Exception");
   public static final ClassName RUNTIME_EXCEPTION = ClassName.get("java.lang", "RuntimeException");
+  public static final ClassName STRING = ClassName.get("java.lang", "String");
+
   public static final ClassName MAP = ClassName.get("java.util", "Map");
   public static final ClassName KOTLIN_METADATA = ClassName.get("kotlin", "Metadata");
   public static final ClassName IMMUTABLE_MAP =
@@ -213,6 +230,10 @@ public final class TypeNames {
 
   public static ParameterizedTypeName providerOf(TypeName typeName) {
     return ParameterizedTypeName.get(PROVIDER, typeName);
+  }
+
+  public static ParameterizedTypeName daggerProviderOf(TypeName typeName) {
+    return ParameterizedTypeName.get(DAGGER_PROVIDER, typeName);
   }
 
   public static ParameterizedTypeName setOf(TypeName elementType) {

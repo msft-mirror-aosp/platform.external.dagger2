@@ -32,10 +32,13 @@ import dagger.Provides;
 import dagger.internal.codegen.base.ClearableCache;
 import dagger.internal.codegen.base.SourceFileGenerationException;
 import dagger.internal.codegen.base.SourceFileGenerator;
+import dagger.internal.codegen.base.SourceFileHjarGenerator;
 import dagger.internal.codegen.binding.BindingGraphFactory;
+import dagger.internal.codegen.binding.ComponentDescriptor;
 import dagger.internal.codegen.binding.InjectBindingRegistry;
 import dagger.internal.codegen.binding.MembersInjectionBinding;
 import dagger.internal.codegen.binding.ModuleDescriptor;
+import dagger.internal.codegen.binding.MonitoringModules;
 import dagger.internal.codegen.binding.ProductionBinding;
 import dagger.internal.codegen.binding.ProvisionBinding;
 import dagger.internal.codegen.bindinggraphvalidation.BindingGraphValidationModule;
@@ -53,7 +56,6 @@ import dagger.internal.codegen.validation.InjectBindingRegistryModule;
 import dagger.internal.codegen.validation.InjectValidator;
 import dagger.internal.codegen.validation.ValidationBindingGraphPlugins;
 import dagger.internal.codegen.writing.FactoryGenerator;
-import dagger.internal.codegen.writing.HjarSourceFileGenerator;
 import dagger.internal.codegen.writing.MembersInjectorGenerator;
 import dagger.internal.codegen.writing.ModuleGenerator;
 import dagger.internal.codegen.writing.ModuleProxies.ModuleConstructorProxyGenerator;
@@ -98,8 +100,9 @@ final class DelegateComponentProcessor {
                           + legacyPlugin.pluginName()
                           + ". Either compile with KAPT or migrate the plugin to implement "
                           + "dagger.spi.model.BindingGraphPlugin."));
-      // We've already reported warnings on the invalid legacy plugins above. We can't actually
-      // process these plugins in KSP, so just skip them to allow processing of the valid plugins.
+      // Even though we've reported an error, processing will still continue for the remainder of
+      // the processing round to try to catch other errors. We set the javac plugins to empty to
+      // skip processing since it would just result in ClassCastExceptions in KSP.
       legacyPlugins = ImmutableSet.of();
     }
     DaggerDelegateComponentProcessor_Injector.factory()
@@ -171,6 +174,14 @@ final class DelegateComponentProcessor {
 
     @Binds
     @IntoSet
+    ClearableCache componentDescriptorFactory(ComponentDescriptor.Factory cache);
+
+    @Binds
+    @IntoSet
+    ClearableCache monitoringModules(MonitoringModules cache);
+
+    @Binds
+    @IntoSet
     ClearableCache bindingGraphFactory(BindingGraphFactory cache);
 
     @Binds
@@ -190,34 +201,44 @@ final class DelegateComponentProcessor {
   interface SourceFileGeneratorsModule {
     @Provides
     static SourceFileGenerator<ProvisionBinding> factoryGenerator(
-        FactoryGenerator generator, CompilerOptions compilerOptions) {
-      return hjarWrapper(generator, compilerOptions);
+        FactoryGenerator generator,
+        CompilerOptions compilerOptions,
+        XProcessingEnv processingEnv) {
+      return hjarWrapper(generator, compilerOptions, processingEnv);
     }
 
     @Provides
     static SourceFileGenerator<ProductionBinding> producerFactoryGenerator(
-        ProducerFactoryGenerator generator, CompilerOptions compilerOptions) {
-      return hjarWrapper(generator, compilerOptions);
+        ProducerFactoryGenerator generator,
+        CompilerOptions compilerOptions,
+        XProcessingEnv processingEnv) {
+      return hjarWrapper(generator, compilerOptions, processingEnv);
     }
 
     @Provides
     static SourceFileGenerator<MembersInjectionBinding> membersInjectorGenerator(
-        MembersInjectorGenerator generator, CompilerOptions compilerOptions) {
-      return hjarWrapper(generator, compilerOptions);
+        MembersInjectorGenerator generator,
+        CompilerOptions compilerOptions,
+        XProcessingEnv processingEnv) {
+      return hjarWrapper(generator, compilerOptions, processingEnv);
     }
 
     @Provides
     @ModuleGenerator
     static SourceFileGenerator<XTypeElement> moduleConstructorProxyGenerator(
-        ModuleConstructorProxyGenerator generator, CompilerOptions compilerOptions) {
-      return hjarWrapper(generator, compilerOptions);
+        ModuleConstructorProxyGenerator generator,
+        CompilerOptions compilerOptions,
+        XProcessingEnv processingEnv) {
+      return hjarWrapper(generator, compilerOptions, processingEnv);
     }
   }
 
   private static <T> SourceFileGenerator<T> hjarWrapper(
-      SourceFileGenerator<T> generator, CompilerOptions compilerOptions) {
+      SourceFileGenerator<T> generator,
+      CompilerOptions compilerOptions,
+      XProcessingEnv processingEnv) {
     return compilerOptions.headerCompilation()
-        ? HjarSourceFileGenerator.wrap(generator)
+        ? SourceFileHjarGenerator.wrap(generator, processingEnv)
         : generator;
   }
 }

@@ -21,6 +21,7 @@ import static com.google.common.base.Ascii.toUpperCase;
 
 import androidx.room.compiler.processing.XProcessingEnv;
 import androidx.room.compiler.processing.XTypeElement;
+import androidx.room.compiler.processing.compat.XConverters;
 import com.google.common.collect.ImmutableSet;
 import dagger.hilt.processor.internal.optionvalues.BooleanValue;
 import dagger.hilt.processor.internal.optionvalues.GradleProjectType;
@@ -101,6 +102,13 @@ public final class HiltCompilerOptions {
     return GRADLE_PROJECT_TYPE.get(env);
   }
 
+  public static boolean isAssistedInjectViewModelsEnabled(XTypeElement viewModelElement) {
+    boolean enabled =
+        ENABLE_ASSISTED_INJECT_VIEWMODELS.get(XConverters.getProcessingEnv(viewModelElement))
+            == BooleanValue.TRUE;
+    return enabled;
+  }
+
   /** Do not use! This is for internal use only. */
   private static final EnumOption<BooleanValue> DISABLE_ANDROID_SUPERCLASS_VALIDATION =
       new EnumOption<>("android.internal.disableAndroidSuperclassValidation", BooleanValue.FALSE);
@@ -124,6 +132,9 @@ public final class HiltCompilerOptions {
   private static final EnumOption<GradleProjectType> GRADLE_PROJECT_TYPE =
       new EnumOption<>("android.internal.projectType", GradleProjectType.UNSET);
 
+  private static final EnumOption<BooleanValue> ENABLE_ASSISTED_INJECT_VIEWMODELS =
+      new EnumOption<>(
+          "enableAssistedInjectViewModels", BooleanValue.TRUE );
   private static final ImmutableSet<String> DEPRECATED_OPTIONS =
       ImmutableSet.of("dagger.hilt.android.useFragmentGetContextFix");
 

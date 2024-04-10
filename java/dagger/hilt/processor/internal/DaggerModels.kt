@@ -18,47 +18,37 @@ package dagger.hilt.processor.internal
 
 import com.google.auto.common.MoreTypes
 import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSDeclaration
 import com.squareup.javapoet.ClassName
 import dagger.spi.model.DaggerAnnotation
 import dagger.spi.model.DaggerElement
 import dagger.spi.model.DaggerProcessingEnv
+import dagger.spi.model.DaggerProcessingEnv.Backend.JAVAC
+import dagger.spi.model.DaggerProcessingEnv.Backend.KSP
 import dagger.spi.model.DaggerType
 
 
-fun DaggerType.asElement(): DaggerElement =
+fun DaggerType.hasAnnotation(className: ClassName): Boolean =
   when (checkNotNull(backend())) {
-    DaggerProcessingEnv.Backend.JAVAC -> {
-      val javaType = checkNotNull(java())
-      DaggerElement.fromJavac(MoreTypes.asElement(javaType))
-    }
-    DaggerProcessingEnv.Backend.KSP -> {
-      val kspType = checkNotNull(ksp())
-      DaggerElement.fromKsp(kspType.declaration)
-    }
+    JAVAC -> Processors.hasAnnotation(MoreTypes.asTypeElement(javac()), className)
+    KSP -> ksp().declaration.hasAnnotation(className.canonicalName())
+  }
+
+fun KSDeclaration.hasAnnotation(annotationName: String): Boolean =
+  annotations.any {
+    it.annotationType.resolve().declaration.qualifiedName?.asString().equals(annotationName)
   }
 
 fun DaggerElement.hasAnnotation(className: ClassName) =
   when (checkNotNull(backend())) {
-    DaggerProcessingEnv.Backend.JAVAC -> {
-      val javaElement = checkNotNull(java())
-      Processors.hasAnnotation(javaElement, className)
-    }
-    DaggerProcessingEnv.Backend.KSP -> {
-      val kspAnnotated = checkNotNull(ksp())
-      kspAnnotated.hasAnnotation(className)
-    }
+    JAVAC -> Processors.hasAnnotation(javac(), className)
+    KSP -> ksp().hasAnnotation(className)
   }
 
 fun DaggerAnnotation.getQualifiedName() =
   when (checkNotNull(backend())) {
-    DaggerProcessingEnv.Backend.JAVAC -> {
-      val javaAnnotation = checkNotNull(java())
-      MoreTypes.asTypeElement(javaAnnotation.annotationType).qualifiedName.toString()
-    }
-    DaggerProcessingEnv.Backend.KSP -> {
-      val kspAnnotation = checkNotNull(ksp())
-      kspAnnotation.annotationType.resolve().declaration.qualifiedName!!.asString()
-    }
+    JAVAC -> MoreTypes.asTypeElement(javac().annotationType).qualifiedName.toString()
+    KSP -> ksp().annotationType.resolve().declaration.qualifiedName!!.asString()
   }
 
 private fun KSAnnotated.hasAnnotation(className: ClassName) =

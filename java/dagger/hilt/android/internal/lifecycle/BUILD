@@ -38,6 +38,7 @@ android_library(
         "@maven//:androidx_lifecycle_lifecycle_viewmodel",
         "@maven//:androidx_lifecycle_lifecycle_viewmodel_savedstate",
         "@maven//:androidx_savedstate_savedstate",
+        "@maven//:org_jetbrains_kotlin_kotlin_stdlib",
     ],
 )
 

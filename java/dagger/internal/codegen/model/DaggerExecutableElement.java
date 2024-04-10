@@ -32,7 +32,7 @@ public abstract class DaggerExecutableElement {
 
   public abstract XExecutableElement xprocessing();
 
-  public ExecutableElement java() {
+  public ExecutableElement javac() {
     return toJavac(xprocessing());
   }
 
