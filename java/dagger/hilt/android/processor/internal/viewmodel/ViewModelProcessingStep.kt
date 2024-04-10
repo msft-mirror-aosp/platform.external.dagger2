@@ -28,16 +28,13 @@ import dagger.internal.codegen.xprocessing.XElements
 @OptIn(ExperimentalProcessingApi::class)
 /** Annotation processor for @ViewModelInject. */
 class ViewModelProcessingStep(env: XProcessingEnv) : BaseProcessingStep(env) {
+
   override fun annotationClassNames() = ImmutableSet.of(AndroidClassNames.HILT_VIEW_MODEL)
 
   override fun processEach(annotation: ClassName, element: XElement) {
     val typeElement = XElements.asTypeElement(element)
-    ViewModelMetadata.create(
-        processingEnv(),
-        typeElement,
-      )
-      ?.let { viewModelMetadata ->
-        ViewModelModuleGenerator(processingEnv(), viewModelMetadata).generate()
-      }
+    ViewModelMetadata.create(processingEnv(), typeElement)?.let { viewModelMetadata ->
+      ViewModelModuleGenerator(processingEnv(), viewModelMetadata).generate()
+    }
   }
 }

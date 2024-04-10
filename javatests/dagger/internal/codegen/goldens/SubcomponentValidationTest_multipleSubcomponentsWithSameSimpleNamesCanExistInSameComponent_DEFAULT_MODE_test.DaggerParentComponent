@@ -13,7 +13,8 @@ import test.subpackage.Sub;
     "unchecked",
     "rawtypes",
     "KotlinInternal",
-    "KotlinInternalInJava"
+    "KotlinInternalInJava",
+    "cast"
 })
 final class DaggerParentComponent {
   private DaggerParentComponent() {

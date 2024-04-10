@@ -39,7 +39,7 @@ public abstract class DaggerProcessingEnv {
     return Backend.valueOf(xprocessing().getBackend().name());
   }
 
-  public ProcessingEnvironment java() {
+  public ProcessingEnvironment javac() {
     return toJavac(xprocessing());
   }
 }

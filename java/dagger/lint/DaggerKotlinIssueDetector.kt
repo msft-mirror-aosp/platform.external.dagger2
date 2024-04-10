@@ -204,7 +204,8 @@ class DaggerKotlinIssueDetector : Detector(), SourceCodeScanner {
         ) {
           val containingClass = node.containingClass?.toUElement(UClass::class.java) ?: return
           if (containingClass.isObject()) {
-            val annotation = node.findAnnotation(JVM_STATIC_ANNOTATION)!!
+            val annotation = node.findAnnotation(JVM_STATIC_ANNOTATION)
+              ?: node.javaPsi.modifierList.findAnnotation(JVM_STATIC_ANNOTATION)!!
             context.report(
               ISSUE_JVM_STATIC_PROVIDES_IN_OBJECT,
               context.getLocation(annotation),

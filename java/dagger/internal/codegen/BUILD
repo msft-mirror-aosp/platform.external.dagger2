@@ -43,7 +43,6 @@ java_library(
         "//java/dagger/internal/codegen/compileroption",
         "//java/dagger/internal/codegen/componentgenerator",
         "//java/dagger/internal/codegen/kotlin",
-        "//java/dagger/internal/codegen/model",
         "//java/dagger/internal/codegen/processingstep",
         "//java/dagger/internal/codegen/validation",
         "//java/dagger/internal/codegen/writing",
@@ -89,7 +88,6 @@ gen_maven_artifact(
     ],
     artifact_target_maven_deps = [
         "com.google.code.findbugs:jsr305",
-        "com.google.dagger:dagger-producers",
         "com.google.dagger:dagger-spi",
         "com.google.dagger:dagger",
         "com.google.devtools.ksp:symbol-processing-api",
