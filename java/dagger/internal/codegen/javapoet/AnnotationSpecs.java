@@ -30,7 +30,8 @@ public final class AnnotationSpecs {
     RAWTYPES("rawtypes"),
     UNCHECKED("unchecked"),
     FUTURE_RETURN_VALUE_IGNORED("FutureReturnValueIgnored"),
-    KOTLIN_INTERNAL("KotlinInternal", "KotlinInternalInJava")
+    KOTLIN_INTERNAL("KotlinInternal", "KotlinInternalInJava"),
+    CAST("cast")
     ;
 
     private final ImmutableList<String> values;

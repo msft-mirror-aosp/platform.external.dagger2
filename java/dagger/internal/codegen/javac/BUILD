@@ -23,24 +23,10 @@ java_library(
     name = "javac",
     srcs = glob(["*.java"]),
     plugins = ["//java/dagger/internal/codegen:component-codegen"],
-    exports = [
-        ":javac-import",
-    ],
     deps = [
-        ":javac-import",
         "//java/dagger:core",
-        "//java/dagger/internal/codegen/binding",
         "//java/dagger/internal/codegen/compileroption",
-        "//java/dagger/internal/codegen/langmodel",
         "//java/dagger/internal/codegen/xprocessing",
         "//third_party/java/guava/collect",
     ],
-)
-
-load("@rules_java//java:defs.bzl", "java_import")
-
-# Replacement for @bazel_tools//third_party/java/jdk/langtools:javac, which seems to have gone away?
-java_import(
-    name = "javac-import",
-    jars = ["@bazel_tools//third_party/java/jdk/langtools:javac_jar"],
 )

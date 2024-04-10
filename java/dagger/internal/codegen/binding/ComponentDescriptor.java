@@ -21,14 +21,28 @@ import static androidx.room.compiler.processing.XTypeKt.isVoid;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.Iterables.getOnlyElement;
+import static dagger.internal.codegen.base.ComponentAnnotation.rootComponentAnnotation;
+import static dagger.internal.codegen.base.ComponentAnnotation.subcomponentAnnotation;
+import static dagger.internal.codegen.base.ComponentAnnotation.subcomponentAnnotations;
+import static dagger.internal.codegen.base.ComponentCreatorAnnotation.creatorAnnotationsFor;
+import static dagger.internal.codegen.base.ModuleAnnotation.moduleAnnotation;
+import static dagger.internal.codegen.base.Scopes.productionScope;
+import static dagger.internal.codegen.base.Util.reentrantComputeIfAbsent;
+import static dagger.internal.codegen.binding.ConfigurationAnnotations.enclosedAnnotatedTypes;
+import static dagger.internal.codegen.binding.ConfigurationAnnotations.isSubcomponentCreator;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableMap;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
 import static dagger.internal.codegen.javapoet.TypeNames.isFutureType;
 import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
+import static dagger.internal.codegen.xprocessing.XTypeElements.getAllUnimplementedMethods;
+import static dagger.internal.codegen.xprocessing.XTypes.isDeclared;
 
-import androidx.room.compiler.processing.XAnnotation;
 import androidx.room.compiler.processing.XElement;
 import androidx.room.compiler.processing.XMethodElement;
+import androidx.room.compiler.processing.XMethodType;
+import androidx.room.compiler.processing.XProcessingEnv;
+import androidx.room.compiler.processing.XType;
 import androidx.room.compiler.processing.XTypeElement;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
@@ -44,16 +58,21 @@ import com.squareup.javapoet.TypeName;
 import dagger.Component;
 import dagger.Module;
 import dagger.Subcomponent;
+import dagger.internal.codegen.base.ClearableCache;
 import dagger.internal.codegen.base.ComponentAnnotation;
+import dagger.internal.codegen.base.DaggerSuperficialValidation;
+import dagger.internal.codegen.base.ModuleAnnotation;
 import dagger.internal.codegen.javapoet.TypeNames;
 import dagger.internal.codegen.model.DependencyRequest;
 import dagger.internal.codegen.model.Scope;
-import dagger.internal.codegen.xprocessing.XAnnotations;
+import dagger.internal.codegen.xprocessing.XTypeElements;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
+import javax.inject.Inject;
+import javax.inject.Singleton;
 
 /**
  * A component declaration.
@@ -68,52 +87,54 @@ import java.util.stream.Stream;
 @CheckReturnValue
 @AutoValue
 public abstract class ComponentDescriptor {
-  /**
-   * The cancellation policy for a {@link dagger.producers.ProductionComponent}.
-   *
-   * <p>@see dagger.producers.CancellationPolicy
-   */
-  public enum CancellationPolicy {
-    PROPAGATE,
-    IGNORE;
-
-    private static CancellationPolicy from(XAnnotation annotation) {
-      checkArgument(XAnnotations.getClassName(annotation).equals(TypeNames.CANCELLATION_POLICY));
-      return valueOf(getSimpleName(annotation.getAsEnum("fromSubcomponents")));
-    }
-  }
-
-  /** Creates a {@link ComponentDescriptor}. */
-  static ComponentDescriptor create(
-      ComponentAnnotation componentAnnotation,
-      XTypeElement component,
-      ImmutableSet<ComponentRequirement> componentDependencies,
-      ImmutableSet<ModuleDescriptor> transitiveModules,
-      ImmutableMap<XMethodElement, ComponentRequirement> dependenciesByDependencyMethod,
-      ImmutableSet<Scope> scopes,
-      ImmutableSet<ComponentDescriptor> subcomponentsFromModules,
-      ImmutableBiMap<ComponentMethodDescriptor, ComponentDescriptor> subcomponentsByFactoryMethod,
-      ImmutableBiMap<ComponentMethodDescriptor, ComponentDescriptor> subcomponentsByBuilderMethod,
-      ImmutableSet<ComponentMethodDescriptor> componentMethods,
-      Optional<ComponentCreatorDescriptor> creator) {
-    ComponentDescriptor descriptor =
-        new AutoValue_ComponentDescriptor(
-            componentAnnotation,
-            component,
-            componentDependencies,
-            transitiveModules,
-            dependenciesByDependencyMethod,
-            scopes,
-            subcomponentsFromModules,
-            subcomponentsByFactoryMethod,
-            subcomponentsByBuilderMethod,
-            componentMethods,
-            creator);
-    return descriptor;
-  }
-
   /** The annotation that specifies that {@link #typeElement()} is a component. */
   public abstract ComponentAnnotation annotation();
+
+  /**
+   * The element that defines the component. This is the element to which the {@link #annotation()}
+   * was applied.
+   */
+  public abstract XTypeElement typeElement();
+
+  /**
+   * The set of component dependencies listed in {@link Component#dependencies} or {@link
+   * dagger.producers.ProductionComponent#dependencies()}.
+   */
+  public abstract ImmutableSet<ComponentRequirement> dependencies();
+
+  /**
+   * The {@link ModuleDescriptor modules} declared in {@link Component#modules()} and reachable by
+   * traversing {@link Module#includes()}.
+   */
+  public abstract ImmutableSet<ModuleDescriptor> modules();
+
+  /** The scopes of the component. */
+  public abstract ImmutableSet<Scope> scopes();
+
+  /**
+   * All {@linkplain Subcomponent direct child} components that are declared by a {@linkplain
+   * Module#subcomponents() module's subcomponents}.
+   */
+  abstract ImmutableSet<ComponentDescriptor> childComponentsDeclaredByModules();
+
+  /**
+   * All {@linkplain Subcomponent direct child} components that are declared by a subcomponent
+   * factory method.
+   */
+  public abstract ImmutableBiMap<ComponentMethodDescriptor, ComponentDescriptor>
+      childComponentsDeclaredByFactoryMethods();
+
+  /**
+   * All {@linkplain Subcomponent direct child} components that are declared by a subcomponent
+   * builder method.
+   */
+  abstract ImmutableMap<ComponentMethodDescriptor, ComponentDescriptor>
+      childComponentsDeclaredByBuilderEntryPoints();
+
+  public abstract ImmutableSet<ComponentMethodDescriptor> componentMethods();
+
+  /** Returns a descriptor for the creator type for this component type, if the user defined one. */
+  public abstract Optional<ComponentCreatorDescriptor> creatorDescriptor();
 
   /** Returns {@code true} if this is a subcomponent. */
   public final boolean isSubcomponent() {
@@ -136,18 +157,6 @@ public abstract class ComponentDescriptor {
     return annotation().isRealComponent();
   }
 
-  /**
-   * The element that defines the component. This is the element to which the {@link #annotation()}
-   * was applied.
-   */
-  public abstract XTypeElement typeElement();
-
-  /**
-   * The set of component dependencies listed in {@link Component#dependencies} or {@link
-   * dagger.producers.ProductionComponent#dependencies()}.
-   */
-  public abstract ImmutableSet<ComponentRequirement> dependencies();
-
   /** The non-abstract {@link #modules()} and the {@link #dependencies()}. */
   public final ImmutableSet<ComponentRequirement> dependenciesAndConcreteModules() {
     return Stream.concat(
@@ -157,12 +166,6 @@ public abstract class ComponentDescriptor {
             dependencies().stream())
         .collect(toImmutableSet());
   }
-
-  /**
-   * The {@link ModuleDescriptor modules} declared in {@link Component#modules()} and reachable by
-   * traversing {@link Module#includes()}.
-   */
-  public abstract ImmutableSet<ModuleDescriptor> modules();
 
   /** The types of the {@link #modules()}. */
   public final ImmutableSet<XTypeElement> moduleTypes() {
@@ -198,13 +201,21 @@ public abstract class ComponentDescriptor {
   }
 
   /**
-   * This component's {@linkplain #dependencies() dependencies} keyed by each provision or
-   * production method defined by that dependency. Note that the dependencies' types are not simply
-   * the enclosing type of the method; a method may be declared by a supertype of the actual
-   * dependency.
+   * Returns this component's dependencies keyed by its provision/production method.
+   *
+   * <p>Note that the dependencies' types are not simply the enclosing type of the method; a method
+   * may be declared by a supertype of the actual dependency.
    */
-  public abstract ImmutableMap<XMethodElement, ComponentRequirement>
-      dependenciesByDependencyMethod();
+  @Memoized
+  public ImmutableMap<XMethodElement, ComponentRequirement> dependenciesByDependencyMethod() {
+    ImmutableMap.Builder<XMethodElement, ComponentRequirement> builder = ImmutableMap.builder();
+    for (ComponentRequirement componentDependency : dependencies()) {
+      XTypeElements.getAllMethods(componentDependency.typeElement()).stream()
+          .filter(ComponentDescriptor::isComponentContributionMethod)
+          .forEach(method -> builder.put(method, componentDependency));
+    }
+    return builder.buildOrThrow();
+  }
 
   /** The {@linkplain #dependencies() component dependency} that defines a method. */
   public final ComponentRequirement getDependencyThatDefinesMethod(XElement method) {
@@ -215,9 +226,6 @@ public abstract class ComponentDescriptor {
         method);
     return dependenciesByDependencyMethod().get(method);
   }
-
-  /** The scopes of the component. */
-  public abstract ImmutableSet<Scope> scopes();
 
   /**
    * All {@link Subcomponent}s which are direct children of this component. This includes
@@ -233,19 +241,6 @@ public abstract class ComponentDescriptor {
         .build();
   }
 
-  /**
-   * All {@linkplain Subcomponent direct child} components that are declared by a {@linkplain
-   * Module#subcomponents() module's subcomponents}.
-   */
-  abstract ImmutableSet<ComponentDescriptor> childComponentsDeclaredByModules();
-
-  /**
-   * All {@linkplain Subcomponent direct child} components that are declared by a subcomponent
-   * factory method.
-   */
-  public abstract ImmutableBiMap<ComponentMethodDescriptor, ComponentDescriptor>
-      childComponentsDeclaredByFactoryMethods();
-
   /** Returns a map of {@link #childComponents()} indexed by {@link #typeElement()}. */
   @Memoized
   public ImmutableMap<XTypeElement, ComponentDescriptor> childComponentsByElement() {
@@ -258,13 +253,6 @@ public abstract class ComponentDescriptor {
     return Optional.ofNullable(
         childComponentsDeclaredByFactoryMethods().inverse().get(childComponent));
   }
-
-  /**
-   * All {@linkplain Subcomponent direct child} components that are declared by a subcomponent
-   * builder method.
-   */
-  abstract ImmutableBiMap<ComponentMethodDescriptor, ComponentDescriptor>
-      childComponentsDeclaredByBuilderEntryPoints();
 
   private final Supplier<ImmutableMap<XTypeElement, ComponentDescriptor>>
       childComponentsByBuilderType =
@@ -284,8 +272,6 @@ public abstract class ComponentDescriptor {
         "no child component found for builder type %s",
         builderType.getQualifiedName());
   }
-
-  public abstract ImmutableSet<ComponentMethodDescriptor> componentMethods();
 
   /** Returns the first component method associated with this binding request, if one exists. */
   public Optional<ComponentMethodDescriptor> firstMatchingComponentMethod(BindingRequest request) {
@@ -307,11 +293,6 @@ public abstract class ComponentDescriptor {
         .filter(method -> method.dependencyRequest().isPresent())
         .collect(toImmutableSet());
   }
-
-  // TODO(gak): Consider making this non-optional and revising the
-  // interaction between the spec & generation
-  /** Returns a descriptor for the creator type for this component type, if the user defined one. */
-  public abstract Optional<ComponentCreatorDescriptor> creatorDescriptor();
 
   /**
    * Returns {@code true} for components that have a creator, either because the user {@linkplain
@@ -407,5 +388,205 @@ public abstract class ComponentDescriptor {
   /** Returns {@code true} if a method could be a component production entry point. */
   static boolean isComponentProductionMethod(XMethodElement method) {
     return isComponentContributionMethod(method) && isFutureType(method.getReturnType());
+  }
+
+  /** A factory for creating a {@link ComponentDescriptor}. */
+  @Singleton
+  public static final class Factory implements ClearableCache {
+    private final XProcessingEnv processingEnv;
+    private final DependencyRequestFactory dependencyRequestFactory;
+    private final ModuleDescriptor.Factory moduleDescriptorFactory;
+    private final InjectionAnnotations injectionAnnotations;
+    private final DaggerSuperficialValidation superficialValidation;
+    private final Map<XTypeElement, ComponentDescriptor> cache = new HashMap<>();
+
+    @Inject
+    Factory(
+        XProcessingEnv processingEnv,
+        DependencyRequestFactory dependencyRequestFactory,
+        ModuleDescriptor.Factory moduleDescriptorFactory,
+        InjectionAnnotations injectionAnnotations,
+        DaggerSuperficialValidation superficialValidation) {
+      this.processingEnv = processingEnv;
+      this.dependencyRequestFactory = dependencyRequestFactory;
+      this.moduleDescriptorFactory = moduleDescriptorFactory;
+      this.injectionAnnotations = injectionAnnotations;
+      this.superficialValidation = superficialValidation;
+    }
+
+    /** Returns a descriptor for a root component type. */
+    public ComponentDescriptor rootComponentDescriptor(XTypeElement typeElement) {
+      Optional<ComponentAnnotation> annotation =
+          rootComponentAnnotation(typeElement, superficialValidation);
+      checkArgument(annotation.isPresent(), "%s must have a component annotation", typeElement);
+      return create(typeElement, annotation.get());
+    }
+
+    /** Returns a descriptor for a subcomponent type. */
+    public ComponentDescriptor subcomponentDescriptor(XTypeElement typeElement) {
+      Optional<ComponentAnnotation> annotation =
+          subcomponentAnnotation(typeElement, superficialValidation);
+      checkArgument(annotation.isPresent(), "%s must have a subcomponent annotation", typeElement);
+      return create(typeElement, annotation.get());
+    }
+
+    /**
+     * Returns a descriptor for a fictional component based on a module type in order to validate
+     * its bindings.
+     */
+    public ComponentDescriptor moduleComponentDescriptor(XTypeElement typeElement) {
+      Optional<ModuleAnnotation> annotation = moduleAnnotation(typeElement, superficialValidation);
+      checkArgument(annotation.isPresent(), "%s must have a module annotation", typeElement);
+      return create(typeElement, ComponentAnnotation.fromModuleAnnotation(annotation.get()));
+    }
+
+    private ComponentDescriptor create(
+        XTypeElement typeElement, ComponentAnnotation componentAnnotation) {
+      return reentrantComputeIfAbsent(
+          cache, typeElement, unused -> createUncached(typeElement, componentAnnotation));
+    }
+
+    private ComponentDescriptor createUncached(
+        XTypeElement typeElement, ComponentAnnotation componentAnnotation) {
+      ImmutableSet<ComponentRequirement> componentDependencies =
+          componentAnnotation.dependencyTypes().stream()
+              .map(ComponentRequirement::forDependency)
+              .collect(toImmutableSet());
+
+      // Start with the component's modules. For fictional components built from a module, start
+      // with that module.
+      ImmutableSet<XTypeElement> modules =
+          componentAnnotation.isRealComponent()
+              ? componentAnnotation.modules()
+              : ImmutableSet.of(typeElement);
+
+      ImmutableSet<ModuleDescriptor> transitiveModules =
+          moduleDescriptorFactory.transitiveModules(modules);
+
+      ImmutableSet.Builder<ComponentMethodDescriptor> componentMethodsBuilder =
+          ImmutableSet.builder();
+      ImmutableBiMap.Builder<ComponentMethodDescriptor, ComponentDescriptor>
+          subcomponentsByFactoryMethod = ImmutableBiMap.builder();
+      ImmutableMap.Builder<ComponentMethodDescriptor, ComponentDescriptor>
+          subcomponentsByBuilderMethod = ImmutableBiMap.builder();
+      if (componentAnnotation.isRealComponent()) {
+        for (XMethodElement componentMethod : getAllUnimplementedMethods(typeElement)) {
+          ComponentMethodDescriptor componentMethodDescriptor =
+              getDescriptorForComponentMethod(componentAnnotation, typeElement, componentMethod);
+          componentMethodsBuilder.add(componentMethodDescriptor);
+          componentMethodDescriptor
+              .subcomponent()
+              .ifPresent(
+                  subcomponent -> {
+                    // If the dependency request is present, that means the method returns the
+                    // subcomponent factory.
+                    if (componentMethodDescriptor.dependencyRequest().isPresent()) {
+                      subcomponentsByBuilderMethod.put(componentMethodDescriptor, subcomponent);
+                    } else {
+                      subcomponentsByFactoryMethod.put(componentMethodDescriptor, subcomponent);
+                    }
+                  });
+        }
+      }
+
+      // Validation should have ensured that this set will have at most one element.
+      ImmutableSet<XTypeElement> enclosedCreators =
+          enclosedAnnotatedTypes(typeElement, creatorAnnotationsFor(componentAnnotation));
+      Optional<ComponentCreatorDescriptor> creatorDescriptor =
+          enclosedCreators.isEmpty()
+              ? Optional.empty()
+              : Optional.of(
+                  ComponentCreatorDescriptor.create(
+                      getOnlyElement(enclosedCreators), dependencyRequestFactory));
+
+      ImmutableSet<Scope> scopes = injectionAnnotations.getScopes(typeElement);
+      if (componentAnnotation.isProduction()) {
+        scopes =
+            ImmutableSet.<Scope>builder()
+                .addAll(scopes).add(productionScope(processingEnv))
+                .build();
+      }
+
+      ImmutableSet<ComponentDescriptor> subcomponentsFromModules =
+        transitiveModules.stream()
+            .flatMap(transitiveModule -> transitiveModule.subcomponentDeclarations().stream())
+            .map(SubcomponentDeclaration::subcomponentType)
+            .map(this::subcomponentDescriptor)
+            .collect(toImmutableSet());
+
+      return new AutoValue_ComponentDescriptor(
+          componentAnnotation,
+          typeElement,
+          componentDependencies,
+          transitiveModules,
+          scopes,
+          subcomponentsFromModules,
+          subcomponentsByFactoryMethod.buildOrThrow(),
+          subcomponentsByBuilderMethod.buildOrThrow(),
+          componentMethodsBuilder.build(),
+          creatorDescriptor);
+    }
+
+    private ComponentMethodDescriptor getDescriptorForComponentMethod(
+        ComponentAnnotation componentAnnotation,
+        XTypeElement componentElement,
+        XMethodElement componentMethod) {
+      ComponentMethodDescriptor.Builder descriptor =
+          ComponentMethodDescriptor.builder(componentMethod);
+
+      XMethodType resolvedComponentMethod = componentMethod.asMemberOf(componentElement.getType());
+      XType returnType = resolvedComponentMethod.getReturnType();
+      if (isDeclared(returnType)
+              && !injectionAnnotations.getQualifier(componentMethod).isPresent()) {
+        XTypeElement returnTypeElement = returnType.getTypeElement();
+        if (returnTypeElement.hasAnyAnnotation(subcomponentAnnotations())) {
+          // It's a subcomponent factory method. There is no dependency request, and there could be
+          // any number of parameters. Just return the descriptor.
+          return descriptor.subcomponent(subcomponentDescriptor(returnTypeElement)).build();
+        }
+        if (isSubcomponentCreator(returnTypeElement)) {
+          descriptor.subcomponent(
+              subcomponentDescriptor(returnTypeElement.getEnclosingTypeElement()));
+        }
+      }
+
+      switch (componentMethod.getParameters().size()) {
+        case 0:
+          checkArgument(
+              !isVoid(returnType), "component method cannot be void: %s", componentMethod);
+          descriptor.dependencyRequest(
+              componentAnnotation.isProduction()
+                  ? dependencyRequestFactory.forComponentProductionMethod(
+                      componentMethod, resolvedComponentMethod)
+                  : dependencyRequestFactory.forComponentProvisionMethod(
+                      componentMethod, resolvedComponentMethod));
+          break;
+
+        case 1:
+          checkArgument(
+              isVoid(returnType)
+                  // TODO(bcorso): Replace this with isSameType()?
+                  || returnType
+                      .getTypeName()
+                      .equals(resolvedComponentMethod.getParameterTypes().get(0).getTypeName()),
+              "members injection method must return void or parameter type: %s",
+              componentMethod);
+          descriptor.dependencyRequest(
+              dependencyRequestFactory.forComponentMembersInjectionMethod(
+                  componentMethod, resolvedComponentMethod));
+          break;
+
+        default:
+          throw new IllegalArgumentException(
+              "component method has too many parameters: " + componentMethod);
+      }
+
+      return descriptor.build();
+    }
+
+    @Override
+    public void clearCache() {
+      cache.clear();
+    }
   }
 }
