@@ -65,16 +65,16 @@ dependencies {
   compileOnly "com.android.tools.build:gradle:$agp_version"
   compileOnly "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
   compileOnly "com.google.devtools.ksp:symbol-processing-gradle-plugin:$ksp_version"
-  implementation 'org.ow2.asm:asm:9.0'
+  implementation 'org.ow2.asm:asm:9.6'
   implementation "com.squareup:javapoet:1.13.0"
 
   testImplementation gradleTestKit()
   testImplementation 'junit:junit:4.12'
   testImplementation 'com.google.truth:truth:1.0.1'
   testImplementation 'org.javassist:javassist:3.26.0-GA'
-  testPluginCompile 'com.android.tools.build:gradle:7.1.2'
-  testPluginCompile 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.8.0'
-  testPluginCompile 'com.google.devtools.ksp:symbol-processing-gradle-plugin:1.8.0-1.0.9'
+  testPluginCompile "com.android.tools.build:gradle:$agp_version"
+  testPluginCompile "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+  testPluginCompile "com.google.devtools.ksp:symbol-processing-gradle-plugin:$ksp_version"
 }
 
 // Configure the generating task of plugin-under-test-metadata.properties to
@@ -85,14 +85,11 @@ tasks.withType(PluginUnderTestMetadata.class).named("pluginUnderTestMetadata").c
   it.pluginClasspath.from(configurations.testPluginCompile)
 }
 
-kotlin {
-  jvmToolchain(11)
-}
-
 compileKotlin {
   kotlinOptions {
     allWarningsAsErrors = true
     freeCompilerArgs += [ "-opt-in=kotlin.ExperimentalStdlibApi" ]
+    jvmTarget = 11
   }
 }
 

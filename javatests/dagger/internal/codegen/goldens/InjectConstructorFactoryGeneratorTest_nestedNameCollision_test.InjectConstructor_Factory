@@ -19,7 +19,8 @@ import other.pkg.Outer;
     "unchecked",
     "rawtypes",
     "KotlinInternal",
-    "KotlinInternalInJava"
+    "KotlinInternalInJava",
+    "cast"
 })
 public final class InjectConstructor_Factory implements Factory<InjectConstructor> {
   private final Provider<Outer.Factory> factoryProvider;

@@ -34,7 +34,6 @@ import dagger.internal.codegen.base.SourceFileGenerator;
 import dagger.internal.codegen.binding.BindingGraph;
 import dagger.internal.codegen.binding.BindingGraphFactory;
 import dagger.internal.codegen.binding.ComponentDescriptor;
-import dagger.internal.codegen.binding.ComponentDescriptorFactory;
 import dagger.internal.codegen.validation.BindingGraphValidator;
 import dagger.internal.codegen.validation.ComponentCreatorValidator;
 import dagger.internal.codegen.validation.ComponentDescriptorValidator;
@@ -52,7 +51,7 @@ final class ComponentProcessingStep extends TypeCheckingProcessingStep<XTypeElem
   private final ComponentValidator componentValidator;
   private final ComponentCreatorValidator creatorValidator;
   private final ComponentDescriptorValidator componentDescriptorValidator;
-  private final ComponentDescriptorFactory componentDescriptorFactory;
+  private final ComponentDescriptor.Factory componentDescriptorFactory;
   private final BindingGraphFactory bindingGraphFactory;
   private final SourceFileGenerator<BindingGraph> componentGenerator;
   private final BindingGraphValidator bindingGraphValidator;
@@ -63,7 +62,7 @@ final class ComponentProcessingStep extends TypeCheckingProcessingStep<XTypeElem
       ComponentValidator componentValidator,
       ComponentCreatorValidator creatorValidator,
       ComponentDescriptorValidator componentDescriptorValidator,
-      ComponentDescriptorFactory componentDescriptorFactory,
+      ComponentDescriptor.Factory componentDescriptorFactory,
       BindingGraphFactory bindingGraphFactory,
       SourceFileGenerator<BindingGraph> componentGenerator,
       BindingGraphValidator bindingGraphValidator) {
@@ -132,7 +131,10 @@ final class ComponentProcessingStep extends TypeCheckingProcessingStep<XTypeElem
       return;
     }
     BindingGraph fullBindingGraph = bindingGraphFactory.create(subcomponentDescriptor, true);
-    boolean isValid = bindingGraphValidator.isValid(fullBindingGraph.topLevelBindingGraph());
+    // In this case, we don't actually care about the return value. The important part here is that
+    // BindingGraphValidator#isValid() runs all of the SPI plugins and reports any errors.
+    // TODO(bcorso): Add a separate API with no return value for this particular case.
+    boolean unusedIsValid = bindingGraphValidator.isValid(fullBindingGraph.topLevelBindingGraph());
   }
 
   private void generateComponent(BindingGraph bindingGraph) {

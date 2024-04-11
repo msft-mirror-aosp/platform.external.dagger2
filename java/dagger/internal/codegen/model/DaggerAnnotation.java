@@ -49,7 +49,7 @@ public abstract class DaggerAnnotation {
     return equivalenceWrapper().get();
   }
 
-  public AnnotationMirror java() {
+  public AnnotationMirror javac() {
     return toJavac(xprocessing());
   }
 
