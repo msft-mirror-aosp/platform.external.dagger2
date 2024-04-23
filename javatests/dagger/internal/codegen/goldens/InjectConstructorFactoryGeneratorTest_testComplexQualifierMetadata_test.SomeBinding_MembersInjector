@@ -20,7 +20,8 @@ import javax.inject.Provider;
     "unchecked",
     "rawtypes",
     "KotlinInternal",
-    "KotlinInternalInJava"
+    "KotlinInternalInJava",
+    "cast"
 })
 public final class SomeBinding_MembersInjector implements MembersInjector<SomeBinding> {
   private final Provider<String> injectFieldProvider;
