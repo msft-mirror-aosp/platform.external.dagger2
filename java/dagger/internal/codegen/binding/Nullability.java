@@ -18,7 +18,7 @@ package dagger.internal.codegen.binding;
 
 import static androidx.room.compiler.processing.XElementKt.isMethod;
 import static androidx.room.compiler.processing.XElementKt.isVariableElement;
-import static dagger.internal.codegen.xprocessing.XAnnotations.getClassName;
+import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
 import static dagger.internal.codegen.xprocessing.XElements.asMethod;
 import static dagger.internal.codegen.xprocessing.XElements.asVariable;
 
@@ -27,7 +27,10 @@ import androidx.room.compiler.processing.XElement;
 import androidx.room.compiler.processing.XNullability;
 import androidx.room.compiler.processing.XType;
 import com.google.auto.value.AutoValue;
-import java.util.Optional;
+import com.google.common.collect.ImmutableSet;
+import com.squareup.javapoet.ClassName;
+import dagger.internal.codegen.xprocessing.XAnnotations;
+import java.util.stream.Stream;
 
 /**
  * Contains information about the nullability of an element.
@@ -42,16 +45,43 @@ import java.util.Optional;
 @AutoValue
 public abstract class Nullability {
   /** A constant that can represent any non-null element. */
-  public static final Nullability NOT_NULLABLE = new AutoValue_Nullability(false, Optional.empty());
+  public static final Nullability NOT_NULLABLE =
+      new AutoValue_Nullability(false, ImmutableSet.of());
 
   public static Nullability of(XElement element) {
-    Optional<XAnnotation> nullableAnnotation = getNullableAnnotation(element);
-    boolean isNullable = isKotlinTypeNullable(element) || nullableAnnotation.isPresent();
-    return isNullable ? new AutoValue_Nullability(isNullable, nullableAnnotation) : NOT_NULLABLE;
+    return new AutoValue_Nullability(
+        /* isKotlinTypeNullable= */ isKotlinTypeNullable(element),
+        /* nullableAnnotations= */ getNullableAnnotations(element));
   }
 
+  private static ImmutableSet<ClassName> getNullableAnnotations(XElement element) {
+    return getNullableAnnotations(element.getAllAnnotations().stream(), ImmutableSet.of());
+  }
+
+  private static ImmutableSet<ClassName> getNullableAnnotations(
+      Stream<XAnnotation> annotations,
+      ImmutableSet<ClassName> filterSet) {
+    return annotations
+        .map(XAnnotations::getClassName)
+        .filter(annotation -> annotation.simpleName().contentEquals("Nullable"))
+        .filter(annotation -> !filterSet.contains(annotation))
+        .collect(toImmutableSet());
+  }
+
+  /**
+   * Returns {@code true} if the element's type is a Kotlin nullable type, e.g. {@code Foo?}.
+   *
+   * <p>Note that this method ignores any {@code @Nullable} type annotations and only looks for
+   * explicit {@code ?} usages on kotlin types.
+   */
   private static boolean isKotlinTypeNullable(XElement element) {
-    if (isMethod(element)) {
+    if (element.getClosestMemberContainer().isFromJava()) {
+      // Note: Technically, it isn't possible for Java sources to have nullable types like in Kotlin
+      // sources, but for some reason KSP treats certain types as nullable if they have a
+      // specific @Nullable (TYPE_USE target) annotation. Thus, to avoid inconsistencies with KAPT,
+      // just return false if this element is from a java source.
+      return false;
+    } else if (isMethod(element)) {
       return isKotlinTypeNullable(asMethod(element).getReturnType());
     } else if (isVariableElement(element)) {
       return isKotlinTypeNullable(asVariable(element).getType());
@@ -64,16 +94,13 @@ public abstract class Nullability {
     return type.getNullability() == XNullability.NULLABLE;
   }
 
-  /** Returns the first type that specifies this' nullability, or empty if none. */
-  private static Optional<XAnnotation> getNullableAnnotation(XElement element) {
-    return element.getAllAnnotations().stream()
-        .filter(annotation -> getClassName(annotation).simpleName().contentEquals("Nullable"))
-        .findFirst();
+  public abstract boolean isKotlinTypeNullable();
+
+  public abstract ImmutableSet<ClassName> nullableAnnotations();
+
+  public final boolean isNullable() {
+    return isKotlinTypeNullable() || !nullableAnnotations().isEmpty();
   }
-
-  public abstract boolean isNullable();
-
-  public abstract Optional<XAnnotation> nullableAnnotation();
 
   Nullability() {}
 }
