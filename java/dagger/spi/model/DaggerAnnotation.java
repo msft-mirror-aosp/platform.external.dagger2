@@ -16,51 +16,29 @@
 
 package dagger.spi.model;
 
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
-
-import androidx.room.compiler.processing.XAnnotation;
-import com.google.auto.common.AnnotationMirrors;
-import com.google.auto.value.AutoValue;
-import com.google.common.base.Equivalence;
-import com.google.common.base.Preconditions;
-import com.squareup.javapoet.ClassName;
+import com.google.devtools.ksp.symbol.KSAnnotation;
+import com.google.errorprone.annotations.DoNotMock;
 import javax.lang.model.element.AnnotationMirror;
 
 /** Wrapper type for an annotation. */
-@AutoValue
+@DoNotMock("Only use real implementations created by Dagger")
 public abstract class DaggerAnnotation {
-  private XAnnotation annotation;
+  public abstract DaggerTypeElement annotationTypeElement();
 
-  public static DaggerAnnotation from(XAnnotation annotation) {
-    Preconditions.checkNotNull(annotation);
-    DaggerAnnotation daggerAnnotation =
-        new AutoValue_DaggerAnnotation(AnnotationMirrors.equivalence().wrap(toJavac(annotation)));
-    daggerAnnotation.annotation = annotation;
-    return daggerAnnotation;
-  }
+  /**
+   * Returns the Javac representation for the annotation.
+   *
+   * @throws IllegalStateException if the current backend isn't Javac.
+   */
+  public abstract AnnotationMirror javac();
 
-  abstract Equivalence.Wrapper<AnnotationMirror> annotationMirror();
+  /**
+   * Returns the KSP representation for the annotation.
+   *
+   * @throws IllegalStateException if the current backend isn't KSP.
+   */
+  public abstract KSAnnotation ksp();
 
-  public DaggerTypeElement annotationTypeElement() {
-    return DaggerTypeElement.from(annotation.getType().getTypeElement());
-  }
-
-  public ClassName className() {
-    return annotationTypeElement().className();
-  }
-
-  public XAnnotation xprocessing() {
-    return annotation;
-  }
-
-  public AnnotationMirror java() {
-    return toJavac(annotation);
-  }
-
-  // TODO(b/204390647): We'll need to update to auto-common to 1.2 before using AnnotationMirrors.
-  @SuppressWarnings("AnnotationMirrorToString")
-  @Override
-  public final String toString() {
-    return java().toString();
-  }
+  /** Returns the backend used in this compilation. */
+  public abstract DaggerProcessingEnv.Backend backend();
 }

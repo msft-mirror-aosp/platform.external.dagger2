@@ -16,19 +16,28 @@
 
 package dagger.internal.codegen.writing;
 
+import static androidx.room.compiler.processing.XTypeKt.isVoid;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.Iterables.getOnlyElement;
 import static dagger.internal.codegen.base.Util.reentrantComputeIfAbsent;
 import static dagger.internal.codegen.binding.BindingRequest.bindingRequest;
 import static dagger.internal.codegen.javapoet.CodeBlocks.makeParametersCodeBlock;
 import static dagger.internal.codegen.langmodel.Accessibility.isRawTypeAccessible;
 import static dagger.internal.codegen.langmodel.Accessibility.isTypeAccessibleFrom;
+import static dagger.internal.codegen.xprocessing.MethodSpecs.overriding;
+import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
+import static dagger.internal.codegen.xprocessing.XProcessingEnvs.isPreJava8SourceVersion;
 
+import androidx.room.compiler.processing.XMethodElement;
+import androidx.room.compiler.processing.XProcessingEnv;
+import androidx.room.compiler.processing.XType;
 import com.google.common.collect.ImmutableList;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.MethodSpec;
+import dagger.internal.codegen.base.MapType;
+import dagger.internal.codegen.base.OptionalType;
 import dagger.internal.codegen.binding.Binding;
 import dagger.internal.codegen.binding.BindingGraph;
 import dagger.internal.codegen.binding.BindingRequest;
@@ -41,15 +50,12 @@ import dagger.internal.codegen.binding.MembersInjectionBinding;
 import dagger.internal.codegen.binding.ProductionBinding;
 import dagger.internal.codegen.binding.ProvisionBinding;
 import dagger.internal.codegen.javapoet.Expression;
-import dagger.internal.codegen.langmodel.DaggerTypes;
-import dagger.internal.codegen.xprocessing.MethodSpecs;
-import dagger.spi.model.DependencyRequest;
-import dagger.spi.model.RequestKind;
+import dagger.internal.codegen.model.DependencyRequest;
+import dagger.internal.codegen.model.RequestKind;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import javax.inject.Inject;
-import javax.lang.model.type.TypeMirror;
 
 /** A central repository of code expressions used to access any binding available to a component. */
 @PerComponentImplementation
@@ -66,12 +72,8 @@ public final class ComponentRequestRepresentations {
       membersInjectionBindingRepresentationFactory;
   private final ProvisionBindingRepresentation.Factory provisionBindingRepresentationFactory;
   private final ProductionBindingRepresentation.Factory productionBindingRepresentationFactory;
-  private final ExperimentalSwitchingProviderDependencyRepresentation.Factory
-      experimentalSwitchingProviderDependencyRepresentationFactory;
-  private final DaggerTypes types;
   private final Map<Binding, BindingRepresentation> representations = new HashMap<>();
-  private final Map<Binding, ExperimentalSwitchingProviderDependencyRepresentation>
-      experimentalSwitchingProviderDependencyRepresentations = new HashMap<>();
+  private final XProcessingEnv processingEnv;
 
   @Inject
   ComponentRequestRepresentations(
@@ -82,9 +84,7 @@ public final class ComponentRequestRepresentations {
       MembersInjectionBindingRepresentation.Factory membersInjectionBindingRepresentationFactory,
       ProvisionBindingRepresentation.Factory provisionBindingRepresentationFactory,
       ProductionBindingRepresentation.Factory productionBindingRepresentationFactory,
-      ExperimentalSwitchingProviderDependencyRepresentation.Factory
-          experimentalSwitchingProviderDependencyRepresentationFactory,
-      DaggerTypes types) {
+      XProcessingEnv processingEnv) {
     this.parent = parent;
     this.graph = graph;
     this.componentImplementation = componentImplementation;
@@ -92,10 +92,8 @@ public final class ComponentRequestRepresentations {
         membersInjectionBindingRepresentationFactory;
     this.provisionBindingRepresentationFactory = provisionBindingRepresentationFactory;
     this.productionBindingRepresentationFactory = productionBindingRepresentationFactory;
-    this.experimentalSwitchingProviderDependencyRepresentationFactory =
-        experimentalSwitchingProviderDependencyRepresentationFactory;
     this.componentRequirementExpressions = checkNotNull(componentRequirementExpressions);
-    this.types = types;
+    this.processingEnv = processingEnv;
   }
 
   /**
@@ -174,14 +172,14 @@ public final class ComponentRequestRepresentations {
   Expression getDependencyArgumentExpression(
       DependencyRequest dependencyRequest, ClassName requestingClass) {
 
-    TypeMirror dependencyType = dependencyRequest.key().type().java();
+    XType dependencyType = dependencyRequest.key().type().xprocessing();
     BindingRequest bindingRequest = bindingRequest(dependencyRequest);
     Expression dependencyExpression = getDependencyExpression(bindingRequest, requestingClass);
 
     if (dependencyRequest.kind().equals(RequestKind.INSTANCE)
         && !isTypeAccessibleFrom(dependencyType, requestingClass.packageName())
         && isRawTypeAccessible(dependencyType, requestingClass.packageName())) {
-      return dependencyExpression.castTo(types.erasure(dependencyType));
+      return dependencyExpression.castTo(dependencyType.getRawType());
     }
 
     return dependencyExpression;
@@ -191,12 +189,68 @@ public final class ComponentRequestRepresentations {
   public MethodSpec getComponentMethod(ComponentMethodDescriptor componentMethod) {
     checkArgument(componentMethod.dependencyRequest().isPresent());
     BindingRequest request = bindingRequest(componentMethod.dependencyRequest().get());
-    return MethodSpecs.overriding(
-            componentMethod.methodElement(), graph.componentTypeElement().getType())
+    return overriding(componentMethod.methodElement(), graph.componentTypeElement().getType())
         .addCode(
-            getRequestRepresentation(request)
-                .getComponentMethodImplementation(componentMethod, componentImplementation))
+            request.isRequestKind(RequestKind.MEMBERS_INJECTION)
+                ? getMembersInjectionComponentMethodImplementation(request, componentMethod)
+                : getContributionComponentMethodImplementation(request, componentMethod))
         .build();
+  }
+
+  private CodeBlock getMembersInjectionComponentMethodImplementation(
+      BindingRequest request, ComponentMethodDescriptor componentMethod) {
+    checkArgument(request.isRequestKind(RequestKind.MEMBERS_INJECTION));
+    XMethodElement methodElement = componentMethod.methodElement();
+    RequestRepresentation requestRepresentation = getRequestRepresentation(request);
+    MembersInjectionBinding binding =
+        ((MembersInjectionRequestRepresentation) requestRepresentation).binding();
+    if (binding.injectionSites().isEmpty()) {
+      // If there are no injection sites either do nothing (if the return type is void) or return
+      // the input instance as-is.
+      return isVoid(methodElement.getReturnType())
+          ? CodeBlock.of("")
+          : CodeBlock.of(
+              "return $L;", getSimpleName(getOnlyElement(methodElement.getParameters())));
+    }
+    Expression expression = getComponentMethodExpression(requestRepresentation, componentMethod);
+    return isVoid(methodElement.getReturnType())
+        ? CodeBlock.of("$L;", expression.codeBlock())
+        : CodeBlock.of("return $L;", expression.codeBlock());
+  }
+
+  private CodeBlock getContributionComponentMethodImplementation(
+      BindingRequest request, ComponentMethodDescriptor componentMethod) {
+    checkArgument(!request.isRequestKind(RequestKind.MEMBERS_INJECTION));
+    Expression expression =
+        getComponentMethodExpression(getRequestRepresentation(request), componentMethod);
+    return CodeBlock.of("return $L;", expression.codeBlock());
+  }
+
+  private Expression getComponentMethodExpression(
+      RequestRepresentation requestRepresentation, ComponentMethodDescriptor componentMethod) {
+    Expression expression =
+        requestRepresentation.getDependencyExpressionForComponentMethod(
+            componentMethod, componentImplementation);
+
+    // Cast if the expression type does not match the component method's return type. This is useful
+    // for types that have protected accessibility to the component but are not accessible to other
+    // classes, e.g. shards, that may need to handle the implementation of the binding.
+    XType returnType =
+        componentMethod.methodElement()
+            .asMemberOf(componentImplementation.graph().componentTypeElement().getType())
+            .getReturnType();
+
+    // When compiling with -source 7, javac's type inference isn't strong enough to match things
+    // like Optional<javax.inject.Provider<T>> to Optional<dagger.internal.Provider<T>>.
+    if (isPreJava8SourceVersion(processingEnv)
+        && (MapType.isMapOfProvider(returnType)
+            || OptionalType.isOptionalProviderType(returnType))) {
+      return expression.castTo(returnType.getRawType());
+    }
+
+    return !isVoid(returnType) && !expression.type().isAssignableTo(returnType)
+        ? expression.castTo(returnType)
+        : expression;
   }
 
   /** Returns the {@link RequestRepresentation} for the given {@link BindingRequest}. */
@@ -230,30 +284,5 @@ public final class ComponentRequestRepresentations {
         return productionBindingRepresentationFactory.create((ProductionBinding) binding);
     }
     throw new AssertionError();
-  }
-
-  /**
-   * Returns an {@link ExperimentalSwitchingProviderDependencyRepresentation} for the requested
-   * binding to satisfy dependency requests on it from experimental switching providers. Cannot be
-   * used for Members Injection requests.
-   */
-  ExperimentalSwitchingProviderDependencyRepresentation
-      getExperimentalSwitchingProviderDependencyRepresentation(BindingRequest request) {
-    checkState(
-        componentImplementation.compilerMode().isExperimentalMergedMode(),
-        "Compiler mode should be experimentalMergedMode!");
-    Optional<Binding> localBinding = graph.localContributionBinding(request.key());
-
-    if (localBinding.isPresent()) {
-      return reentrantComputeIfAbsent(
-          experimentalSwitchingProviderDependencyRepresentations,
-          localBinding.get(),
-          binding ->
-              experimentalSwitchingProviderDependencyRepresentationFactory.create(
-                  (ProvisionBinding) binding));
-    }
-
-    checkArgument(parent.isPresent(), "no expression found for %s", request);
-    return parent.get().getExperimentalSwitchingProviderDependencyRepresentation(request);
   }
 }

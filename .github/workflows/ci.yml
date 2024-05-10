@@ -10,46 +10,52 @@ on:
 
 env:
   USE_JAVA_DISTRIBUTION: 'zulu'
-  # Our Bazel builds currently rely on JDK 8.
-  USE_JAVA_VERSION: '8'
-  # Our Bazel builds currently rely on 4.2.1. The version is set via
+  USE_JAVA_VERSION: '11'
+  # This is required by AGP 8.3+.
+  USE_JAVA_VERSION_FOR_PLUGIN: '17'
+  # Our Bazel builds currently rely on 6.4.0. The version is set via
   # baselisk by USE_BAZEL_VERSION: https://github.com/bazelbuild/bazelisk.
-  USE_BAZEL_VERSION: '4.2.1'
+  USE_BAZEL_VERSION: '6.4.0'
+  # The default Maven 3.9.0 has a regression so we manually install 3.8.7.
+  # https://issues.apache.org/jira/browse/MNG-7679
+  USE_MAVEN_VERSION: '3.8.7'
 
 jobs:
   validate-latest-dagger-version:
     name: 'Validate Dagger version'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: ./.github/actions/prechecks
   bazel-build:
     name: 'Bazel build'
     needs: validate-latest-dagger-version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: ./.github/actions/bazel-build
   bazel-test:
     name: 'Bazel tests'
     needs: validate-latest-dagger-version
-    runs-on: ubuntu-latest
+    runs-on:
+      group: large-runner
+      labels: ubuntu-22.04-16core
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: ./.github/actions/bazel-test
   artifact-java-local-tests:
     name: 'Artifact Java local tests'
     needs: bazel-build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: ./.github/actions/artifact-java-local-tests
   test-gradle-plugin:
     name: 'Test Hilt Gradle plugin'
     needs: bazel-build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: ./.github/actions/test-gradle-plugin
   artifact-android-local-tests:
     name: 'Artifact Android local tests (AGP ${{ matrix.agp }})'
@@ -57,24 +63,19 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        agp: ['4.1.0', '4.2.0', '7.0.0']
+        include:
+          - agp: '7.0.0'
+            jdk: '11'
+          - agp: '7.1.2'
+            jdk: '11'
+          - agp: '8.1.0'
+            jdk: '17'
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: ./.github/actions/artifact-android-local-tests
         with:
           agp: '${{ matrix.agp }}'
-  artifact-android-emulator-tests:
-    name: 'Artifact Android emulator tests (API 30)'
-    needs: bazel-build
-    # It's recommended to run emulator tests on macOS
-    # See https://github.com/marketplace/actions/android-emulator-runner
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: ./.github/actions/artifact-android-emulator-tests
-        timeout-minutes: 25
-        with:
-          api-level: '30'
+          jdk: '${{ matrix.jdk }}'
   artifact-android-emulator-legacy-api-tests:
     name: 'Artifact Android emulator tests (API ${{ matrix.api-level }})'
     # We only run this on master push (essentially a postsubmit) since these
@@ -86,11 +87,11 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix: # Run on 16 (PreL), 21 (L), and 26 (O).
-        api-level: [16, 21, 26]
+        api-level: [16, 21, 26, 30]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: ./.github/actions/artifact-android-emulator-tests
-        timeout-minutes: 25
+        timeout-minutes: 35
         with:
           api-level: '${{ matrix.api-level }}'
   publish-snapshot:
@@ -102,7 +103,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 'Install Java ${{ env.USE_JAVA_VERSION }}'
-        uses: actions/setup-java@v2
+        uses: actions/setup-java@v3
         with:
           distribution: '${{ env.USE_JAVA_DISTRIBUTION }}'
           java-version: '${{ env.USE_JAVA_VERSION }}'
@@ -110,9 +111,9 @@ jobs:
           server-username: CI_DEPLOY_USERNAME
           server-password: CI_DEPLOY_PASSWORD
       - name: 'Check out repository'
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: 'Cache local Maven repository'
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
             ~/.m2/repository
@@ -121,14 +122,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
       - name: 'Cache Bazel files'
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: ~/.cache/bazel
           key: ${{ runner.os }}-bazel-build-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-bazel-build-
       - name: 'Cache Gradle files'
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
             ~/.gradle/caches
@@ -168,7 +169,16 @@ jobs:
     needs: bazel-build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: ./.github/actions/build-gradle-plugin
         with:
           agp: '+'
+  cleanup-caches:
+    name: 'Clean up GitHub Action caches'
+    # TODO(bcorso): Consider also waiting on artifact-android-emulator-tests
+    # and artifact-android-emulator-legacy-api-tests after checking flakiness.
+    needs: [bazel-test, artifact-java-local-tests, artifact-android-local-tests, test-gradle-plugin]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/cleanup-caches

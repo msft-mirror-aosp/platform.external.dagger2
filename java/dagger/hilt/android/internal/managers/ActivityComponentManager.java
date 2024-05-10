@@ -70,17 +70,20 @@ public class ActivityComponentManager implements GeneratedComponentManager<Objec
     return component;
   }
 
+  public final SavedStateHandleHolder getSavedStateHandleHolder() {
+    // This will only be used on base activity that extends ComponentActivity.
+    return ((ActivityRetainedComponentManager) activityRetainedComponentManager)
+        .getSavedStateHandleHolder();
+  }
+
   protected Object createComponent() {
     if (!(activity.getApplication() instanceof GeneratedComponentManager)) {
-      if (Application.class.equals(activity.getApplication().getClass())) {
-        throw new IllegalStateException(
-                "Hilt Activity must be attached to an @HiltAndroidApp Application. "
-                + "Did you forget to specify your Application's class name in your manifest's "
-                + "<application />'s android:name attribute?");
-      }
       throw new IllegalStateException(
-              "Hilt Activity must be attached to an @AndroidEntryPoint Application. Found: "
-              + activity.getApplication().getClass());
+          "Hilt Activity must be attached to an @HiltAndroidApp Application. "
+              + (Application.class.equals(activity.getApplication().getClass())
+                  ? "Did you forget to specify your Application's class name in your manifest's "
+                      + "<application />'s android:name attribute?"
+                  : "Found: " + activity.getApplication().getClass()));
     }
 
     return EntryPoints.get(

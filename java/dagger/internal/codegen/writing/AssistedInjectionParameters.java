@@ -16,7 +16,6 @@
 
 package dagger.internal.codegen.writing;
 
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
 import static com.google.common.base.Preconditions.checkArgument;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
 import static dagger.internal.codegen.xprocessing.XElements.asConstructor;
@@ -24,17 +23,17 @@ import static dagger.internal.codegen.xprocessing.XElements.asTypeElement;
 
 import androidx.room.compiler.processing.XConstructorElement;
 import androidx.room.compiler.processing.XConstructorType;
+import androidx.room.compiler.processing.XExecutableParameterElement;
 import androidx.room.compiler.processing.XMethodType;
 import androidx.room.compiler.processing.XType;
 import androidx.room.compiler.processing.XTypeElement;
-import androidx.room.compiler.processing.XVariableElement;
 import com.google.common.collect.ImmutableList;
 import com.squareup.javapoet.ParameterSpec;
 import dagger.internal.codegen.binding.AssistedInjectionAnnotations;
 import dagger.internal.codegen.binding.AssistedInjectionAnnotations.AssistedFactoryMetadata;
 import dagger.internal.codegen.binding.Binding;
+import dagger.internal.codegen.model.BindingKind;
 import dagger.internal.codegen.writing.ComponentImplementation.ShardImplementation;
-import dagger.spi.model.BindingKind;
 import java.util.List;
 
 /** Utility class for generating unique assisted parameter names for a component shard. */
@@ -80,18 +79,18 @@ final class AssistedInjectionParameters {
   }
 
   private static ImmutableList<ParameterSpec> assistedParameterSpecs(
-      List<? extends XVariableElement> paramElements,
+      List<XExecutableParameterElement> paramElements,
       List<XType> paramTypes,
       ShardImplementation shardImplementation) {
     ImmutableList.Builder<ParameterSpec> assistedParameterSpecs = ImmutableList.builder();
     for (int i = 0; i < paramElements.size(); i++) {
-      XVariableElement paramElement = paramElements.get(i);
+      XExecutableParameterElement paramElement = paramElements.get(i);
       XType paramType = paramTypes.get(i);
       if (AssistedInjectionAnnotations.isAssistedParameter(paramElement)) {
         assistedParameterSpecs.add(
             ParameterSpec.builder(
                     paramType.getTypeName(),
-                    shardImplementation.getUniqueFieldNameForAssistedParam(toJavac(paramElement)))
+                    shardImplementation.getUniqueFieldNameForAssistedParam(paramElement))
                 .build());
       }
     }

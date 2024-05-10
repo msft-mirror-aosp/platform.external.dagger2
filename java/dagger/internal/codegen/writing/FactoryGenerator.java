@@ -22,8 +22,6 @@ import static com.squareup.javapoet.MethodSpec.methodBuilder;
 import static com.squareup.javapoet.TypeSpec.classBuilder;
 import static dagger.internal.codegen.binding.AssistedInjectionAnnotations.assistedParameters;
 import static dagger.internal.codegen.binding.SourceFiles.bindingTypeElementTypeVariableNames;
-import static dagger.internal.codegen.binding.SourceFiles.frameworkFieldUsages;
-import static dagger.internal.codegen.binding.SourceFiles.frameworkTypeUsageStatement;
 import static dagger.internal.codegen.binding.SourceFiles.generateBindingFieldsForDependencies;
 import static dagger.internal.codegen.binding.SourceFiles.generatedClassNameForBinding;
 import static dagger.internal.codegen.binding.SourceFiles.parameterizedGeneratedTypeNameForBinding;
@@ -34,20 +32,18 @@ import static dagger.internal.codegen.javapoet.AnnotationSpecs.Suppression.UNCHE
 import static dagger.internal.codegen.javapoet.AnnotationSpecs.suppressWarnings;
 import static dagger.internal.codegen.javapoet.CodeBlocks.makeParametersCodeBlock;
 import static dagger.internal.codegen.javapoet.TypeNames.factoryOf;
+import static dagger.internal.codegen.model.BindingKind.INJECTION;
+import static dagger.internal.codegen.model.BindingKind.PROVISION;
 import static dagger.internal.codegen.writing.GwtCompatibility.gwtIncompatibleAnnotation;
-import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
-import static dagger.spi.model.BindingKind.INJECTION;
-import static dagger.spi.model.BindingKind.PROVISION;
 import static javax.lang.model.element.Modifier.FINAL;
 import static javax.lang.model.element.Modifier.PRIVATE;
 import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
 
 import androidx.room.compiler.processing.XElement;
+import androidx.room.compiler.processing.XExecutableParameterElement;
 import androidx.room.compiler.processing.XFiler;
-import androidx.room.compiler.processing.XType;
-import androidx.room.compiler.processing.XTypeElement;
-import androidx.room.compiler.processing.compat.XConverters;
+import androidx.room.compiler.processing.XProcessingEnv;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -64,47 +60,38 @@ import dagger.internal.codegen.base.SourceFileGenerator;
 import dagger.internal.codegen.base.UniqueNameSet;
 import dagger.internal.codegen.binding.Binding;
 import dagger.internal.codegen.binding.ProvisionBinding;
+import dagger.internal.codegen.binding.SourceFiles;
 import dagger.internal.codegen.compileroption.CompilerOptions;
 import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.internal.codegen.kotlin.KotlinMetadataUtil;
-import dagger.internal.codegen.langmodel.DaggerElements;
-import dagger.internal.codegen.langmodel.DaggerTypes;
+import dagger.internal.codegen.model.BindingKind;
+import dagger.internal.codegen.model.DaggerAnnotation;
+import dagger.internal.codegen.model.DependencyRequest;
+import dagger.internal.codegen.model.Key;
+import dagger.internal.codegen.model.Scope;
 import dagger.internal.codegen.writing.InjectionMethods.InjectionSiteMethod;
 import dagger.internal.codegen.writing.InjectionMethods.ProvisionMethod;
-import dagger.spi.model.BindingKind;
-import dagger.spi.model.DaggerAnnotation;
-import dagger.spi.model.DependencyRequest;
-import dagger.spi.model.Key;
-import dagger.spi.model.Scope;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 import javax.inject.Inject;
-import javax.lang.model.SourceVersion;
-import javax.lang.model.element.VariableElement;
 
 /**
  * Generates {@link Factory} implementations from {@link ProvisionBinding} instances for {@link
  * Inject} constructors.
  */
 public final class FactoryGenerator extends SourceFileGenerator<ProvisionBinding> {
-  private final DaggerTypes types;
   private final CompilerOptions compilerOptions;
-  private final KotlinMetadataUtil metadataUtil;
+  private final SourceFiles sourceFiles;
 
   @Inject
   FactoryGenerator(
       XFiler filer,
-      SourceVersion sourceVersion,
-      DaggerTypes types,
-      DaggerElements elements,
       CompilerOptions compilerOptions,
-      KotlinMetadataUtil metadataUtil) {
-    super(filer, elements, sourceVersion);
-    this.types = types;
+      SourceFiles sourceFiles,
+      XProcessingEnv processingEnv) {
+    super(filer, processingEnv);
     this.compilerOptions = compilerOptions;
-    this.metadataUtil = metadataUtil;
+    this.sourceFiles = sourceFiles;
   }
 
   @Override
@@ -144,7 +131,7 @@ public final class FactoryGenerator extends SourceFileGenerator<ProvisionBinding
     factoryBuilder.addMethod(getMethod(binding));
     addCreateMethod(binding, factoryBuilder);
 
-    factoryBuilder.addMethod(ProvisionMethod.create(binding, compilerOptions, metadataUtil));
+    factoryBuilder.addMethod(ProvisionMethod.create(binding, compilerOptions));
     gwtIncompatibleAnnotation(binding).ifPresent(factoryBuilder::addAnnotation);
 
     return factoryBuilder;
@@ -247,21 +234,20 @@ public final class FactoryGenerator extends SourceFileGenerator<ProvisionBinding
     UniqueNameSet uniqueFieldNames = new UniqueNameSet();
     ImmutableMap<DependencyRequest, FieldSpec> frameworkFields = frameworkFields(binding);
     frameworkFields.values().forEach(field -> uniqueFieldNames.claim(field.name));
-    Map<VariableElement, ParameterSpec> assistedParameters =
+    ImmutableMap<XExecutableParameterElement, ParameterSpec> assistedParameters =
         assistedParameters(binding).stream()
             .collect(
                 toImmutableMap(
-                    XConverters::toJavac,
-                    element ->
+                    parameter -> parameter,
+                    parameter ->
                         ParameterSpec.builder(
-                                element.getType().getTypeName(),
-                                uniqueFieldNames.getUniqueName(getSimpleName(element)))
+                                parameter.getType().getTypeName(),
+                                uniqueFieldNames.getUniqueName(parameter.getJvmName()))
                             .build()));
     TypeName providedTypeName = providedTypeName(binding);
     MethodSpec.Builder getMethod =
         methodBuilder("get")
             .addModifiers(PUBLIC)
-            .returns(providedTypeName)
             .addParameters(assistedParameters.values());
 
     if (factoryTypeName(binding).isPresent()) {
@@ -271,37 +257,38 @@ public final class FactoryGenerator extends SourceFileGenerator<ProvisionBinding
         ProvisionMethod.invoke(
             binding,
             request ->
-                frameworkTypeUsageStatement(
+                sourceFiles.frameworkTypeUsageStatement(
                     CodeBlock.of("$N", frameworkFields.get(request)), request.kind()),
             param -> assistedParameters.get(param).name,
             generatedClassNameForBinding(binding),
             moduleParameter(binding).map(module -> CodeBlock.of("$N", module)),
-            compilerOptions,
-            metadataUtil);
+            compilerOptions);
 
     if (binding.kind().equals(PROVISION)) {
       binding
-          .nullableType()
-          .map(XType::getTypeElement)
-          .map(XTypeElement::getClassName)
-          .ifPresent(getMethod::addAnnotation);
+          .nullability()
+          .nullableAnnotations()
+          .forEach(getMethod::addAnnotation);
+      getMethod.returns(providedTypeName);
       getMethod.addStatement("return $L", invokeNewInstance);
     } else if (!binding.injectionSites().isEmpty()) {
       CodeBlock instance = CodeBlock.of("instance");
       getMethod
+          .returns(providedTypeName)
           .addStatement("$T $L = $L", providedTypeName, instance, invokeNewInstance)
           .addCode(
               InjectionSiteMethod.invokeAll(
                   binding.injectionSites(),
                   generatedClassNameForBinding(binding),
                   instance,
-                  binding.key().type().java(),
-                  frameworkFieldUsages(binding.dependencies(), frameworkFields)::get,
-                  types,
-                  metadataUtil))
+                  binding.key().type().xprocessing(),
+                  sourceFiles.frameworkFieldUsages(binding.dependencies(), frameworkFields)::get))
           .addStatement("return $L", instance);
+
     } else {
-      getMethod.addStatement("return $L", invokeNewInstance);
+      getMethod
+          .returns(providedTypeName)
+          .addStatement("return $L", invokeNewInstance);
     }
     return getMethod.build();
   }

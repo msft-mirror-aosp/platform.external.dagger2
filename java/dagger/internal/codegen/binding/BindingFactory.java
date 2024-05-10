@@ -19,34 +19,32 @@ package dagger.internal.codegen.binding;
 import static androidx.room.compiler.processing.XElementKt.isMethod;
 import static androidx.room.compiler.processing.XElementKt.isTypeElement;
 import static androidx.room.compiler.processing.XElementKt.isVariableElement;
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.getOnlyElement;
-import static dagger.internal.codegen.base.MoreAnnotationMirrors.wrapOptionalInEquivalence;
 import static dagger.internal.codegen.binding.ComponentDescriptor.isComponentProductionMethod;
-import static dagger.internal.codegen.binding.ConfigurationAnnotations.getNullableType;
 import static dagger.internal.codegen.binding.MapKeys.getMapKey;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
+import static dagger.internal.codegen.model.BindingKind.ASSISTED_FACTORY;
+import static dagger.internal.codegen.model.BindingKind.ASSISTED_INJECTION;
+import static dagger.internal.codegen.model.BindingKind.BOUND_INSTANCE;
+import static dagger.internal.codegen.model.BindingKind.COMPONENT;
+import static dagger.internal.codegen.model.BindingKind.COMPONENT_DEPENDENCY;
+import static dagger.internal.codegen.model.BindingKind.COMPONENT_PRODUCTION;
+import static dagger.internal.codegen.model.BindingKind.COMPONENT_PROVISION;
+import static dagger.internal.codegen.model.BindingKind.DELEGATE;
+import static dagger.internal.codegen.model.BindingKind.INJECTION;
+import static dagger.internal.codegen.model.BindingKind.MEMBERS_INJECTOR;
+import static dagger.internal.codegen.model.BindingKind.OPTIONAL;
+import static dagger.internal.codegen.model.BindingKind.PRODUCTION;
+import static dagger.internal.codegen.model.BindingKind.PROVISION;
+import static dagger.internal.codegen.model.BindingKind.SUBCOMPONENT_CREATOR;
 import static dagger.internal.codegen.xprocessing.XElements.asMethod;
 import static dagger.internal.codegen.xprocessing.XElements.asTypeElement;
 import static dagger.internal.codegen.xprocessing.XElements.asVariable;
+import static dagger.internal.codegen.xprocessing.XTypes.erasedTypeName;
 import static dagger.internal.codegen.xprocessing.XTypes.isDeclared;
-import static dagger.spi.model.BindingKind.ASSISTED_FACTORY;
-import static dagger.spi.model.BindingKind.ASSISTED_INJECTION;
-import static dagger.spi.model.BindingKind.BOUND_INSTANCE;
-import static dagger.spi.model.BindingKind.COMPONENT;
-import static dagger.spi.model.BindingKind.COMPONENT_DEPENDENCY;
-import static dagger.spi.model.BindingKind.COMPONENT_PRODUCTION;
-import static dagger.spi.model.BindingKind.COMPONENT_PROVISION;
-import static dagger.spi.model.BindingKind.DELEGATE;
-import static dagger.spi.model.BindingKind.INJECTION;
-import static dagger.spi.model.BindingKind.MEMBERS_INJECTOR;
-import static dagger.spi.model.BindingKind.OPTIONAL;
-import static dagger.spi.model.BindingKind.PRODUCTION;
-import static dagger.spi.model.BindingKind.PROVISION;
-import static dagger.spi.model.BindingKind.SUBCOMPONENT_CREATOR;
 
 import androidx.room.compiler.processing.XConstructorElement;
 import androidx.room.compiler.processing.XConstructorType;
@@ -69,19 +67,17 @@ import dagger.internal.codegen.base.SetType;
 import dagger.internal.codegen.binding.MembersInjectionBinding.InjectionSite;
 import dagger.internal.codegen.binding.ProductionBinding.ProductionKind;
 import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.internal.codegen.langmodel.DaggerTypes;
-import dagger.spi.model.BindingKind;
-import dagger.spi.model.DaggerType;
-import dagger.spi.model.DependencyRequest;
-import dagger.spi.model.Key;
-import dagger.spi.model.RequestKind;
+import dagger.internal.codegen.model.BindingKind;
+import dagger.internal.codegen.model.DaggerAnnotation;
+import dagger.internal.codegen.model.DependencyRequest;
+import dagger.internal.codegen.model.Key;
+import dagger.internal.codegen.model.RequestKind;
 import java.util.Optional;
 import java.util.function.BiFunction;
 import javax.inject.Inject;
 
 /** A factory for {@link Binding} objects. */
 public final class BindingFactory {
-  private final DaggerTypes types;
   private final KeyFactory keyFactory;
   private final DependencyRequestFactory dependencyRequestFactory;
   private final InjectionSiteFactory injectionSiteFactory;
@@ -89,12 +85,10 @@ public final class BindingFactory {
 
   @Inject
   BindingFactory(
-      DaggerTypes types,
       KeyFactory keyFactory,
       DependencyRequestFactory dependencyRequestFactory,
       InjectionSiteFactory injectionSiteFactory,
       InjectionAnnotations injectionAnnotations) {
-    this.types = types;
     this.keyFactory = keyFactory;
     this.dependencyRequestFactory = dependencyRequestFactory;
     this.injectionSiteFactory = injectionSiteFactory;
@@ -102,7 +96,7 @@ public final class BindingFactory {
   }
 
   /**
-   * Returns an {@link dagger.spi.model.BindingKind#INJECTION} binding.
+   * Returns an {@link dagger.internal.codegen.model.BindingKind#INJECTION} binding.
    *
    * @param constructorElement the {@code @Inject}-annotated constructor
    * @param resolvedType the parameterized type if the constructor is for a generic class and the
@@ -167,12 +161,12 @@ public final class BindingFactory {
     XMethodType factoryMethodType = factoryMethod.asMemberOf(factoryType);
     return ProvisionBinding.builder()
         .contributionType(ContributionType.UNIQUE)
-        .key(Key.builder(DaggerType.from(factoryType)).build())
+        .key(keyFactory.forType(factoryType))
         .bindingElement(factory)
         .provisionDependencies(
             ImmutableSet.of(
                 DependencyRequest.builder()
-                    .key(Key.builder(DaggerType.from(factoryMethodType.getReturnType())).build())
+                    .key(keyFactory.forType(factoryMethodType.getReturnType()))
                     .kind(RequestKind.PROVIDER)
                     .build()))
         .kind(ASSISTED_FACTORY)
@@ -180,7 +174,7 @@ public final class BindingFactory {
   }
 
   /**
-   * Returns a {@link dagger.spi.model.BindingKind#PROVISION} binding for a
+   * Returns a {@link dagger.internal.codegen.model.BindingKind#PROVISION} binding for a
    * {@code @Provides}-annotated method.
    *
    * @param contributedBy the installed module that declares or inherits the method
@@ -195,12 +189,12 @@ public final class BindingFactory {
             this::providesMethodBinding)
         .kind(PROVISION)
         .scope(injectionAnnotations.getScope(providesMethod))
-        .nullableType(getNullableType(providesMethod))
+        .nullability(Nullability.of(providesMethod))
         .build();
   }
 
   /**
-   * Returns a {@link dagger.spi.model.BindingKind#PRODUCTION} binding for a
+   * Returns a {@link dagger.internal.codegen.model.BindingKind#PRODUCTION} binding for a
    * {@code @Produces}-annotated method.
    *
    * @param contributedBy the installed module that declares or inherits the method
@@ -231,7 +225,7 @@ public final class BindingFactory {
           Key key,
           BiFunction<XMethodElement, XTypeElement, C> create) {
     XMethodType methodType = method.asMemberOf(contributedBy.getType());
-    if (!types.isSameType(toJavac(methodType), toJavac(method.getExecutableType()))) {
+    if (!methodType.isSameType(method.getExecutableType())) {
       checkState(isTypeElement(method.getEnclosingElement()));
       builder.unresolved(create.apply(method, asTypeElement(method.getEnclosingElement())));
     }
@@ -241,15 +235,15 @@ public final class BindingFactory {
         .contributingModule(contributedBy)
         .key(key)
         .dependencies(
-            dependencyRequestFactory.forRequiredResolvedXVariables(
+            dependencyRequestFactory.forRequiredResolvedVariables(
                 method.getParameters(), methodType.getParameterTypes()))
-        .wrappedMapKeyAnnotation(wrapOptionalInEquivalence(getMapKey(method)));
+        .mapKey(getMapKey(method).map(DaggerAnnotation::from));
   }
 
   /**
-   * Returns a {@link dagger.spi.model.BindingKind#MULTIBOUND_MAP} or {@link
-   * dagger.spi.model.BindingKind#MULTIBOUND_SET} binding given a set of multibinding contribution
-   * bindings.
+   * Returns a {@link dagger.internal.codegen.model.BindingKind#MULTIBOUND_MAP} or {@link
+   * dagger.internal.codegen.model.BindingKind#MULTIBOUND_SET} binding given a set of multibinding
+   * contribution bindings.
    *
    * @param key a key that may be satisfied by a multibinding
    */
@@ -293,7 +287,10 @@ public final class BindingFactory {
         multibindingContributions, binding -> binding.bindingType().equals(BindingType.PRODUCTION));
   }
 
-  /** Returns a {@link dagger.spi.model.BindingKind#COMPONENT} binding for the component. */
+  /**
+   * Returns a {@link dagger.internal.codegen.model.BindingKind#COMPONENT} binding for the
+   * component.
+   */
   public ProvisionBinding componentBinding(XTypeElement componentDefinitionType) {
     checkNotNull(componentDefinitionType);
     return ProvisionBinding.builder()
@@ -305,8 +302,8 @@ public final class BindingFactory {
   }
 
   /**
-   * Returns a {@link dagger.spi.model.BindingKind#COMPONENT_DEPENDENCY} binding for a component's
-   * dependency.
+   * Returns a {@link dagger.internal.codegen.model.BindingKind#COMPONENT_DEPENDENCY} binding for a
+   * component's dependency.
    */
   public ProvisionBinding componentDependencyBinding(ComponentRequirement dependency) {
     checkNotNull(dependency);
@@ -319,9 +316,9 @@ public final class BindingFactory {
   }
 
   /**
-   * Returns a {@link dagger.spi.model.BindingKind#COMPONENT_PROVISION} or {@link
-   * dagger.spi.model.BindingKind#COMPONENT_PRODUCTION} binding for a method on a component's
-   * dependency.
+   * Returns a {@link dagger.internal.codegen.model.BindingKind#COMPONENT_PROVISION} or {@link
+   * dagger.internal.codegen.model.BindingKind#COMPONENT_PRODUCTION} binding for a method on a
+   * component's dependency.
    *
    * @param componentDescriptor the component with the dependency, not the dependency that has the
    *     method
@@ -340,7 +337,7 @@ public final class BindingFactory {
       builder =
           ProvisionBinding.builder()
               .key(keyFactory.forComponentMethod(dependencyMethod))
-              .nullableType(getNullableType(dependencyMethod))
+              .nullability(Nullability.of(dependencyMethod))
               .kind(COMPONENT_PROVISION)
               .scope(injectionAnnotations.getScope(dependencyMethod));
     }
@@ -351,7 +348,7 @@ public final class BindingFactory {
   }
 
   /**
-   * Returns a {@link dagger.spi.model.BindingKind#BOUND_INSTANCE} binding for a
+   * Returns a {@link dagger.internal.codegen.model.BindingKind#BOUND_INSTANCE} binding for a
    * {@code @BindsInstance}-annotated builder setter method or factory method parameter.
    */
   ProvisionBinding boundInstanceBinding(ComponentRequirement requirement, XElement element) {
@@ -364,14 +361,14 @@ public final class BindingFactory {
         .contributionType(ContributionType.UNIQUE)
         .bindingElement(element)
         .key(requirement.key().get())
-        .nullableType(getNullableType(parameterElement))
+        .nullability(Nullability.of(parameterElement))
         .kind(BOUND_INSTANCE)
         .build();
   }
 
   /**
-   * Returns a {@link dagger.spi.model.BindingKind#SUBCOMPONENT_CREATOR} binding declared by a
-   * component method that returns a subcomponent builder. Use {{@link
+   * Returns a {@link dagger.internal.codegen.model.BindingKind#SUBCOMPONENT_CREATOR} binding
+   * declared by a component method that returns a subcomponent builder. Use {{@link
    * #subcomponentCreatorBinding(ImmutableSet)}} for bindings declared using {@link
    * Module#subcomponents()}.
    *
@@ -391,8 +388,8 @@ public final class BindingFactory {
   }
 
   /**
-   * Returns a {@link dagger.spi.model.BindingKind#SUBCOMPONENT_CREATOR} binding declared using
-   * {@link Module#subcomponents()}.
+   * Returns a {@link dagger.internal.codegen.model.BindingKind#SUBCOMPONENT_CREATOR} binding
+   * declared using {@link Module#subcomponents()}.
    */
   ProvisionBinding subcomponentCreatorBinding(
       ImmutableSet<SubcomponentDeclaration> subcomponentDeclarations) {
@@ -405,7 +402,7 @@ public final class BindingFactory {
   }
 
   /**
-   * Returns a {@link dagger.spi.model.BindingKind#DELEGATE} binding.
+   * Returns a {@link dagger.internal.codegen.model.BindingKind#DELEGATE} binding.
    *
    * @param delegateDeclaration the {@code @Binds}-annotated declaration
    * @param actualBinding the binding that satisfies the {@code @Binds} declaration
@@ -415,7 +412,7 @@ public final class BindingFactory {
     switch (actualBinding.bindingType()) {
       case PRODUCTION:
         return buildDelegateBinding(
-            ProductionBinding.builder().nullableType(actualBinding.nullableType()),
+            ProductionBinding.builder().nullability(actualBinding.nullability()),
             delegateDeclaration,
             TypeNames.PRODUCER);
 
@@ -423,7 +420,7 @@ public final class BindingFactory {
         return buildDelegateBinding(
             ProvisionBinding.builder()
                 .scope(injectionAnnotations.getScope(delegateDeclaration.bindingElement().get()))
-                .nullableType(actualBinding.nullableType()),
+                .nullability(actualBinding.nullability()),
             delegateDeclaration,
             TypeNames.PROVIDER);
 
@@ -433,8 +430,8 @@ public final class BindingFactory {
   }
 
   /**
-   * Returns a {@link dagger.spi.model.BindingKind#DELEGATE} binding used when there is no binding
-   * that satisfies the {@code @Binds} declaration.
+   * Returns a {@link dagger.internal.codegen.model.BindingKind#DELEGATE} binding used when there is
+   * no binding that satisfies the {@code @Binds} declaration.
    */
   public ContributionBinding unresolvedDelegateBinding(DelegateDeclaration delegateDeclaration) {
     return buildDelegateBinding(
@@ -454,13 +451,13 @@ public final class BindingFactory {
         .contributingModule(delegateDeclaration.contributingModule().get())
         .key(keyFactory.forDelegateBinding(delegateDeclaration, frameworkType))
         .dependencies(delegateDeclaration.delegateRequest())
-        .wrappedMapKeyAnnotation(delegateDeclaration.wrappedMapKey())
+        .mapKey(delegateDeclaration.mapKey())
         .kind(DELEGATE)
         .build();
   }
 
   /**
-   * Returns an {@link dagger.spi.model.BindingKind#OPTIONAL} binding for {@code key}.
+   * Returns an {@link dagger.internal.codegen.model.BindingKind#OPTIONAL} binding for {@code key}.
    *
    * @param requestKind the kind of request for the optional binding
    * @param underlyingKeyBindings the possibly empty set of bindings that exist in the component for
@@ -492,7 +489,7 @@ public final class BindingFactory {
         .build();
   }
 
-  /** Returns a {@link dagger.spi.model.BindingKind#MEMBERS_INJECTOR} binding. */
+  /** Returns a {@link dagger.internal.codegen.model.BindingKind#MEMBERS_INJECTOR} binding. */
   public ProvisionBinding membersInjectorBinding(
       Key key, MembersInjectionBinding membersInjectionBinding) {
     return ProvisionBinding.builder()
@@ -506,7 +503,7 @@ public final class BindingFactory {
   }
 
   /**
-   * Returns a {@link dagger.spi.model.BindingKind#MEMBERS_INJECTION} binding.
+   * Returns a {@link dagger.internal.codegen.model.BindingKind#MEMBERS_INJECTION} binding.
    *
    * @param resolvedType if {@code declaredType} is a generic class and {@code resolvedType} is a
    *     parameterization of that type, the returned binding will be for the resolved type
@@ -536,10 +533,10 @@ public final class BindingFactory {
 
   private void checkIsSameErasedType(XType type1, XType type2) {
     checkState(
-        types.isSameType(types.erasure(toJavac(type1)), types.erasure(toJavac(type2))),
+        erasedTypeName(type1).equals(erasedTypeName(type2)),
         "erased expected type: %s, erased actual type: %s",
-        types.erasure(toJavac(type1)),
-        types.erasure(toJavac(type2)));
+        erasedTypeName(type1),
+        erasedTypeName(type2));
   }
 
   private static boolean hasNonDefaultTypeParameters(XType type) {

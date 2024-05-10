@@ -22,9 +22,9 @@ import com.squareup.javapoet.CodeBlock;
 import dagger.internal.codegen.binding.BindingRequest;
 import dagger.internal.codegen.binding.ContributionBinding;
 import dagger.internal.codegen.javapoet.CodeBlocks;
+import dagger.internal.codegen.model.DependencyRequest;
 import dagger.internal.codegen.writing.ComponentImplementation.ShardImplementation;
 import dagger.internal.codegen.writing.FrameworkFieldInitializer.FrameworkInstanceCreationExpression;
-import dagger.spi.model.DependencyRequest;
 
 /** An abstract factory creation expression for multibindings. */
 abstract class MultibindingFactoryCreationExpression
@@ -66,6 +66,6 @@ abstract class MultibindingFactoryCreationExpression
    * component, and therefore a raw type must be used.
    */
   protected final boolean useRawType() {
-    return !shardImplementation.isTypeAccessible(binding.key().type().java());
+    return !shardImplementation.isTypeAccessible(binding.key().type().xprocessing());
   }
 }

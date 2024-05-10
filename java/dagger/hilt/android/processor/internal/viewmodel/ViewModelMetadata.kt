@@ -16,92 +16,181 @@
 
 package dagger.hilt.android.processor.internal.viewmodel
 
-import com.google.auto.common.MoreElements
+import androidx.room.compiler.codegen.XTypeName
+import androidx.room.compiler.codegen.toJavaPoet
+import androidx.room.compiler.processing.ExperimentalProcessingApi
+import androidx.room.compiler.processing.XMethodElement
+import androidx.room.compiler.processing.XProcessingEnv
+import androidx.room.compiler.processing.XTypeElement
 import com.squareup.javapoet.ClassName
 import dagger.hilt.android.processor.internal.AndroidClassNames
 import dagger.hilt.processor.internal.ClassNames
+import dagger.hilt.processor.internal.HiltCompilerOptions
 import dagger.hilt.processor.internal.ProcessorErrors
 import dagger.hilt.processor.internal.Processors
-import javax.annotation.processing.ProcessingEnvironment
-import javax.lang.model.element.Modifier
-import javax.lang.model.element.NestingKind
-import javax.lang.model.element.TypeElement
-import javax.lang.model.util.ElementFilter
+import dagger.internal.codegen.xprocessing.XAnnotations
+import dagger.internal.codegen.xprocessing.XElements
+import dagger.internal.codegen.xprocessing.XTypeElements
+import dagger.internal.codegen.xprocessing.XTypes
 
-/**
- * Data class that represents a Hilt injected ViewModel
- */
-internal class ViewModelMetadata private constructor(
-  val typeElement: TypeElement
-) {
-  val className = ClassName.get(typeElement)
+/** Data class that represents a Hilt injected ViewModel */
+@OptIn(ExperimentalProcessingApi::class)
+internal class ViewModelMetadata
+private constructor(val viewModelElement: XTypeElement, val assistedFactory: XTypeElement) {
+  val className = viewModelElement.asClassName().toJavaPoet()
 
-  val modulesClassName = ClassName.get(
-    MoreElements.getPackage(typeElement).qualifiedName.toString(),
-    "${className.simpleNames().joinToString("_")}_HiltModules"
-  )
+  val assistedFactoryClassName: ClassName = assistedFactory.asClassName().toJavaPoet()
+
+  val modulesClassName =
+    ClassName.get(
+      viewModelElement.packageName,
+      "${className.simpleNames().joinToString("_")}_HiltModules"
+    )
 
   companion object {
-    internal fun create(
-      processingEnv: ProcessingEnvironment,
-      typeElement: TypeElement,
-    ): ViewModelMetadata? {
-      val types = processingEnv.typeUtils
-      val elements = processingEnv.elementUtils
 
+    private const val ASSISTED_FACTORY_VALUE = "assistedFactory"
+
+    fun getAssistedFactoryMethods(factory: XTypeElement?): List<XMethodElement> {
+      return XTypeElements.getAllNonPrivateInstanceMethods(factory)
+        .filter { it.isAbstract() }
+        .filter { !it.isJavaDefault() }
+    }
+
+    internal fun create(
+      processingEnv: XProcessingEnv,
+      viewModelElement: XTypeElement,
+    ): ViewModelMetadata? {
       ProcessorErrors.checkState(
-        types.isSubtype(
-          typeElement.asType(),
-          elements.getTypeElement(AndroidClassNames.VIEW_MODEL.toString()).asType()
+        XTypes.isSubtype(
+          viewModelElement.type,
+          processingEnv.requireType(AndroidClassNames.VIEW_MODEL)
         ),
-        typeElement,
+        viewModelElement,
         "@HiltViewModel is only supported on types that subclass %s.",
         AndroidClassNames.VIEW_MODEL
       )
 
-      ElementFilter.constructorsIn(typeElement.enclosedElements).filter { constructor ->
+      val isAssistedInjectFeatureEnabled =
+        HiltCompilerOptions.isAssistedInjectViewModelsEnabled(viewModelElement)
+
+      val assistedFactoryType =
+        viewModelElement
+          .requireAnnotation(AndroidClassNames.HILT_VIEW_MODEL)
+          .getAsType(ASSISTED_FACTORY_VALUE)
+      val assistedFactory = assistedFactoryType.typeElement!!
+
+      if (assistedFactoryType.asTypeName() != XTypeName.ANY_OBJECT) {
         ProcessorErrors.checkState(
-          !Processors.hasAnnotation(constructor, ClassNames.ASSISTED_INJECT),
-          constructor,
-          "ViewModel constructor should be annotated with @Inject instead of @AssistedInject."
-        )
-        Processors.hasAnnotation(constructor, ClassNames.INJECT)
-      }.let { injectConstructors ->
-        ProcessorErrors.checkState(
-          injectConstructors.size == 1,
-          typeElement,
-          "@HiltViewModel annotated class should contain exactly one @Inject " +
-            "annotated constructor."
+          isAssistedInjectFeatureEnabled,
+          viewModelElement,
+          "Specified assisted factory %s for %s in @HiltViewModel but compiler option 'enableAssistedInjectViewModels' was not enabled.",
+          assistedFactoryType.asTypeName().toJavaPoet(),
+          XElements.toStableString(viewModelElement),
         )
 
-        injectConstructors.forEach { constructor ->
-          ProcessorErrors.checkState(
-            !constructor.modifiers.contains(Modifier.PRIVATE),
-            constructor,
-            "@Inject annotated constructors must not be private."
-          )
+        ProcessorErrors.checkState(
+          assistedFactory.hasAnnotation(ClassNames.ASSISTED_FACTORY),
+          viewModelElement,
+          "Class %s is not annotated with @AssistedFactory.",
+          assistedFactoryType.asTypeName().toJavaPoet()
+        )
+
+        val assistedFactoryMethod = getAssistedFactoryMethods(assistedFactory).singleOrNull()
+
+        ProcessorErrors.checkState(
+          assistedFactoryMethod != null,
+          assistedFactory,
+          "Cannot find assisted factory method in %s.",
+          XElements.toStableString(assistedFactory)
+        )
+
+        val assistedFactoryMethodType = assistedFactoryMethod!!.asMemberOf(assistedFactoryType)
+
+        ProcessorErrors.checkState(
+          assistedFactoryMethodType.returnType.asTypeName() == viewModelElement.asClassName(),
+          assistedFactoryMethod,
+          "Class %s must have a factory method that returns a %s. Found %s.",
+          XElements.toStableString(assistedFactory),
+          XElements.toStableString(viewModelElement),
+          XTypes.toStableString(assistedFactoryMethodType.returnType)
+        )
+      }
+
+      val injectConstructors =
+        viewModelElement.getConstructors().filter { constructor ->
+          if (isAssistedInjectFeatureEnabled) {
+            constructor.hasAnnotation(ClassNames.INJECT) ||
+              constructor.hasAnnotation(ClassNames.ASSISTED_INJECT)
+          } else {
+            ProcessorErrors.checkState(
+              !constructor.hasAnnotation(ClassNames.ASSISTED_INJECT),
+              constructor,
+              "ViewModel constructor should be annotated with @Inject instead of @AssistedInject."
+            )
+            constructor.hasAnnotation(ClassNames.INJECT)
+          }
         }
+
+      val injectAnnotationsMessage =
+        if (isAssistedInjectFeatureEnabled) {
+          "@Inject or @AssistedInject"
+        } else {
+          "@Inject"
+        }
+
+      ProcessorErrors.checkState(
+        injectConstructors.size == 1,
+        viewModelElement,
+        "@HiltViewModel annotated class should contain exactly one %s annotated constructor.",
+        injectAnnotationsMessage
+      )
+
+      val injectConstructor = injectConstructors.single()
+
+      ProcessorErrors.checkState(
+        !injectConstructor.isPrivate(),
+        injectConstructor,
+        "%s annotated constructors must not be private.",
+        injectAnnotationsMessage
+      )
+
+      if (injectConstructor.hasAnnotation(ClassNames.ASSISTED_INJECT)) {
+        // If "enableAssistedInjectViewModels" is not enabled we'll get error:
+        // "ViewModel constructor should be annotated with @Inject instead of @AssistedInject."
+
+        ProcessorErrors.checkState(
+          assistedFactoryType.asTypeName() != XTypeName.ANY_OBJECT,
+          viewModelElement,
+          "%s must have a valid assisted factory specified in @HiltViewModel when used with assisted injection. Found %s.",
+          XElements.toStableString(viewModelElement),
+          XTypes.toStableString(assistedFactoryType)
+        )
+      } else {
+        ProcessorErrors.checkState(
+          assistedFactoryType.asTypeName() == XTypeName.ANY_OBJECT,
+          injectConstructor,
+          "Found assisted factory %s in @HiltViewModel but the constructor was annotated with @Inject instead of @AssistedInject.",
+          XTypes.toStableString(assistedFactoryType),
+        )
       }
 
       ProcessorErrors.checkState(
-        typeElement.nestingKind != NestingKind.MEMBER ||
-          typeElement.modifiers.contains(Modifier.STATIC),
-        typeElement,
+        !viewModelElement.isNested() || viewModelElement.isStatic(),
+        viewModelElement,
         "@HiltViewModel may only be used on inner classes if they are static."
       )
 
-      Processors.getScopeAnnotations(typeElement).let { scopeAnnotations ->
+      Processors.getScopeAnnotations(viewModelElement).let { scopeAnnotations ->
         ProcessorErrors.checkState(
           scopeAnnotations.isEmpty(),
-          typeElement,
+          viewModelElement,
           "@HiltViewModel classes should not be scoped. Found: %s",
-          scopeAnnotations.joinToString()
+          scopeAnnotations.joinToString { XAnnotations.toStableString(it) }
         )
       }
 
-      return ViewModelMetadata(
-        typeElement
-      )
+      return ViewModelMetadata(viewModelElement, assistedFactory)
     }
   }
 }

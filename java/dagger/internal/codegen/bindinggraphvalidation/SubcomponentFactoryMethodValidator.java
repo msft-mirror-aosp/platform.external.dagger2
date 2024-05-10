@@ -20,22 +20,22 @@ import static com.google.common.collect.Sets.union;
 import static dagger.internal.codegen.binding.ComponentRequirement.componentCanMakeNewInstances;
 import static dagger.internal.codegen.extension.DaggerStreams.instancesOf;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
+import static java.util.stream.Collectors.joining;
 import static javax.tools.Diagnostic.Kind.ERROR;
 
 import androidx.room.compiler.processing.XExecutableType;
 import androidx.room.compiler.processing.XType;
 import androidx.room.compiler.processing.XTypeElement;
-import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Sets.SetView;
 import dagger.internal.codegen.base.Util;
 import dagger.internal.codegen.binding.ComponentNodeImpl;
-import dagger.spi.model.BindingGraph;
-import dagger.spi.model.BindingGraph.ChildFactoryMethodEdge;
-import dagger.spi.model.BindingGraph.ComponentNode;
-import dagger.spi.model.BindingGraphPlugin;
-import dagger.spi.model.DiagnosticReporter;
+import dagger.internal.codegen.model.BindingGraph;
+import dagger.internal.codegen.model.BindingGraph.ChildFactoryMethodEdge;
+import dagger.internal.codegen.model.BindingGraph.ComponentNode;
+import dagger.internal.codegen.model.DiagnosticReporter;
+import dagger.internal.codegen.validation.ValidationBindingGraphPlugin;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -43,7 +43,7 @@ import java.util.function.Function;
 import javax.inject.Inject;
 
 /** Reports an error if a subcomponent factory method is missing required modules. */
-final class SubcomponentFactoryMethodValidator implements BindingGraphPlugin {
+final class SubcomponentFactoryMethodValidator extends ValidationBindingGraphPlugin {
 
   private final Map<ComponentNode, Set<XTypeElement>> inheritedModulesCache = new HashMap<>();
 
@@ -146,6 +146,8 @@ final class SubcomponentFactoryMethodValidator implements BindingGraphPlugin {
             .currentComponent()
             .className()
             .canonicalName(),
-        Joiner.on(", ").join(missingModules));
+        missingModules.stream()
+            .map(XTypeElement::getQualifiedName)
+            .collect(joining(", ")));
   }
 }

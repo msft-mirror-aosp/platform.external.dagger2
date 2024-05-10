@@ -19,7 +19,6 @@ package dagger.internal.codegen.compileroption;
 import static com.google.common.base.CaseFormat.LOWER_CAMEL;
 import static com.google.common.base.CaseFormat.UPPER_UNDERSCORE;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Sets.immutableEnumSet;
 import static dagger.internal.codegen.compileroption.FeatureStatus.DISABLED;
 import static dagger.internal.codegen.compileroption.FeatureStatus.ENABLED;
@@ -29,7 +28,9 @@ import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompil
 import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.FAST_INIT;
 import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.FLOATING_BINDS_METHODS;
 import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.FORMAT_GENERATED_SOURCE;
+import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.GENERATED_CLASS_EXTENDS_COMPONENT;
 import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.IGNORE_PRIVATE_AND_STATIC_INJECTION_FOR_COMPONENT;
+import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.IGNORE_PROVISION_KEY_WILDCARDS;
 import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.INCLUDE_STACKTRACE_WITH_DEFERRED_ERROR_MESSAGES;
 import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.PLUGINS_VISIT_FULL_BINDING_GRAPHS;
 import static dagger.internal.codegen.compileroption.ProcessingEnvironmentCompilerOptions.Feature.STRICT_MULTIBINDING_VALIDATION;
@@ -54,13 +55,13 @@ import static java.util.stream.Collectors.joining;
 import static java.util.stream.Stream.concat;
 
 import androidx.room.compiler.processing.XMessager;
+import androidx.room.compiler.processing.XProcessingEnv;
 import androidx.room.compiler.processing.XTypeElement;
 import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.internal.codegen.langmodel.DaggerElements;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -76,25 +77,27 @@ public final class ProcessingEnvironmentCompilerOptions extends CompilerOptions 
   // EnumOption<T> doesn't support integer inputs so just doing this as a 1-off for now.
   private static final String KEYS_PER_COMPONENT_SHARD = "dagger.keysPerComponentShard";
 
+  private final XProcessingEnv processingEnv;
   private final XMessager messager;
   private final Map<String, String> options;
-  private final DaggerElements elements;
   private final Map<EnumOption<?>, Object> enumOptions = new HashMap<>();
   private final Map<EnumOption<?>, ImmutableMap<String, ? extends Enum<?>>> allCommandLineOptions =
       new HashMap<>();
 
   @Inject
   ProcessingEnvironmentCompilerOptions(
-      XMessager messager, @ProcessingOptions Map<String, String> options, DaggerElements elements) {
+      XProcessingEnv processingEnv,
+      XMessager messager,
+      @ProcessingOptions Map<String, String> options) {
+    this.processingEnv = processingEnv;
     this.messager = messager;
     this.options = options;
-    this.elements = elements;
     checkValid();
   }
 
   @Override
   public boolean usesProducers() {
-    return elements.getTypeElement(TypeNames.PRODUCES) != null;
+    return processingEnv.findTypeElement(TypeNames.PRODUCES) != null;
   }
 
   @Override
@@ -103,35 +106,12 @@ public final class ProcessingEnvironmentCompilerOptions extends CompilerOptions 
   }
 
   @Override
-  public boolean experimentalMergedMode(XTypeElement component) {
-    boolean isExperimental = experimentalMergedModeInternal();
-    if (isExperimental) {
-      checkState(
-          !fastInitInternal(component),
-          "Both fast init and experimental merged mode were turned on, please specify exactly one"
-              + " compilation mode.");
-    }
-    return isExperimental;
-  }
-
-  @Override
   public boolean fastInit(XTypeElement component) {
-    boolean isFastInit = fastInitInternal(component);
-    if (isFastInit) {
-      checkState(
-          !experimentalMergedModeInternal(),
-          "Both fast init and experimental merged mode were turned on, please specify exactly one"
-              + " compilation mode.");
-    }
-    return isFastInit;
+    return fastInitInternal(component);
   }
 
   private boolean fastInitInternal(XTypeElement component) {
     return isEnabled(FAST_INIT);
-  }
-
-  private boolean experimentalMergedModeInternal() {
-    return false;
   }
 
   @Override
@@ -210,6 +190,11 @@ public final class ProcessingEnvironmentCompilerOptions extends CompilerOptions 
   }
 
   @Override
+  public boolean ignoreProvisionKeyWildcards() {
+    return isEnabled(IGNORE_PROVISION_KEY_WILDCARDS);
+  }
+
+  @Override
   public boolean strictMultibindingValidation() {
     return isEnabled(STRICT_MULTIBINDING_VALIDATION);
   }
@@ -217,6 +202,11 @@ public final class ProcessingEnvironmentCompilerOptions extends CompilerOptions 
   @Override
   public boolean strictSuperficialValidation() {
     return isEnabled(STRICT_SUPERFICIAL_VALIDATION);
+  }
+
+  @Override
+  public boolean generatedClassExtendsComponent() {
+    return isEnabled(GENERATED_CLASS_EXTENDS_COMPONENT);
   }
 
   @Override
@@ -254,6 +244,16 @@ public final class ProcessingEnvironmentCompilerOptions extends CompilerOptions 
     noLongerRecognized(FLOATING_BINDS_METHODS);
     noLongerRecognized(EXPERIMENTAL_AHEAD_OF_TIME_SUBCOMPONENTS);
     noLongerRecognized(USE_GRADLE_INCREMENTAL_PROCESSING);
+    if (!isEnabled(IGNORE_PROVISION_KEY_WILDCARDS)) {
+      if (processingEnv.getBackend() == XProcessingEnv.Backend.KSP) {
+        processingEnv.getMessager().printMessage(
+            Diagnostic.Kind.ERROR,
+            String.format(
+                "When using KSP, you must also enable the '%s' compiler option (see %s).",
+                "dagger.ignoreProvisionKeyWildcards",
+                "https://dagger.dev/dev-guide/compiler-options#ignore-provision-key-wildcards"));
+      }
+    }
     return this;
   }
 
@@ -343,6 +343,10 @@ public final class ProcessingEnvironmentCompilerOptions extends CompilerOptions 
 
     STRICT_SUPERFICIAL_VALIDATION(ENABLED),
 
+    GENERATED_CLASS_EXTENDS_COMPONENT,
+
+    IGNORE_PROVISION_KEY_WILDCARDS(ENABLED),
+
     VALIDATE_TRANSITIVE_COMPONENT_DEPENDENCIES(ENABLED)
     ;
 
@@ -400,7 +404,7 @@ public final class ProcessingEnvironmentCompilerOptions extends CompilerOptions 
      * How to report that an explicit binding in a subcomponent conflicts with an {@code @Inject}
      * constructor used in an ancestor component.
      */
-    EXPLICIT_BINDING_CONFLICTS_WITH_INJECT(WARNING, ERROR, NONE),
+    EXPLICIT_BINDING_CONFLICTS_WITH_INJECT(ERROR, WARNING, NONE),
     ;
 
     final ValidationType defaultType;

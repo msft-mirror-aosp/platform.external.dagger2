@@ -22,6 +22,7 @@ import static dagger.internal.codegen.base.ComponentCreatorAnnotation.getCreator
 import static dagger.internal.codegen.base.ModuleAnnotation.moduleAnnotations;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
 import static dagger.internal.codegen.xprocessing.XTypeElements.getAllUnimplementedMethods;
+import static dagger.internal.codegen.xprocessing.XTypes.isSubtype;
 
 import androidx.room.compiler.processing.XElement;
 import androidx.room.compiler.processing.XExecutableParameterElement;
@@ -39,8 +40,8 @@ import com.google.common.collect.Multimap;
 import dagger.internal.codegen.base.ComponentCreatorAnnotation;
 import dagger.internal.codegen.base.ComponentCreatorKind;
 import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.internal.codegen.langmodel.DaggerTypes;
-import dagger.spi.model.DependencyRequest;
+import dagger.internal.codegen.model.DependencyRequest;
+import dagger.internal.codegen.xprocessing.XElements;
 import java.util.List;
 
 /**
@@ -152,7 +153,7 @@ public abstract class ComponentCreatorDescriptor {
 
   /** Creates a new {@link ComponentCreatorDescriptor} for the given creator {@code type}. */
   public static ComponentCreatorDescriptor create(
-      XTypeElement creator, DaggerTypes types, DependencyRequestFactory dependencyRequestFactory) {
+      XTypeElement creator, DependencyRequestFactory dependencyRequestFactory) {
     XType componentType = creator.getEnclosingTypeElement().getType();
 
     ImmutableSetMultimap.Builder<ComponentRequirement, XMethodElement> setterMethods =
@@ -160,8 +161,13 @@ public abstract class ComponentCreatorDescriptor {
     XMethodElement factoryMethod = null;
     for (XMethodElement method : getAllUnimplementedMethods(creator)) {
       XMethodType resolvedMethodType = method.asMemberOf(creator.getType());
-      if (types.isSubtype(componentType, resolvedMethodType.getReturnType())) {
-        verify(factoryMethod == null); // validation should have ensured there's only 1.
+      if (isSubtype(componentType, resolvedMethodType.getReturnType())) {
+        verify(
+            factoryMethod == null,
+            "Expected a single factory method for %s but found multiple: [%s, %s]",
+            XElements.toStableString(creator),
+            XElements.toStableString(factoryMethod),
+            XElements.toStableString(method));
         factoryMethod = method;
       } else {
         XExecutableParameterElement parameter = getOnlyElement(method.getParameters());
@@ -171,7 +177,10 @@ public abstract class ComponentCreatorDescriptor {
             method);
       }
     }
-    verify(factoryMethod != null); // validation should have ensured this.
+    verify(
+        factoryMethod != null,
+        "Expected a single factory method for %s but found none.",
+        XElements.toStableString(creator));
 
     ImmutableSetMultimap.Builder<ComponentRequirement, XExecutableParameterElement>
         factoryParameters = ImmutableSetMultimap.builder();

@@ -16,32 +16,27 @@
 
 package dagger.spi.model;
 
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
-
-import androidx.room.compiler.processing.XTypeElement;
-import com.google.auto.value.AutoValue;
-import com.squareup.javapoet.ClassName;
+import com.google.devtools.ksp.symbol.KSClassDeclaration;
+import com.google.errorprone.annotations.DoNotMock;
 import javax.lang.model.element.TypeElement;
 
 /** Wrapper type for a type element. */
-@AutoValue
+@DoNotMock("Only use real implementations created by Dagger")
 public abstract class DaggerTypeElement {
-  public static DaggerTypeElement from(XTypeElement typeElement) {
-    return new AutoValue_DaggerTypeElement(typeElement);
-  }
+  /**
+   * Returns the Javac representation for the type element.
+   *
+   * @throws IllegalStateException if the current backend isn't Javac.
+   */
+  public abstract TypeElement javac();
 
-  public abstract XTypeElement xprocessing();
+  /**
+   * Returns the KSP representation for the type element.
+   *
+   * @throws IllegalStateException if the current backend isn't KSP.
+   */
+  public abstract KSClassDeclaration ksp();
 
-  public TypeElement java() {
-    return toJavac(xprocessing());
-  }
-
-  public ClassName className() {
-    return xprocessing().getClassName();
-  }
-
-  @Override
-  public final String toString() {
-    return xprocessing().toString();
-  }
+  /** Returns the backend used in this compilation. */
+  public abstract DaggerProcessingEnv.Backend backend();
 }

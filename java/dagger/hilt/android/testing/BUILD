@@ -168,6 +168,15 @@ android_library(
     ],
 )
 
+android_library(
+    name = "skip_test_injection",
+    testonly = 1,
+    srcs = ["SkipTestInjection.java"],
+    deps = [
+        ":package_info",
+    ],
+)
+
 java_library(
     name = "package_info",
     srcs = ["package-info.java"],
@@ -220,11 +229,13 @@ gen_maven_artifact(
     artifact_target_maven_deps = [
         "androidx.activity:activity",
         "androidx.annotation:annotation",
+        "androidx.annotation:annotation-experimental",
         "androidx.fragment:fragment",
         "androidx.lifecycle:lifecycle-common",
         "androidx.lifecycle:lifecycle-viewmodel",
         "androidx.lifecycle:lifecycle-viewmodel-savedstate",
         "androidx.multidex:multidex",
+        "androidx.savedstate:savedstate",
         "androidx.test:core",
         "com.google.code.findbugs:jsr305",
         "com.google.dagger:dagger",
@@ -235,9 +246,9 @@ gen_maven_artifact(
     ],
     artifact_target_maven_deps_banned = [
         "com.google.guava:guava",
-        "javax.annotation:jsr250-api",
+        "javax.annotation:javax.annotation-api",
     ],
-    javadoc_android_api_level = 30,
+    javadoc_android_api_level = 32,
     javadoc_exclude_packages = [
         "dagger.hilt.internal",
         "dagger.hilt.android.internal",

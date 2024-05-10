@@ -19,18 +19,17 @@ load("@rules_java//java:defs.bzl", "java_library")
 load(
     "//:build_defs.bzl",
     "DOCLINT_HTML_AND_SYNTAX",
+    "JAVA_RELEASE_MIN",
     "POM_VERSION",
-    "SOURCE_7_TARGET_7",
 )
-load("//tools:maven.bzl", "pom_file")
-load("@google_bazel_common//tools/javadoc:javadoc.bzl", "javadoc_library")
+load("//tools:maven.bzl", "gen_maven_artifact")
 
 package(default_visibility = ["//:src"])
 
 java_library(
     name = "core",
     srcs = glob(["**/*.java"]),
-    javacopts = SOURCE_7_TARGET_7 + DOCLINT_HTML_AND_SYNTAX,
+    javacopts = JAVA_RELEASE_MIN + DOCLINT_HTML_AND_SYNTAX,
     tags = ["maven_coordinates=com.google.dagger:dagger:" + POM_VERSION],
     exports = ["//third_party/java/jsr330_inject"],
     deps = [
@@ -38,22 +37,21 @@ java_library(
     ],
 )
 
-pom_file(
-    name = "pom",
-    artifact_id = "dagger",
+gen_maven_artifact(
+    name = "artifact",
+    artifact_coordinates = "com.google.dagger:dagger:" + POM_VERSION,
     artifact_name = "Dagger",
-    targets = [":core"],
+    artifact_target = ":core",
+    artifact_target_maven_deps = [
+        "javax.inject:javax.inject",
+    ],
+    javadoc_root_packages = ["dagger"],
+    javadoc_srcs = [":javadoc-srcs"],
+    proguard_specs = [":proguard.pro"],
+    r8_specs = [":r8.pro"],
 )
 
 filegroup(
     name = "javadoc-srcs",
     srcs = glob(["**/*"]),
-)
-
-javadoc_library(
-    name = "core-javadoc",
-    srcs = [":javadoc-srcs"],
-    exclude_packages = ["dagger.internal"],
-    root_packages = ["dagger"],
-    deps = ["//third_party/java/jsr330_inject"],
 )

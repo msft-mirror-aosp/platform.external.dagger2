@@ -19,19 +19,20 @@ package dagger.internal.codegen.writing;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static dagger.internal.codegen.writing.DelegateRequestRepresentation.instanceRequiresCast;
 
+import androidx.room.compiler.processing.XProcessingEnv;
 import com.squareup.javapoet.ClassName;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
 import dagger.assisted.AssistedInject;
+import dagger.internal.codegen.base.MapType;
 import dagger.internal.codegen.binding.BindsTypeChecker;
 import dagger.internal.codegen.binding.ComponentDescriptor.ComponentMethodDescriptor;
 import dagger.internal.codegen.binding.ContributionBinding;
 import dagger.internal.codegen.binding.FrameworkType;
 import dagger.internal.codegen.javapoet.Expression;
-import dagger.internal.codegen.langmodel.DaggerElements;
-import dagger.internal.codegen.langmodel.DaggerTypes;
-import dagger.spi.model.BindingKind;
-import dagger.spi.model.RequestKind;
+import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.model.BindingKind;
+import dagger.internal.codegen.model.RequestKind;
 
 /** A binding expression that depends on a framework instance. */
 final class DerivedFromFrameworkInstanceRequestRepresentation extends RequestRepresentation {
@@ -39,7 +40,7 @@ final class DerivedFromFrameworkInstanceRequestRepresentation extends RequestRep
   private final RequestRepresentation frameworkRequestRepresentation;
   private final RequestKind requestKind;
   private final FrameworkType frameworkType;
-  private final DaggerTypes types;
+  private final XProcessingEnv processingEnv;
   private final BindsTypeChecker bindsTypeChecker;
 
   @AssistedInject
@@ -48,40 +49,71 @@ final class DerivedFromFrameworkInstanceRequestRepresentation extends RequestRep
       @Assisted RequestRepresentation frameworkRequestRepresentation,
       @Assisted RequestKind requestKind,
       @Assisted FrameworkType frameworkType,
-      DaggerTypes types,
-      DaggerElements elements) {
+      XProcessingEnv processingEnv,
+      BindsTypeChecker bindsTypeChecker) {
     this.binding = binding;
     this.frameworkRequestRepresentation = checkNotNull(frameworkRequestRepresentation);
     this.requestKind = requestKind;
     this.frameworkType = checkNotNull(frameworkType);
-    this.types = types;
-    this.bindsTypeChecker = new BindsTypeChecker(types, elements);
+    this.processingEnv = processingEnv;
+    this.bindsTypeChecker = bindsTypeChecker;
   }
 
   @Override
   Expression getDependencyExpression(ClassName requestingClass) {
-    Expression expression =
-        frameworkType.to(
-            requestKind,
-            frameworkRequestRepresentation.getDependencyExpression(requestingClass),
-            types);
-    return requiresTypeCast(expression, requestingClass)
-        ? expression.castTo(binding.contributedType())
-        : expression;
+    return getDependencyExpressionFromFrameworkExpression(
+        frameworkRequestRepresentation.getDependencyExpression(requestingClass),
+        requestingClass);
   }
 
   @Override
   Expression getDependencyExpressionForComponentMethod(
       ComponentMethodDescriptor componentMethod, ComponentImplementation component) {
+    return getDependencyExpressionFromFrameworkExpression(
+        frameworkRequestRepresentation
+            .getDependencyExpressionForComponentMethod(componentMethod, component),
+        component.name());
+  }
+
+  private Expression getDependencyExpressionFromFrameworkExpression(
+      Expression frameworkExpression, ClassName requestingClass) {
     Expression expression =
         frameworkType.to(
             requestKind,
-            frameworkRequestRepresentation.getDependencyExpressionForComponentMethod(
-                componentMethod, component),
-            types);
-    return requiresTypeCast(expression, component.name())
+            frameworkExpression,
+            processingEnv);
+
+    // If it is a map type we need to do a raw type cast. This is because a user requested field
+    // type like dagger.internal.Provider<Map<K, javax.inject.Provider<V>>> isn't always assignable
+    // from something like dagger.internal.Provider<Map<K, dagger.internal.Provider<V>>> just due
+    // to variance issues.
+    if (MapType.isMapOfProvider(binding.contributedType())) {
+      return castMapOfProvider(expression, binding);
+    }
+
+    return requiresTypeCast(expression, requestingClass)
         ? expression.castTo(binding.contributedType())
         : expression;
+  }
+
+  private Expression castMapOfProvider(Expression expression, ContributionBinding binding) {
+    switch (requestKind) {
+      case INSTANCE:
+        return expression.castTo(binding.contributedType());
+      case PROVIDER:
+      case PROVIDER_OF_LAZY:
+        return expression.castTo(processingEnv.requireType(TypeNames.DAGGER_PROVIDER).getRawType());
+      case LAZY:
+        return expression.castTo(processingEnv.requireType(TypeNames.LAZY).getRawType());
+      case PRODUCER:
+      case FUTURE:
+        return expression.castTo(processingEnv.requireType(TypeNames.PRODUCER).getRawType());
+      case PRODUCED:
+        return expression.castTo(processingEnv.requireType(TypeNames.PRODUCED).getRawType());
+
+      case MEMBERS_INJECTION: // fall through
+    }
+    throw new IllegalStateException("Unexpected request kind: " + requestKind);
   }
 
   private boolean requiresTypeCast(Expression expression, ClassName requestingClass) {

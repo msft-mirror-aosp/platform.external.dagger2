@@ -24,16 +24,6 @@ public abstract class CompilerOptions {
   public abstract boolean usesProducers();
 
   /**
-   * Returns true if the experimental Android mode is enabled.
-   *
-   * <p><b>Warning: Do Not use! This flag is for internal, experimental use only!</b>
-   *
-   * <p>Issues related to this flag will not be supported. This flag could break your build, cause
-   * memory leaks in your app, or cause other unknown issues at runtime.
-   */
-  public abstract boolean experimentalMergedMode(XTypeElement element);
-
-  /**
    * Returns true if the fast initialization flag, {@code fastInit}, is enabled.
    *
    * <p>If enabled, the generated code will attempt to optimize for fast component initialization.
@@ -129,6 +119,16 @@ public abstract class CompilerOptions {
    */
   public abstract boolean strictSuperficialValidation();
 
+  /**
+   * Returns {@code true} if the Dagger generated class should extend the {@code @Component}
+   * annotated interface/class.
+   *
+   * <p>The default value is {@code false}. This flag was introduced in Dagger 2.42 to allow users
+   * to switch back to the previous behavior ({@code true}) so that they can migrate incrementally.
+   * This flag will be removed in a future release.
+   */
+  public abstract boolean generatedClassExtendsComponent();
+
   /** Returns the number of bindings allowed per shard. */
   public int keysPerComponentShard(XTypeElement component) {
     return 3500;
@@ -140,4 +140,13 @@ public abstract class CompilerOptions {
    * eventually become the default and enforced.
    */
   public abstract boolean strictMultibindingValidation();
+
+  /**
+   * Returns {@code true} if we should ignore the variance in provision key types.
+   *
+   * <p>By enabling this flag, Dagger will no longer allow provisioning multiple keys that only
+   * differ by the key type's variance (a.k.a. wildcards). As an example, the provisioning a binding
+   * for {@code Foo<? extends Bar>} and {@code Foo<Bar>} would result in a duplicate binding error.
+   */
+  public abstract boolean ignoreProvisionKeyWildcards();
 }

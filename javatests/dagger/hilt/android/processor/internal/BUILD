@@ -24,13 +24,15 @@ compiler_test(
     compiler_deps = [
         "//java/dagger/hilt/android:hilt_android_app",
         "//java/dagger/hilt/android:android_entry_point",
-        "@androidsdk//:platforms/android-30/android.jar",
+        "@androidsdk//:platforms/android-32/android.jar",
         "@maven//:androidx_annotation_annotation",
     ],
     deps = [
-        "//third_party/java/compile_testing",
+        "//java/dagger/hilt/android/testing/compile",
+        "//java/dagger/internal/codegen/xprocessing",
+        "//java/dagger/internal/codegen/xprocessing:xprocessing-testing",
+        "//third_party/java/guava/base",
         "//third_party/java/junit",
         "//third_party/java/truth",
-        "//java/dagger/hilt/android/testing/compile",
     ],
 )

@@ -17,12 +17,14 @@
 package dagger.internal.codegen.writing;
 
 import static androidx.room.compiler.processing.XElementKt.isMethod;
+import static com.google.common.base.CaseFormat.LOWER_CAMEL;
+import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.squareup.javapoet.MethodSpec.constructorBuilder;
 import static com.squareup.javapoet.MethodSpec.methodBuilder;
 import static com.squareup.javapoet.TypeSpec.classBuilder;
-import static dagger.internal.codegen.javapoet.TypeNames.providerOf;
+import static dagger.internal.codegen.javapoet.TypeNames.daggerProviderOf;
 import static dagger.internal.codegen.writing.ComponentImplementation.TypeSpecKind.COMPONENT_PROVISION_FACTORY;
 import static dagger.internal.codegen.xprocessing.XElements.asMethod;
 import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
@@ -91,7 +93,7 @@ final class DependencyMethodProviderCreationExpression
         ComponentProvisionRequestRepresentation.maybeCheckForNull(
             binding,
             compilerOptions,
-            CodeBlock.of("$N.$N()", dependency().variableName(), getSimpleName(provisionMethod)));
+            CodeBlock.of("$N.$N()", dependency().variableName(), provisionMethod.getJvmName()));
     ClassName dependencyClassName = dependency().typeElement().getClassName();
     TypeName keyType = binding.key().type().xprocessing().getTypeName();
     MethodSpec.Builder getMethod =
@@ -100,9 +102,11 @@ final class DependencyMethodProviderCreationExpression
             .addModifiers(PUBLIC)
             .returns(keyType)
             .addStatement("return $L", invocation);
-    if (binding.nullableType().isPresent()) {
-      getMethod.addAnnotation(binding.nullableType().get().getTypeElement().getClassName());
-    }
+
+    binding
+        .nullability()
+        .nullableAnnotations()
+        .forEach(getMethod::addAnnotation);
 
     // We need to use the componentShard here since the generated type is static and shards are
     // not static classes so it can't be nested inside the shard.
@@ -112,13 +116,12 @@ final class DependencyMethodProviderCreationExpression
         componentShard
             .name()
             .nestedClass(
-                dependency().typeElement().getQualifiedName().replace('.', '_')
-                    + "_"
-                    + getSimpleName(provisionMethod));
+                componentShard.getUniqueClassName(
+                    LOWER_CAMEL.to(UPPER_CAMEL, getSimpleName(provisionMethod) + "Provider")));
     componentShard.addType(
         COMPONENT_PROVISION_FACTORY,
         classBuilder(factoryClassName)
-            .addSuperinterface(providerOf(keyType))
+            .addSuperinterface(daggerProviderOf(keyType))
             .addModifiers(PRIVATE, STATIC, FINAL)
             .addField(dependencyClassName, dependency().variableName(), PRIVATE, FINAL)
             .addMethod(

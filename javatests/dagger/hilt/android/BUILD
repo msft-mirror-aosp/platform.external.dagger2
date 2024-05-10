@@ -14,9 +14,20 @@
 # Description:
 #   Tests for internal code for implementing Hilt processors.
 
-load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_android_library")
+load("//third_party/kotlin/build_extensions:rules.bzl", "kt_android_library")
 
 package(default_visibility = ["//:src"])
+
+android_library(
+    name = "resources",
+    manifest = "AndroidManifest.xml",
+    resource_files = glob(["res/**"]),
+    deps = [
+        "@maven//:androidx_navigation_navigation_common",
+        "@maven//:androidx_navigation_navigation_fragment",
+        "@maven//:androidx_navigation_navigation_runtime",
+    ],
+)
 
 # Checks that multiple test roots can be compiled together. This library
 # only compiles the sources. they are tested in the android_local_tests.
@@ -118,6 +129,7 @@ android_library(
     name = "custom_inject_classes",
     srcs = ["CustomInjectClasses.java"],
     deps = [
+        "//:android_local_test_exports",
         "//:dagger_with_compiler",
         "//java/dagger/hilt:install_in",
         "//java/dagger/hilt/android:hilt_android_app",
@@ -164,6 +176,7 @@ android_library(
     name = "EarlyEntryPointHiltAndroidAppRuntimeClasses",
     srcs = ["EarlyEntryPointHiltAndroidAppRuntimeClasses.java"],
     deps = [
+        "//:android_local_test_exports",
         "//java/dagger/hilt:entry_point",
         "//java/dagger/hilt/android:early_entry_point",
         "//java/dagger/hilt/android:hilt_android_app",
@@ -267,8 +280,6 @@ android_local_test(
         # Note: Hilt's bytecode injection doesn't work in Blaze but we disable
         # superclass validation in this test just to verify everything builds.
         "-Adagger.hilt.android.internal.disableAndroidSuperclassValidation=true",
-        # Note: Used to test base classes across java packages.
-        "-Xep:PackageLocation:OFF",
     ],
     manifest_values = {
         "minSdkVersion": "14",
@@ -318,54 +329,8 @@ android_local_test(
     ],
 )
 
-android_local_test(
-    name = "InstallInObjectModuleTest",
-    srcs = ["InstallInObjectModuleTest.java"],
-    manifest_values = {
-        "minSdkVersion": "14",
-    },
-    deps = [
-        ":InstallInObjectModuleClasses",
-        "//:android_local_test_exports",
-        "//:dagger_with_compiler",
-        "//java/dagger/hilt:entry_point",
-        "//java/dagger/hilt/android:android_entry_point",
-        "//java/dagger/hilt/android:package_info",
-        "//java/dagger/hilt/android/testing:hilt_android_test",
-        "//third_party/java/junit",
-        "//third_party/java/truth",
-    ],
-)
-
-kt_android_library(
-    name = "InstallInObjectModuleClasses",
-    testonly = True,
-    srcs = ["InstallInObjectModule.kt"],
-    deps = [
-        "//:dagger_with_compiler",
-        "//java/dagger/hilt:entry_point",
-        "//java/dagger/hilt:install_in",
-        "//java/dagger/hilt/components",
-    ],
-)
-
-android_local_test(
-    name = "InternalKtModuleTest",
-    size = "small",
-    srcs = ["InternalKtModuleTest.java"],
-    manifest_values = {
-        "minSdkVersion": "14",
-    },
-    deps = [
-        "//:android_local_test_exports",
-        "//:dagger_with_compiler",
-        "//java/dagger/hilt:install_in",
-        "//java/dagger/hilt/android:package_info",
-        "//java/dagger/hilt/android/testing:hilt_android_test",
-        "//javatests/dagger/hilt/testmodules",
-        "//third_party/java/truth",
-    ],
-)
+# InstallInObjectModuleTest and InternalKtModuleTest are excluded because they don't build
+# due to https://github.com/bazelbuild/bazel/issues/16087
 
 android_local_test(
     name = "DefaultViewModelFactoryTest",
@@ -380,7 +345,7 @@ android_local_test(
         "//java/dagger/hilt:install_in",
         "//java/dagger/hilt/android:android_entry_point",
         "//java/dagger/hilt/android:package_info",
-        "//java/dagger/hilt/android/lifecycle",
+        "//java/dagger/hilt/android/lifecycle:hilt_view_model",
         "//java/dagger/hilt/android/testing:bind_value",
         "//java/dagger/hilt/android/testing:hilt_android_test",
         "//third_party/java/jsr330_inject",
@@ -562,7 +527,8 @@ android_local_test(
         "//java/dagger/hilt:install_in",
         "//java/dagger/hilt/android:android_entry_point",
         "//java/dagger/hilt/android:package_info",
-        "//java/dagger/hilt/android/lifecycle",
+        "//java/dagger/hilt/android:view_model_lifecycle",
+        "//java/dagger/hilt/android/lifecycle:hilt_view_model",
         "//java/dagger/hilt/android/scopes",
         "//java/dagger/hilt/android/testing:hilt_android_test",
         "//third_party/java/jsr330_inject",
@@ -572,6 +538,73 @@ android_local_test(
         "@maven//:androidx_lifecycle_lifecycle_common",
         "@maven//:androidx_lifecycle_lifecycle_viewmodel",
         "@maven//:androidx_lifecycle_lifecycle_viewmodel_savedstate",
+        "@maven//:junit_junit",
+    ],
+)
+
+android_local_test(
+    name = "ViewModelAssistedTest",
+    srcs = ["ViewModelAssistedTest.java"],
+    javacopts = ["-Adagger.hilt.enableAssistedInjectViewModels=true"],
+    manifest = "AndroidManifest.xml",
+    manifest_values = {
+        "minSdkVersion": "14",
+    },
+    deps = [
+        "//:android_local_test_exports",
+        "//:dagger_with_compiler",
+        "//java/dagger/hilt:install_in",
+        "//java/dagger/hilt/android:android_entry_point",
+        "//java/dagger/hilt/android:package_info",
+        "//java/dagger/hilt/android:view_model_lifecycle",
+        "//java/dagger/hilt/android/internal/lifecycle",
+        "//java/dagger/hilt/android/lifecycle:hilt_view_model",
+        "//java/dagger/hilt/android/lifecycle:hilt_view_model_extensions",
+        "//java/dagger/hilt/android/scopes",
+        "//java/dagger/hilt/android/testing:hilt_android_test",
+        "//third_party/java/jsr330_inject",
+        "//third_party/java/truth",
+        "@maven//:androidx_activity_activity",
+        "@maven//:androidx_fragment_fragment",
+        "@maven//:androidx_lifecycle_lifecycle_common",
+        "@maven//:androidx_lifecycle_lifecycle_viewmodel",
+        "@maven//:androidx_lifecycle_lifecycle_viewmodel_savedstate",
+        "@maven//:androidx_test_core",
+        "@maven//:junit_junit",
+        "@maven//:org_jetbrains_kotlin_kotlin_stdlib",
+    ],
+)
+
+android_local_test(
+    name = "ViewModelSavedStateOwnerTest",
+    srcs = ["ViewModelSavedStateOwnerTest.java"],
+    manifest = "AndroidManifest.xml",
+    manifest_values = {
+        "minSdkVersion": "14",
+    },
+    deps = [
+        ":resources",
+        "//:android_local_test_exports",
+        "//:dagger_with_compiler",
+        "//java/dagger/hilt:install_in",
+        "//java/dagger/hilt/android:android_entry_point",
+        "//java/dagger/hilt/android:package_info",
+        "//java/dagger/hilt/android:unstable_api",
+        "//java/dagger/hilt/android/lifecycle:activity_retained_saved_state",
+        "//java/dagger/hilt/android/lifecycle:hilt_view_model",
+        "//java/dagger/hilt/android/scopes",
+        "//java/dagger/hilt/android/testing:hilt_android_test",
+        "//third_party/java/jsr330_inject",
+        "//third_party/java/truth",
+        "@maven//:androidx_activity_activity",
+        "@maven//:androidx_annotation_annotation_experimental",
+        "@maven//:androidx_fragment_fragment",
+        "@maven//:androidx_lifecycle_lifecycle_common",
+        "@maven//:androidx_lifecycle_lifecycle_viewmodel",
+        "@maven//:androidx_lifecycle_lifecycle_viewmodel_savedstate",
+        "@maven//:androidx_navigation_navigation_common",
+        "@maven//:androidx_navigation_navigation_fragment",
+        "@maven//:androidx_navigation_navigation_runtime",
         "@maven//:junit_junit",
     ],
 )
@@ -589,7 +622,7 @@ android_local_test(
         "//java/dagger/hilt:install_in",
         "//java/dagger/hilt/android:android_entry_point",
         "//java/dagger/hilt/android:package_info",
-        "//java/dagger/hilt/android/lifecycle",
+        "//java/dagger/hilt/android/lifecycle:hilt_view_model",
         "//java/dagger/hilt/android/testing:hilt_android_test",
         "//third_party/java/jsr330_inject",
         "//third_party/java/truth",
@@ -707,6 +740,7 @@ android_library(
         "//java/dagger/hilt/android:hilt_android_app",
         "//java/dagger/hilt/android:package_info",
         "//java/dagger/hilt/android/components",
+        "//java/dagger/hilt/android/internal/lifecycle",  # b/247145646
         "//java/dagger/hilt/android/testing:bind_value",
         "//java/dagger/hilt/android/testing:hilt_android_test",
         "//java/dagger/hilt/testing:test_install_in",

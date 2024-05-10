@@ -27,14 +27,12 @@ compiler_test(
         "//java/dagger/hilt/android/testing:hilt_android_test",
         "//java/dagger/hilt/android/testing:uninstall_modules",
         "//java/dagger/hilt/migration:disable_install_in_check",
-        "@androidsdk//:platforms/android-30/android.jar",
+        "@androidsdk//:platforms/android-32/android.jar",
         "@maven//:androidx_annotation_annotation",
     ],
     deps = [
         "//java/dagger/hilt/android/testing/compile",
-        "//third_party/java/compile_testing",
         "//third_party/java/junit",
-        "//third_party/java/truth",
     ],
 )
 

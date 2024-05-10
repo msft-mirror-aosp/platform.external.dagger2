@@ -32,7 +32,11 @@ java_plugin(
 
 java_library(
     name = "processor_lib",
-    srcs = ["AndroidEntryPointProcessor.java"],
+    srcs = [
+        "AndroidEntryPointProcessingStep.java",
+        "AndroidEntryPointProcessor.java",
+        "KspAndroidEntryPointProcessor.java",
+    ],
     deps = [
         ":android_generators",
         ":metadata",
@@ -40,10 +44,13 @@ java_library(
         "//java/dagger/hilt/processor/internal:base_processor",
         "//java/dagger/hilt/processor/internal:compiler_options",
         "//java/dagger/hilt/processor/internal:processor_errors",
-        "//java/dagger/hilt/processor/internal:processors",
+        "//java/dagger/hilt/processor/internal/optionvalues",
+        "//java/dagger/internal/codegen/xprocessing",
         "//third_party/java/auto:service",
         "//third_party/java/guava/collect",
         "//third_party/java/incap",
+        "//third_party/java/javapoet",
+        "@maven//:com_google_devtools_ksp_symbol_processing_api",
     ],
 )
 
@@ -62,18 +69,17 @@ java_library(
     deps = [
         ":metadata",
         "//java/dagger/hilt/android/processor/internal:android_classnames",
-        "//java/dagger/hilt/android/processor/internal:utils",
         "//java/dagger/hilt/processor/internal:classnames",
-        "//java/dagger/hilt/processor/internal:compiler_options",
         "//java/dagger/hilt/processor/internal:component_names",
+        "//java/dagger/hilt/processor/internal:method_signature",
         "//java/dagger/hilt/processor/internal:processor_errors",
         "//java/dagger/hilt/processor/internal:processors",
         "//java/dagger/internal/codegen/extension",
-        "//java/dagger/internal/codegen/langmodel",
-        "//third_party/java/auto:common",
+        "//java/dagger/internal/codegen/xprocessing",
         "//third_party/java/guava/base",
         "//third_party/java/guava/collect",
         "//third_party/java/javapoet",
+        "@maven//:org_jetbrains_kotlin_kotlin_stdlib",
     ],
 )
 
@@ -84,15 +90,13 @@ java_library(
     ],
     deps = [
         "//java/dagger/hilt/android/processor/internal:android_classnames",
-        "//java/dagger/hilt/processor/internal:classnames",
         "//java/dagger/hilt/processor/internal:compiler_options",
         "//java/dagger/hilt/processor/internal:components",
-        "//java/dagger/hilt/processor/internal:kotlin",
         "//java/dagger/hilt/processor/internal:processor_errors",
         "//java/dagger/hilt/processor/internal:processors",
+        "//java/dagger/hilt/processor/internal/kotlin",
         "//java/dagger/internal/codegen/extension",
-        "//java/dagger/internal/codegen/kotlin",
-        "//third_party/java/auto:common",
+        "//java/dagger/internal/codegen/xprocessing",
         "//third_party/java/auto:value",
         "//third_party/java/guava/base",
         "//third_party/java/guava/collect",

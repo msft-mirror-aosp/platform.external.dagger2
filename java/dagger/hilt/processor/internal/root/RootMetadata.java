@@ -19,10 +19,10 @@ package dagger.hilt.processor.internal.root;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Suppliers.memoize;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
-import static javax.lang.model.element.Modifier.ABSTRACT;
-import static javax.lang.model.element.Modifier.PRIVATE;
-import static javax.lang.model.element.Modifier.STATIC;
 
+import androidx.room.compiler.processing.XConstructorElement;
+import androidx.room.compiler.processing.XProcessingEnv;
+import androidx.room.compiler.processing.XTypeElement;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
@@ -30,21 +30,16 @@ import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.TypeName;
 import dagger.hilt.processor.internal.ClassNames;
 import dagger.hilt.processor.internal.ComponentDescriptor;
-import dagger.hilt.processor.internal.KotlinMetadataUtils;
 import dagger.hilt.processor.internal.Processors;
 import dagger.hilt.processor.internal.aggregateddeps.ComponentDependencies;
 import dagger.hilt.processor.internal.aliasof.AliasOfs;
-import dagger.internal.codegen.kotlin.KotlinMetadataUtil;
 import java.util.List;
-import javax.annotation.processing.ProcessingEnvironment;
-import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
-import javax.lang.model.util.ElementFilter;
-import javax.lang.model.util.Elements;
 import javax.tools.Diagnostic;
 
 /** Contains metadata about the given hilt root. */
 public final class RootMetadata {
+
   private static final ClassName APPLICATION_CONTEXT_MODULE =
       ClassName.get("dagger.hilt.android.internal.modules", "ApplicationContextModule");
 
@@ -53,7 +48,7 @@ public final class RootMetadata {
       ComponentTree componentTree,
       ComponentDependencies deps,
       AliasOfs aliasOfs,
-      ProcessingEnvironment env) {
+      XProcessingEnv env) {
     return createInternal(root, componentTree, deps, aliasOfs, env);
   }
 
@@ -66,15 +61,14 @@ public final class RootMetadata {
       ComponentTree componentTree,
       ComponentDependencies deps,
       AliasOfs aliasOfs,
-      ProcessingEnvironment env) {
+      XProcessingEnv env) {
     RootMetadata metadata = new RootMetadata(root, componentTree, deps, aliasOfs, env);
     metadata.validate();
     return metadata;
   }
 
   private final Root root;
-  private final ProcessingEnvironment env;
-  private final Elements elements;
+  private final XProcessingEnv env;
   private final ComponentTree componentTree;
   private final ComponentDependencies deps;
   private final AliasOfs aliasOfs;
@@ -88,10 +82,9 @@ public final class RootMetadata {
       ComponentTree componentTree,
       ComponentDependencies deps,
       AliasOfs aliasOfs,
-      ProcessingEnvironment env) {
+      XProcessingEnv env) {
     this.root = root;
     this.env = env;
-    this.elements = env.getElementUtils();
     this.componentTree = componentTree;
     this.deps = deps;
     this.aliasOfs = aliasOfs;
@@ -109,15 +102,15 @@ public final class RootMetadata {
     return deps;
   }
 
-  public ImmutableSet<TypeElement> modules(ClassName componentName) {
-    return deps.modules().get(componentName);
+  public ImmutableSet<XTypeElement> modules(ClassName componentName) {
+    return deps.modules().get(componentName).stream().collect(toImmutableSet());
   }
 
   public ImmutableSet<TypeName> entryPoints(ClassName componentName) {
     return ImmutableSet.<TypeName>builder()
         .addAll(
             deps.entryPoints().get(componentName).stream()
-                .map(ClassName::get)
+                .map(XTypeElement::getClassName)
                 .collect(toImmutableSet()))
         .add(
             root.isTestRoot() && componentName.equals(ClassNames.SINGLETON_COMPONENT)
@@ -138,10 +131,10 @@ public final class RootMetadata {
    * filters out framework modules directly referenced by the codegen, since those are already known
    * about and are specifically handled in the codegen.
    */
-  public ImmutableSet<TypeElement> modulesThatDaggerCannotConstruct(ClassName componentName) {
+  public ImmutableSet<XTypeElement> modulesThatDaggerCannotConstruct(ClassName componentName) {
     return modules(componentName).stream()
         .filter(module -> !daggerCanConstruct(module))
-        .filter(module -> !APPLICATION_CONTEXT_MODULE.equals(ClassName.get(module)))
+        .filter(module -> !APPLICATION_CONTEXT_MODULE.equals(module.getClassName()))
         .collect(toImmutableSet());
   }
 
@@ -167,7 +160,7 @@ public final class RootMetadata {
     // Only test modules in the application component can be missing default constructor
     for (ComponentDescriptor componentDescriptor : componentTree.getComponentDescriptors()) {
       ClassName componentName = componentDescriptor.component();
-      for (TypeElement extraModule : modulesThatDaggerCannotConstruct(componentName)) {
+      for (XTypeElement extraModule : modulesThatDaggerCannotConstruct(componentName)) {
         if (root.isTestRoot() && !componentName.equals(ClassNames.SINGLETON_COMPONENT)) {
           env.getMessager()
               .printMessage(
@@ -201,44 +194,18 @@ public final class RootMetadata {
     return builder.build();
   }
 
-  private static boolean daggerCanConstruct(TypeElement type) {
-    KotlinMetadataUtil metadataUtil = KotlinMetadataUtils.getMetadataUtil();
-    boolean isKotlinObject =
-        metadataUtil.isObjectClass(type) || metadataUtil.isCompanionObjectClass(type);
-    if (isKotlinObject) {
-      // Treat Kotlin object modules as if Dagger can construct them (it technically can't, but it
-      // doesn't need to as it can use them since all their provision methods are static).
+  private static boolean daggerCanConstruct(XTypeElement type) {
+    if (!Processors.requiresModuleInstance(type)) {
       return true;
     }
-
-    return !isInnerClass(type)
-        && !hasNonDaggerAbstractMethod(type)
-        && (hasOnlyStaticProvides(type) || hasVisibleEmptyConstructor(type));
+    return hasVisibleEmptyConstructor(type) && (!type.isNested() || type.isStatic());
   }
 
-  private static boolean isInnerClass(TypeElement type) {
-    return type.getNestingKind().isNested() && !type.getModifiers().contains(STATIC);
-  }
-
-  private static boolean hasNonDaggerAbstractMethod(TypeElement type) {
-    // TODO(erichang): Actually this isn't really supported b/28989613
-    return ElementFilter.methodsIn(type.getEnclosedElements()).stream()
-        .filter(method -> method.getModifiers().contains(ABSTRACT))
-        .anyMatch(method -> !Processors.hasDaggerAbstractMethodAnnotation(method));
-  }
-
-  private static boolean hasOnlyStaticProvides(TypeElement type) {
-    // TODO(erichang): Check for @Produces too when we have a producers story
-    return ElementFilter.methodsIn(type.getEnclosedElements()).stream()
-        .filter(method -> Processors.hasAnnotation(method, ClassNames.PROVIDES))
-        .allMatch(method -> method.getModifiers().contains(STATIC));
-  }
-
-  private static boolean hasVisibleEmptyConstructor(TypeElement type) {
-    List<ExecutableElement> constructors = ElementFilter.constructorsIn(type.getEnclosedElements());
+  private static boolean hasVisibleEmptyConstructor(XTypeElement type) {
+    List<XConstructorElement> constructors = type.getConstructors();
     return constructors.isEmpty()
         || constructors.stream()
             .filter(constructor -> constructor.getParameters().isEmpty())
-            .anyMatch(constructor -> !constructor.getModifiers().contains(PRIVATE));
+            .anyMatch(constructor -> !constructor.isPrivate());
   }
 }

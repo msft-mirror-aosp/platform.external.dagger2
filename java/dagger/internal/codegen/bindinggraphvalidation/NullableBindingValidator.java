@@ -24,18 +24,18 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import dagger.internal.codegen.compileroption.CompilerOptions;
-import dagger.spi.model.Binding;
-import dagger.spi.model.BindingGraph;
-import dagger.spi.model.BindingGraph.DependencyEdge;
-import dagger.spi.model.BindingGraphPlugin;
-import dagger.spi.model.DiagnosticReporter;
+import dagger.internal.codegen.model.Binding;
+import dagger.internal.codegen.model.BindingGraph;
+import dagger.internal.codegen.model.BindingGraph.DependencyEdge;
+import dagger.internal.codegen.model.DiagnosticReporter;
+import dagger.internal.codegen.validation.ValidationBindingGraphPlugin;
 import javax.inject.Inject;
 
 /**
  * Reports errors or warnings (depending on the {@code -Adagger.nullableValidation} value) for each
  * non-nullable dependency request that is satisfied by a nullable binding.
  */
-final class NullableBindingValidator implements BindingGraphPlugin {
+final class NullableBindingValidator extends ValidationBindingGraphPlugin {
 
   private final CompilerOptions compilerOptions;
 

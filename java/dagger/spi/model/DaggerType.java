@@ -16,39 +16,27 @@
 
 package dagger.spi.model;
 
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
-
-import androidx.room.compiler.processing.XType;
-import com.google.auto.common.MoreTypes;
-import com.google.auto.value.AutoValue;
-import com.google.common.base.Equivalence;
-import com.google.common.base.Preconditions;
+import com.google.devtools.ksp.symbol.KSType;
+import com.google.errorprone.annotations.DoNotMock;
 import javax.lang.model.type.TypeMirror;
 
 /** Wrapper type for a type. */
-@AutoValue
+@DoNotMock("Only use real implementations created by Dagger")
 public abstract class DaggerType {
-  private XType type;
+  /**
+   * Returns the Javac representation for the type.
+   *
+   * @throws IllegalStateException if the current backend isn't Javac.
+   */
+  public abstract TypeMirror javac();
 
-  public static DaggerType from(XType type) {
-    Preconditions.checkNotNull(type);
-    DaggerType daggerType = new AutoValue_DaggerType(MoreTypes.equivalence().wrap(toJavac(type)));
-    daggerType.type = type;
-    return daggerType;
-  }
+  /**
+   * Returns the KSP representation for the type.
+   *
+   * @throws IllegalStateException if the current backend isn't KSP.
+   */
+  public abstract KSType ksp();
 
-  abstract Equivalence.Wrapper<TypeMirror> typeMirror();
-
-  public XType xprocessing() {
-    return type;
-  }
-
-  public TypeMirror java() {
-    return toJavac(type);
-  }
-
-  @Override
-  public final String toString() {
-    return type.toString();
-  }
+  /** Returns the backend used in this compilation. */
+  public abstract DaggerProcessingEnv.Backend backend();
 }

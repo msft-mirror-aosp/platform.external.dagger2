@@ -16,38 +16,54 @@
 
 package dagger.internal.codegen.bindinggraphvalidation;
 
+import static androidx.room.compiler.processing.compat.XConverters.getProcessingEnv;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.Iterables.getLast;
+import static com.google.common.collect.Iterables.getOnlyElement;
+import static dagger.internal.codegen.base.ElementFormatter.elementToString;
+import static dagger.internal.codegen.base.Formatter.INDENT;
 import static dagger.internal.codegen.base.Keys.isValidImplicitProvisionKey;
 import static dagger.internal.codegen.base.Keys.isValidMembersInjectionKey;
 import static dagger.internal.codegen.base.RequestKinds.canBeSatisfiedByProductionBinding;
 import static dagger.internal.codegen.binding.DependencyRequestFormatter.DOUBLE_INDENT;
 import static dagger.internal.codegen.extension.DaggerStreams.instancesOf;
+import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
+import static dagger.internal.codegen.xprocessing.XTypes.isDeclared;
 import static dagger.internal.codegen.xprocessing.XTypes.isWildcard;
 import static javax.tools.Diagnostic.Kind.ERROR;
 
+import androidx.room.compiler.processing.XType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterators;
+import com.google.common.collect.Lists;
+import com.squareup.javapoet.TypeName;
+import com.squareup.javapoet.WildcardTypeName;
+import dagger.internal.codegen.binding.ComponentNodeImpl;
 import dagger.internal.codegen.binding.DependencyRequestFormatter;
 import dagger.internal.codegen.binding.InjectBindingRegistry;
+import dagger.internal.codegen.model.Binding;
+import dagger.internal.codegen.model.BindingGraph;
+import dagger.internal.codegen.model.BindingGraph.ComponentNode;
+import dagger.internal.codegen.model.BindingGraph.DependencyEdge;
+import dagger.internal.codegen.model.BindingGraph.Edge;
+import dagger.internal.codegen.model.BindingGraph.MissingBinding;
+import dagger.internal.codegen.model.BindingGraph.Node;
+import dagger.internal.codegen.model.DaggerAnnotation;
+import dagger.internal.codegen.model.DiagnosticReporter;
+import dagger.internal.codegen.model.Key;
 import dagger.internal.codegen.validation.DiagnosticMessageGenerator;
-import dagger.spi.model.Binding;
-import dagger.spi.model.BindingGraph;
-import dagger.spi.model.BindingGraph.ComponentNode;
-import dagger.spi.model.BindingGraph.DependencyEdge;
-import dagger.spi.model.BindingGraph.Edge;
-import dagger.spi.model.BindingGraph.MissingBinding;
-import dagger.spi.model.BindingGraph.Node;
-import dagger.spi.model.BindingGraphPlugin;
-import dagger.spi.model.ComponentPath;
-import dagger.spi.model.DiagnosticReporter;
-import dagger.spi.model.Key;
+import dagger.internal.codegen.validation.ValidationBindingGraphPlugin;
+import dagger.internal.codegen.xprocessing.XTypes;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.Iterator;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Optional;
 import javax.inject.Inject;
 
 /** Reports errors for missing bindings. */
-final class MissingBindingValidator implements BindingGraphPlugin {
+final class MissingBindingValidator extends ValidationBindingGraphPlugin {
 
   private final InjectBindingRegistry injectBindingRegistry;
   private final DependencyRequestFormatter dependencyRequestFormatter;
@@ -75,30 +91,72 @@ final class MissingBindingValidator implements BindingGraphPlugin {
     if (graph.isFullBindingGraph() || graph.rootComponentNode().isSubcomponent()) {
       return;
     }
-    graph
+    // A missing binding might exist in a different component as unused binding, thus getting
+    // stripped. Therefore, full graph needs to be traversed to capture the stripped bindings.
+    if (!graph.missingBindings().isEmpty()) {
+      requestVisitFullGraph(graph);
+    }
+  }
+
+  @Override
+  public void revisitFullGraph(
+      BindingGraph prunedGraph, BindingGraph fullGraph, DiagnosticReporter diagnosticReporter) {
+    prunedGraph
         .missingBindings()
-        .forEach(missingBinding -> reportMissingBinding(missingBinding, graph, diagnosticReporter));
+        .forEach(
+            missingBinding -> reportMissingBinding(missingBinding, fullGraph, diagnosticReporter));
   }
 
   private void reportMissingBinding(
-      MissingBinding missingBinding, BindingGraph graph, DiagnosticReporter diagnosticReporter) {
-    List<ComponentPath> alternativeComponents =
-        graph.bindings(missingBinding.key()).stream()
-            .map(Binding::componentPath)
-            .distinct()
-            .collect(Collectors.toList());
-    // Print component name for each binding along the dependency path if the missing binding
-    // exists in a different component than expected
-    if (alternativeComponents.isEmpty()) {
-      diagnosticReporter.reportBinding(
-          ERROR, missingBinding, missingBindingErrorMessage(missingBinding, graph));
-    } else {
-      diagnosticReporter.reportComponent(
-          ERROR,
-          graph.componentNode(missingBinding.componentPath()).get(),
-          missingBindingErrorMessage(missingBinding, graph)
-              + wrongComponentErrorMessage(missingBinding, alternativeComponents, graph));
+      MissingBinding missingBinding,
+      BindingGraph graph,
+      DiagnosticReporter diagnosticReporter) {
+    diagnosticReporter.reportComponent(
+        ERROR,
+        graph.componentNode(missingBinding.componentPath()).get(),
+        missingBindingErrorMessage(missingBinding, graph)
+            + missingBindingDependencyTraceMessage(missingBinding, graph)
+            + alternativeBindingsMessage(missingBinding, graph)
+            + similarBindingsMessage(missingBinding, graph));
+  }
+
+  private static ImmutableSet<Binding> getSimilarTypeBindings(
+      BindingGraph graph, Key missingBindingKey) {
+    XType missingBindingType = missingBindingKey.type().xprocessing();
+    Optional<DaggerAnnotation> missingBindingQualifier = missingBindingKey.qualifier();
+    ImmutableList<TypeName> flatMissingBindingType = flattenBindingType(missingBindingType);
+    if (flatMissingBindingType.size() <= 1) {
+      return ImmutableSet.of();
     }
+    return graph.bindings().stream()
+        .filter(
+            binding ->
+                binding.key().qualifier().equals(missingBindingQualifier)
+                    && isSimilarType(binding.key().type().xprocessing(), flatMissingBindingType))
+        .collect(toImmutableSet());
+  }
+
+  /**
+   * Unwraps a parameterized type to a list of TypeNames. e.g. {@code Map<Foo, List<Bar>>} to {@code
+   * [Map, Foo, List, Bar]}.
+   */
+  private static ImmutableList<TypeName> flattenBindingType(XType type) {
+    return ImmutableList.copyOf(new TypeDfsIterator(type));
+  }
+
+  private static boolean isSimilarType(XType type, List<TypeName> flatTypeNames) {
+    return Iterators.elementsEqual(flatTypeNames.iterator(), new TypeDfsIterator(type));
+  }
+
+  private static TypeName getBound(WildcardTypeName wildcardType) {
+    // Note: The javapoet API returns a list to be extensible, but there's currently no way to get
+    // multiple bounds, and it's not really clear what we should do if there were multiple bounds
+    // so we just assume there's only one for now. The javapoet API also guarantees that there will
+    // always be at least one upper bound -- in the absence of an explicit upper bound the Object
+    // type is used (e.g. Set<?> has an upper bound of Object).
+    return !wildcardType.lowerBounds.isEmpty()
+        ? getOnlyElement(wildcardType.lowerBounds)
+        : getOnlyElement(wildcardType.upperBounds);
   }
 
   private String missingBindingErrorMessage(MissingBinding missingBinding, BindingGraph graph) {
@@ -123,50 +181,24 @@ final class MissingBindingValidator implements BindingGraphPlugin {
     return errorMessage.toString();
   }
 
-  private String wrongComponentErrorMessage(
-      MissingBinding missingBinding,
-      List<ComponentPath> alternativeComponentPath,
-      BindingGraph graph) {
+  private String missingBindingDependencyTraceMessage(
+      MissingBinding missingBinding, BindingGraph graph) {
     ImmutableSet<DependencyEdge> entryPoints =
         graph.entryPointEdgesDependingOnBinding(missingBinding);
     DiagnosticMessageGenerator generator = diagnosticMessageGeneratorFactory.create(graph);
     ImmutableList<DependencyEdge> dependencyTrace =
         generator.dependencyTrace(missingBinding, entryPoints);
     StringBuilder message =
-        graph.isFullBindingGraph()
-            ? new StringBuilder()
-            : new StringBuilder(dependencyTrace.size() * 100 /* a guess heuristic */);
-    // Check in which component the missing binding is requested. This can be different from the
-    // component the missing binding is in because we'll try to search up the parent components for
-    // a binding which makes missing bindings end up at the root component. This is different from
-    // the place we are logically requesting the binding from. Note that this is related to the
-    // particular dependency trace being shown and so is not necessarily stable.
-    String missingComponentName =
-        getComponentFromDependencyEdge(dependencyTrace.get(0), graph, false);
-    boolean hasSameComponentName = false;
-    for (ComponentPath component : alternativeComponentPath) {
-      message.append("\nA binding for ").append(missingBinding.key()).append(" exists in ");
-      String currentComponentName = component.currentComponent().className().canonicalName();
-      if (currentComponentName.contentEquals(missingComponentName)) {
-        hasSameComponentName = true;
-        message.append("[").append(component).append("]");
-      } else {
-        message.append(currentComponentName);
-      }
-      message.append(":");
-    }
+        new StringBuilder(dependencyTrace.size() * 100 /* a guess heuristic */).append("\n");
     for (DependencyEdge edge : dependencyTrace) {
       String line = dependencyRequestFormatter.format(edge.dependencyRequest());
       if (line.isEmpty()) {
         continue;
       }
-      // If we ran into a rare case where the component names collide and we need to show the full
-      // path, only show the full path for the first dependency request. This is guaranteed to be
-      // the component in question since the logic for checking for a collision uses the first
-      // edge in the trace. Do not expand subsequent component paths to reduce spam.
-      String componentName =
-          String.format("[%s] ", getComponentFromDependencyEdge(edge, graph, hasSameComponentName));
-      hasSameComponentName = false;
+      // We don't have to check for cases where component names collide since
+      //  1. We always show the full classname of the component, and
+      //  2. We always show the full component path at the end of the dependency trace (below).
+      String componentName = String.format("[%s] ", getComponentFromDependencyEdge(edge, graph));
       message.append("\n").append(line.replace(DOUBLE_INDENT, DOUBLE_INDENT + componentName));
     }
     if (!dependencyTrace.isEmpty()) {
@@ -176,6 +208,71 @@ final class MissingBindingValidator implements BindingGraphPlugin {
         generator.getRequestsNotInTrace(
             dependencyTrace, generator.requests(missingBinding), entryPoints));
     return message.toString();
+  }
+
+  private String alternativeBindingsMessage(
+      MissingBinding missingBinding, BindingGraph graph) {
+    ImmutableSet<Binding> alternativeBindings = graph.bindings(missingBinding.key());
+    if (alternativeBindings.isEmpty()) {
+      return "";
+    }
+    StringBuilder message = new StringBuilder();
+    message.append("\n\nNote: ")
+        .append(missingBinding.key())
+        .append(" is provided in the following other components:");
+    for (Binding alternativeBinding : alternativeBindings) {
+      // Some alternative bindings appear multiple times because they were re-resolved in multiple
+      // components (e.g. due to multibinding contributions). To avoid the noise, we only report
+      // the binding where the module is contributed.
+      if (alternativeBinding.contributingModule().isPresent()
+          && !((ComponentNodeImpl) graph.componentNode(alternativeBinding.componentPath()).get())
+              .componentDescriptor()
+              .moduleTypes()
+              .contains(alternativeBinding.contributingModule().get().xprocessing())) {
+        continue;
+      }
+      message.append("\n").append(INDENT).append(asString(alternativeBinding));
+    }
+    return message.toString();
+  }
+
+  private String similarBindingsMessage(
+      MissingBinding missingBinding, BindingGraph graph) {
+    ImmutableSet<Binding> similarBindings =
+        getSimilarTypeBindings(graph, missingBinding.key());
+    if (similarBindings.isEmpty()) {
+      return "";
+    }
+    StringBuilder message =
+        new StringBuilder(
+            "\n\nNote: A similar binding is provided in the following other components:");
+    for (Binding similarBinding : similarBindings) {
+      message
+          .append("\n")
+          .append(INDENT)
+          .append(similarBinding.key())
+          .append(" is provided at:")
+          .append("\n")
+          .append(DOUBLE_INDENT)
+          .append(asString(similarBinding));
+    }
+    message.append("\n")
+        .append(
+            "(For Kotlin sources, you may need to use '@JvmSuppressWildcards' or '@JvmWildcard' if "
+                + "you need to explicitly control the wildcards at a particular usage site.)");
+    return message.toString();
+  }
+
+  private String asString(Binding binding) {
+    return String.format(
+        "[%s] %s",
+        binding.componentPath().currentComponent().xprocessing().getQualifiedName(),
+        binding.bindingElement().isPresent()
+            ? elementToString(
+                binding.bindingElement().get().xprocessing(),
+                /* elideMethodParameterTypes= */ true)
+            // For synthetic bindings just print the Binding#toString()
+            : binding);
   }
 
   private boolean allIncomingDependenciesCanUseProduction(
@@ -192,11 +289,11 @@ final class MissingBindingValidator implements BindingGraphPlugin {
     if (source instanceof ComponentNode) {
       return canBeSatisfiedByProductionBinding(edge.dependencyRequest().kind());
     }
-    if (source instanceof dagger.spi.model.Binding) {
-      return ((dagger.spi.model.Binding) source).isProduction();
+    if (source instanceof Binding) {
+      return ((Binding) source).isProduction();
     }
     throw new IllegalArgumentException(
-        "expected a dagger.spi.model.Binding or ComponentNode: " + source);
+        "expected a dagger.internal.codegen.model.Binding or ComponentNode: " + source);
   }
 
   private boolean typeHasInjectionSites(Key key) {
@@ -206,15 +303,59 @@ final class MissingBindingValidator implements BindingGraphPlugin {
         .orElse(false);
   }
 
-  private static String getComponentFromDependencyEdge(
-      DependencyEdge edge, BindingGraph graph, boolean completePath) {
-    ComponentPath componentPath = graph.network().incidentNodes(edge).source().componentPath();
-    return completePath
-        ? componentPath.toString()
-        : componentPath.currentComponent().className().canonicalName();
+  private static String getComponentFromDependencyEdge(DependencyEdge edge, BindingGraph graph) {
+    return source(edge, graph).componentPath().currentComponent().className().canonicalName();
   }
 
-  private Node source(Edge edge, BindingGraph graph) {
+  private static Node source(Edge edge, BindingGraph graph) {
     return graph.network().incidentNodes(edge).source();
+  }
+
+  /**
+   * An iterator over a list of TypeNames produced by flattening a parameterized type. e.g. {@code
+   * Map<Foo, List<Bar>>} to {@code [Map, Foo, List, Bar]}.
+   *
+   * <p>The iterator returns the bound when encounters a wildcard type.
+   */
+  private static class TypeDfsIterator implements Iterator<TypeName> {
+    final Deque<XType> stack = new ArrayDeque<>();
+
+    TypeDfsIterator(XType root) {
+      stack.push(root);
+    }
+
+    @Override
+    public boolean hasNext() {
+      return !stack.isEmpty();
+    }
+
+    @Override
+    public TypeName next() {
+      XType next = stack.pop();
+      if (isDeclared(next)) {
+        if (XTypes.isRawParameterizedType(next)) {
+          XType obj = getProcessingEnv(next).requireType(TypeName.OBJECT);
+          for (int i = 0; i < next.getTypeElement().getType().getTypeArguments().size(); i++) {
+            stack.push(obj);
+          }
+        } else {
+          for (XType arg : Lists.reverse(next.getTypeArguments())) {
+            stack.push(arg);
+          }
+        }
+      }
+      return getBaseTypeName(next);
+    }
+
+    private static TypeName getBaseTypeName(XType type) {
+      if (isDeclared(type)) {
+        return type.getRawType().getTypeName();
+      }
+      TypeName typeName = type.getTypeName();
+      if (typeName instanceof WildcardTypeName) {
+        return getBound((WildcardTypeName) typeName);
+      }
+      return typeName;
+    }
   }
 }

@@ -17,7 +17,6 @@
 package dagger.internal.codegen.validation;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
-import static dagger.internal.codegen.binding.ConfigurationAnnotations.getNullableAnnotation;
 import static dagger.internal.codegen.validation.BindingElementValidator.AllowsMultibindings.ALLOWS_MULTIBINDINGS;
 import static dagger.internal.codegen.validation.BindingElementValidator.AllowsScoping.NO_SCOPING;
 import static dagger.internal.codegen.validation.BindingMethodValidator.Abstractness.MUST_BE_CONCRETE;
@@ -25,11 +24,13 @@ import static dagger.internal.codegen.validation.BindingMethodValidator.Exceptio
 import static dagger.internal.codegen.xprocessing.XTypes.isTypeOf;
 
 import androidx.room.compiler.processing.XMethodElement;
+import androidx.room.compiler.processing.XProcessingEnv;
 import androidx.room.compiler.processing.XType;
 import com.google.common.util.concurrent.ListenableFuture;
 import dagger.internal.codegen.binding.InjectionAnnotations;
+import dagger.internal.codegen.binding.Nullability;
 import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.internal.codegen.langmodel.DaggerTypes;
+import dagger.internal.codegen.xprocessing.XTypes;
 import java.util.Optional;
 import java.util.Set;
 import javax.inject.Inject;
@@ -39,18 +40,18 @@ final class ProducesMethodValidator extends BindingMethodValidator {
 
   @Inject
   ProducesMethodValidator(
-      DaggerTypes types,
+      XProcessingEnv processingEnv,
       DependencyRequestValidator dependencyRequestValidator,
       InjectionAnnotations injectionAnnotations) {
     super(
-        types,
-        dependencyRequestValidator,
         TypeNames.PRODUCES,
         TypeNames.PRODUCER_MODULE,
         MUST_BE_CONCRETE,
         EXCEPTION,
         ALLOWS_MULTIBINDINGS,
         NO_SCOPING,
+        processingEnv,
+        dependencyRequestValidator,
         injectionAnnotations);
   }
 
@@ -88,7 +89,8 @@ final class ProducesMethodValidator extends BindingMethodValidator {
      */
     // TODO(beder): Properly handle nullable with producer methods.
     private void checkNullable() {
-      if (getNullableAnnotation(method).isPresent()) {
+      Nullability nullability = Nullability.of(method);
+      if (!nullability.nullableAnnotations().isEmpty()) {
         report.addWarning("@Nullable on @Produces methods does not do anything");
       }
     }
@@ -116,7 +118,7 @@ final class ProducesMethodValidator extends BindingMethodValidator {
 
     private Optional<XType> unwrapListenableFuture(XType type) {
       if (isTypeOf(type, TypeNames.LISTENABLE_FUTURE)) {
-        if (type.getTypeArguments().isEmpty()) {
+        if (XTypes.isRawParameterizedType(type)) {
           report.addError("@Produces methods cannot return a raw ListenableFuture");
           return Optional.empty();
         } else {

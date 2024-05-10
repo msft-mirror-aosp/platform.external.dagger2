@@ -20,22 +20,19 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
-import static dagger.internal.codegen.langmodel.DaggerElements.isAnnotationPresent;
 import static dagger.internal.codegen.xprocessing.XElements.asConstructor;
 import static dagger.internal.codegen.xprocessing.XElements.asTypeElement;
-import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
-import static kotlin.streams.jdk8.StreamsKt.asStream;
 
 import androidx.room.compiler.processing.XConstructorElement;
 import androidx.room.compiler.processing.XConstructorType;
 import androidx.room.compiler.processing.XElement;
+import androidx.room.compiler.processing.XExecutableParameterElement;
 import androidx.room.compiler.processing.XHasModifiers;
 import androidx.room.compiler.processing.XMethodElement;
 import androidx.room.compiler.processing.XMethodType;
 import androidx.room.compiler.processing.XType;
 import androidx.room.compiler.processing.XTypeElement;
 import androidx.room.compiler.processing.XVariableElement;
-import com.google.auto.common.MoreElements;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.collect.ImmutableList;
@@ -46,10 +43,11 @@ import com.squareup.javapoet.TypeName;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
 import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.spi.model.BindingKind;
+import dagger.internal.codegen.model.BindingKind;
+import dagger.internal.codegen.xprocessing.XTypeElements;
+import dagger.internal.codegen.xprocessing.XTypes;
 import java.util.List;
 import java.util.Optional;
-import javax.lang.model.element.VariableElement;
 
 /** Assisted injection utility methods. */
 public final class AssistedInjectionAnnotations {
@@ -60,7 +58,7 @@ public final class AssistedInjectionAnnotations {
 
   /** Returns the list of abstract factory methods for the given factory {@link XTypeElement}. */
   public static ImmutableSet<XMethodElement> assistedFactoryMethods(XTypeElement factory) {
-    return asStream(factory.getAllNonPrivateInstanceMethods())
+    return XTypeElements.getAllNonPrivateInstanceMethods(factory).stream()
         .filter(XHasModifiers::isAbstract)
         .filter(method -> !method.isJavaDefault())
         .collect(toImmutableSet());
@@ -92,14 +90,15 @@ public final class AssistedInjectionAnnotations {
   }
 
   private static ImmutableList<ParameterSpec> assistedParameterSpecs(
-      List<? extends XVariableElement> paramElements, List<XType> paramTypes) {
+      List<? extends XExecutableParameterElement> paramElements, List<XType> paramTypes) {
     ImmutableList.Builder<ParameterSpec> assistedParameterSpecs = ImmutableList.builder();
     for (int i = 0; i < paramElements.size(); i++) {
-      XVariableElement paramElement = paramElements.get(i);
+      XExecutableParameterElement paramElement = paramElements.get(i);
       XType paramType = paramTypes.get(i);
       if (isAssistedParameter(paramElement)) {
         assistedParameterSpecs.add(
-            ParameterSpec.builder(paramType.getTypeName(), getSimpleName(paramElement)).build());
+            ParameterSpec.builder(paramType.getTypeName(), paramElement.getJvmName())
+                .build());
       }
     }
     return assistedParameterSpecs.build();
@@ -135,7 +134,7 @@ public final class AssistedInjectionAnnotations {
         .collect(toImmutableSet());
   }
 
-  public static ImmutableList<XVariableElement> assistedParameters(Binding binding) {
+  public static ImmutableList<XExecutableParameterElement> assistedParameters(Binding binding) {
     return binding.kind() == BindingKind.ASSISTED_INJECTION
         ? asConstructor(binding.bindingElement().get()).getParameters().stream()
             .filter(AssistedInjectionAnnotations::isAssistedParameter)
@@ -146,11 +145,6 @@ public final class AssistedInjectionAnnotations {
   /** Returns {@code true} if this binding is uses assisted injection. */
   public static boolean isAssistedParameter(XVariableElement param) {
     return param.hasAnnotation(TypeNames.ASSISTED);
-  }
-
-  /** Returns {@code true} if this binding is uses assisted injection. */
-  public static boolean isAssistedParameter(VariableElement param) {
-    return isAnnotationPresent(MoreElements.asVariable(param), TypeNames.ASSISTED);
   }
 
   /** Metadata about an {@link dagger.assisted.AssistedFactory} annotated type. */
@@ -191,8 +185,10 @@ public final class AssistedInjectionAnnotations {
     public abstract ImmutableList<AssistedParameter> assistedFactoryAssistedParameters();
 
     @Memoized
-    public ImmutableMap<AssistedParameter, XVariableElement> assistedInjectAssistedParametersMap() {
-      ImmutableMap.Builder<AssistedParameter, XVariableElement> builder = ImmutableMap.builder();
+    public ImmutableMap<AssistedParameter, XExecutableParameterElement>
+        assistedInjectAssistedParametersMap() {
+      ImmutableMap.Builder<AssistedParameter, XExecutableParameterElement> builder =
+          ImmutableMap.builder();
       for (AssistedParameter assistedParameter : assistedInjectAssistedParameters()) {
         builder.put(assistedParameter, assistedParameter.element());
       }
@@ -200,9 +196,10 @@ public final class AssistedInjectionAnnotations {
     }
 
     @Memoized
-    public ImmutableMap<AssistedParameter, XVariableElement>
+    public ImmutableMap<AssistedParameter, XExecutableParameterElement>
         assistedFactoryAssistedParametersMap() {
-      ImmutableMap.Builder<AssistedParameter, XVariableElement> builder = ImmutableMap.builder();
+      ImmutableMap.Builder<AssistedParameter, XExecutableParameterElement> builder =
+          ImmutableMap.builder();
       for (AssistedParameter assistedParameter : assistedFactoryAssistedParameters()) {
         builder.put(assistedParameter, assistedParameter.element());
       }
@@ -218,7 +215,8 @@ public final class AssistedInjectionAnnotations {
    */
   @AutoValue
   public abstract static class AssistedParameter {
-    public static AssistedParameter create(XVariableElement parameter, XType parameterType) {
+    public static AssistedParameter create(
+        XExecutableParameterElement parameter, XType parameterType) {
       AssistedParameter assistedParameter =
           new AutoValue_AssistedInjectionAnnotations_AssistedParameter(
               Optional.ofNullable(parameter.getAnnotation(TypeNames.ASSISTED))
@@ -230,7 +228,7 @@ public final class AssistedInjectionAnnotations {
       return assistedParameter;
     }
 
-    private XVariableElement parameterElement;
+    private XExecutableParameterElement parameterElement;
     private XType parameterType;
 
     /** Returns the string qualifier from the {@link Assisted#value()}. */
@@ -244,15 +242,15 @@ public final class AssistedInjectionAnnotations {
       return parameterType;
     }
 
-    public final XVariableElement element() {
+    public final XExecutableParameterElement element() {
       return parameterElement;
     }
 
     @Override
     public final String toString() {
       return qualifier().isEmpty()
-          ? String.format("@Assisted %s", type())
-          : String.format("@Assisted(\"%s\") %s", qualifier(), type());
+          ? String.format("@Assisted %s", XTypes.toStableString(type()))
+          : String.format("@Assisted(\"%s\") %s", qualifier(), XTypes.toStableString(type()));
     }
   }
 
@@ -267,7 +265,7 @@ public final class AssistedInjectionAnnotations {
 
     ImmutableList.Builder<AssistedParameter> builder = ImmutableList.builder();
     for (int i = 0; i < assistedInjectConstructor.getParameters().size(); i++) {
-      XVariableElement parameter = assistedInjectConstructor.getParameters().get(i);
+      XExecutableParameterElement parameter = assistedInjectConstructor.getParameters().get(i);
       XType parameterType = assistedInjectConstructorType.getParameterTypes().get(i);
       if (parameter.hasAnnotation(TypeNames.ASSISTED)) {
         builder.add(AssistedParameter.create(parameter, parameterType));
@@ -280,7 +278,7 @@ public final class AssistedInjectionAnnotations {
       XMethodElement factoryMethod, XMethodType factoryMethodType) {
     ImmutableList.Builder<AssistedParameter> builder = ImmutableList.builder();
     for (int i = 0; i < factoryMethod.getParameters().size(); i++) {
-      XVariableElement parameter = factoryMethod.getParameters().get(i);
+      XExecutableParameterElement parameter = factoryMethod.getParameters().get(i);
       XType parameterType = factoryMethodType.getParameterTypes().get(i);
       builder.add(AssistedParameter.create(parameter, parameterType));
     }

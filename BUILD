@@ -76,17 +76,6 @@ android_library(
 )
 
 jarjar_library(
-    name = "shaded_android_processor",
-    jars = [
-        "//java/dagger/android/processor",
-        "//third_party/java/auto:common",
-    ],
-    rules = [
-        "rule com.google.auto.common.** dagger.android.shaded.auto.common.@1",
-    ],
-)
-
-jarjar_library(
     name = "shaded_grpc_server_processor",
     jars = [
         "//java/dagger/grpc/server/processor",
@@ -101,7 +90,7 @@ android_library(
     name = "android_local_test_exports",
     exports = [
         # TODO(bcorso): see if we can remove jsr250 dep from autovalue to prevent this.
-        "@javax_annotation_jsr250_api",  # For @Generated
+        "@maven//:javax_annotation_javax_annotation_api",  # For @Generated
         "@maven//:org_robolectric_shadows_framework",  # For ActivityController
         "@maven//:androidx_lifecycle_lifecycle_common",  # For Lifecycle.State
         "@maven//:androidx_activity_activity",  # For ComponentActivity
@@ -127,7 +116,7 @@ javadoc_library(
         "//java/dagger/producers:producers-srcs",
         "//java/dagger/spi:spi-srcs",
     ],
-    android_api_level = 30,
+    android_api_level = 32,
     # TODO(ronshapiro): figure out how to specify the version number for release builds
     doctitle = "Dagger Dependency Injection API",
     exclude_packages = [

@@ -5,7 +5,7 @@ runs:
   using: "composite"
   steps:
     - name: 'Check out repository'
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
     - name: 'Cache Gradle files'
       uses: actions/cache@v2
       with:
@@ -16,7 +16,7 @@ runs:
         restore-keys: |
           ${{ runner.os }}-gradle-
     - name: 'Download local snapshot for tests'
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
       with:
         name: local-snapshot
         path: ~/.m2/repository/com/google/dagger

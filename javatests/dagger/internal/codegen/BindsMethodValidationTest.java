@@ -16,24 +16,22 @@
 
 package dagger.internal.codegen;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static dagger.internal.codegen.Compilers.daggerCompiler;
 import static dagger.internal.codegen.DaggerModuleMethodSubject.Factory.assertThatMethodInUnannotatedClass;
 import static dagger.internal.codegen.DaggerModuleMethodSubject.Factory.assertThatModuleMethod;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+import androidx.room.compiler.processing.XProcessingEnv;
+import androidx.room.compiler.processing.util.Source;
 import com.google.common.collect.ImmutableList;
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
 import dagger.Module;
 import dagger.multibindings.IntKey;
 import dagger.multibindings.LongKey;
 import dagger.producers.ProducerModule;
+import dagger.testing.compile.CompilerTests;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
 import java.util.Collection;
 import javax.inject.Qualifier;
-import javax.tools.JavaFileObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -52,6 +50,70 @@ public class BindsMethodValidationTest {
   public BindsMethodValidationTest(Class<? extends Annotation> moduleAnnotation) {
     this.moduleAnnotation = "@" + moduleAnnotation.getCanonicalName();
     moduleDeclaration = this.moduleAnnotation + " abstract class %s { %s }";
+  }
+
+  @Test
+  public void noExtensionForBinds() {
+    Source module =
+        CompilerTests.kotlinSource(
+            "test.TestModule.kt",
+            "package test",
+            "",
+            "import dagger.Binds",
+            "",
+            moduleAnnotation,
+            "interface TestModule {",
+            "  @Binds fun FooImpl.bindObject(): Foo",
+            "}");
+    Source foo =
+        CompilerTests.javaSource(
+            "test.Foo", // Prevents formatting onto a single line
+            "package test;",
+            "",
+            "interface Foo {}");
+    Source fooImpl =
+        CompilerTests.javaSource(
+            "test.FooImpl", // Prevents formatting onto a single line
+            "package test;",
+            "",
+            "class FooImpl implements Foo {",
+            "   @Inject FooImpl() {}",
+            "}");
+    CompilerTests.daggerCompiler(module, foo, fooImpl)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining("@Binds methods can not be an extension function");
+            });
+  }
+
+  @Test
+  public void noExtensionForProvides() {
+    Source module =
+        CompilerTests.kotlinSource(
+            "test.TestModule.kt",
+            "package test",
+            "",
+            "import dagger.Provides",
+            "",
+            moduleAnnotation,
+            "object TestModule {",
+            "  @Provides fun Foo.providesString(): String = \"hello\"",
+            "}");
+    Source foo =
+        CompilerTests.javaSource(
+            "test.Foo", // Prevents formatting onto a single line
+            "package test;",
+            "",
+            "class Foo {",
+            "  @Inject Foo() {}",
+            "}");
+    CompilerTests.daggerCompiler(module, foo)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining("@Provides methods can not be an extension function");
+            });
   }
 
   @Test
@@ -150,8 +212,8 @@ public class BindsMethodValidationTest {
 
   @Test
   public void bindsMissingTypeInParameterHierarchy() {
-    JavaFileObject module =
-        JavaFileObjects.forSourceLines(
+    Source module =
+        CompilerTests.javaSource(
             "test.TestComponent",
             "package test;",
             "",
@@ -162,51 +224,63 @@ public class BindsMethodValidationTest {
             "  @Binds String bindObject(Child<String> child);",
             "}");
 
-    JavaFileObject child =
-        JavaFileObjects.forSourceLines(
+    Source child =
+        CompilerTests.javaSource(
             "test.Child",
             "package test;",
             "",
             "class Child<T> extends Parent<T> {}");
 
-    JavaFileObject parent =
-        JavaFileObjects.forSourceLines(
+    Source parent =
+        CompilerTests.javaSource(
             "test.Parent",
             "package test;",
             "",
             "class Parent<T> extends MissingType {}");
 
-    Compilation compilation = daggerCompiler().compile(module, child, parent);
-    assertThat(compilation).failed();
-    assertThat(compilation).hadErrorCount(3);
-    assertThat(compilation)
-        .hadErrorContaining(
-            "cannot find symbol"
-                + "\n  symbol: class MissingType");
-    assertThat(compilation)
-        .hadErrorContaining(
-            "ModuleProcessingStep was unable to process 'test.TestModule' because 'MissingType' "
-                + "could not be resolved.");
-    assertThat(compilation)
-        .hadErrorContaining(
-            "BindingMethodProcessingStep was unable to process"
-                + " 'bindObject(test.Child<java.lang.String>)' because 'MissingType' could not be"
-                + " resolved."
-                + "\n  "
-                + "\n  Dependency trace:"
-                + "\n      => element (INTERFACE): test.TestModule"
-                + "\n      => element (METHOD): bindObject(test.Child<java.lang.String>)"
-                + "\n      => element (PARAMETER): child"
-                + "\n      => type (DECLARED parameter): test.Child<java.lang.String>"
-                + "\n      => type (DECLARED supertype): test.Parent<java.lang.String>"
-                + "\n      => type (ERROR supertype): MissingType");
+    CompilerTests.daggerCompiler(module, child, parent)
+        .compile(
+            subject -> {
+              switch (CompilerTests.backend(subject)) {
+                case JAVAC:
+                  subject.hasErrorCount(3);
+                  subject.hasErrorContaining(
+                      "cannot find symbol"
+                          + "\n  symbol: class MissingType");
+                  break;
+                case KSP:
+                  subject.hasErrorCount(2);
+                  break;
+              }
+              // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
+              boolean isJavac = CompilerTests.backend(subject) == XProcessingEnv.Backend.JAVAC;
+              subject.hasErrorContaining(
+                  String.format(
+                      "ModuleProcessingStep was unable to process 'test.TestModule' because '%s' "
+                          + "could not be resolved.",
+                      isJavac ? "MissingType" : "error.NonExistentClass"));
+              subject.hasErrorContaining(
+                  String.format(
+                      "BindingMethodProcessingStep was unable to process"
+                          + " 'bindObject(test.Child<java.lang.String>)' because '%1$s' could not "
+                          + "be resolved."
+                          + "\n  "
+                          + "\n  Dependency trace:"
+                          + "\n      => element (INTERFACE): test.TestModule"
+                          + "\n      => element (METHOD): bindObject(test.Child<java.lang.String>)"
+                          + "\n      => element (PARAMETER): child"
+                          + "\n      => type (DECLARED parameter): test.Child<java.lang.String>"
+                          + "\n      => type (DECLARED supertype): test.Parent<java.lang.String>"
+                          + "\n      => type (ERROR supertype): %1$s",
+                      isJavac ? "MissingType" : "error.NonExistentClass"));
+            });
   }
 
 
   @Test
   public void bindsMissingTypeInReturnTypeHierarchy() {
-    JavaFileObject module =
-        JavaFileObjects.forSourceLines(
+    Source module =
+        CompilerTests.javaSource(
             "test.TestComponent",
             "package test;",
             "",
@@ -217,42 +291,55 @@ public class BindsMethodValidationTest {
             "  @Binds Child<String> bindChild(String str);",
             "}");
 
-    JavaFileObject child =
-        JavaFileObjects.forSourceLines(
+    Source child =
+        CompilerTests.javaSource(
             "test.Child",
             "package test;",
             "",
             "class Child<T> extends Parent<T> {}");
 
-    JavaFileObject parent =
-        JavaFileObjects.forSourceLines(
+    Source parent =
+        CompilerTests.javaSource(
             "test.Parent",
             "package test;",
             "",
             "class Parent<T> extends MissingType {}");
 
-    Compilation compilation = daggerCompiler().compile(module, child, parent);
-    assertThat(compilation).failed();
-    assertThat(compilation).hadErrorCount(3);
-    assertThat(compilation)
-        .hadErrorContaining(
-            "cannot find symbol"
-                + "\n  symbol: class MissingType");
-    assertThat(compilation)
-        .hadErrorContaining(
-            "ModuleProcessingStep was unable to process 'test.TestModule' because 'MissingType' "
-                + "could not be resolved.");
-    assertThat(compilation)
-        .hadErrorContaining(
-            "BindingMethodProcessingStep was unable to process 'bindChild(java.lang.String)'"
-                + " because 'MissingType' could not be resolved."
-                + "\n  "
-                + "\n  Dependency trace:"
-                + "\n      => element (INTERFACE): test.TestModule"
-                + "\n      => element (METHOD): bindChild(java.lang.String)"
-                + "\n      => type (DECLARED return type): test.Child<java.lang.String>"
-                + "\n      => type (DECLARED supertype): test.Parent<java.lang.String>"
-                + "\n      => type (ERROR supertype): MissingType");
+    CompilerTests.daggerCompiler(module, child, parent)
+        .compile(
+            subject -> {
+              switch (CompilerTests.backend(subject)) {
+                case JAVAC:
+                  subject.hasErrorCount(3);
+                  subject.hasErrorContaining(
+                      "cannot find symbol"
+                          + "\n  symbol: class MissingType");
+                  break;
+                case KSP:
+                  subject.hasErrorCount(2);
+                  break;
+              }
+              // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
+              boolean isJavac = CompilerTests.backend(subject) == XProcessingEnv.Backend.JAVAC;
+              subject.hasErrorContaining(
+                  String.format(
+                      "ModuleProcessingStep was unable to process 'test.TestModule' because '%s' "
+                          + "could not be resolved.",
+                      isJavac ? "MissingType" : "error.NonExistentClass"));
+              subject.hasErrorContaining(
+                  String.format(
+                      "BindingMethodProcessingStep was unable to process "
+                          + "'bindChild(java.lang.String)' because '%1$s' could not be"
+                          + " resolved."
+                          + "\n  "
+                          + "\n  Dependency trace:"
+                          + "\n      => element (INTERFACE): test.TestModule"
+                          + "\n      => element (METHOD): bindChild(java.lang.String)"
+                          + "\n      => type (DECLARED return type): test.Child<java.lang.String>"
+                          + "\n      => type (DECLARED supertype): test.Parent<java.lang.String>"
+                          + "\n      => type (ERROR supertype): %1$s",
+                      isJavac ? "MissingType" : "error.NonExistentClass"));
+            });
   }
 
   private DaggerModuleMethodSubject assertThatMethod(String method) {

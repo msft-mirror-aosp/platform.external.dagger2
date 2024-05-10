@@ -16,9 +16,15 @@
 
 package dagger.hilt.android.processor.internal.androidentrypoint;
 
-import static javax.lang.model.element.Modifier.ABSTRACT;
-import static javax.lang.model.element.Modifier.PROTECTED;
+import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
+import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
+import static kotlin.streams.jdk8.StreamsKt.asStream;
 
+import androidx.room.compiler.processing.JavaPoetExtKt;
+import androidx.room.compiler.processing.XFiler;
+import androidx.room.compiler.processing.XMethodElement;
+import androidx.room.compiler.processing.XProcessingEnv;
+import androidx.room.compiler.processing.XTypeParameterElement;
 import com.google.common.collect.ImmutableSet;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
@@ -28,28 +34,23 @@ import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
-import com.squareup.javapoet.TypeVariableName;
 import dagger.hilt.android.processor.internal.AndroidClassNames;
 import dagger.hilt.processor.internal.ComponentNames;
 import dagger.hilt.processor.internal.ProcessorErrors;
 import dagger.hilt.processor.internal.Processors;
+import dagger.internal.codegen.xprocessing.XElements;
 import java.io.IOException;
-import java.util.Set;
-import java.util.stream.Collectors;
-import javax.annotation.processing.ProcessingEnvironment;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ExecutableElement;
+import java.util.stream.Stream;
 import javax.lang.model.element.Modifier;
-import javax.lang.model.util.ElementFilter;
 
 /** Generates an Hilt Application for an @AndroidEntryPoint app class. */
 public final class ApplicationGenerator {
-  private final ProcessingEnvironment env;
+  private final XProcessingEnv env;
   private final AndroidEntryPointMetadata metadata;
   private final ClassName wrapperClassName;
   private final ComponentNames componentNames;
 
-  public ApplicationGenerator(ProcessingEnvironment env, AndroidEntryPointMetadata metadata) {
+  public ApplicationGenerator(XProcessingEnv env, AndroidEntryPointMetadata metadata) {
     this.env = env;
     this.metadata = metadata;
     this.wrapperClassName = metadata.generatedClassName();
@@ -63,17 +64,21 @@ public final class ApplicationGenerator {
   public void generate() throws IOException {
     TypeSpec.Builder typeSpecBuilder =
         TypeSpec.classBuilder(wrapperClassName.simpleName())
-            .addOriginatingElement(metadata.element())
             .superclass(metadata.baseClassName())
             .addModifiers(metadata.generatedClassModifiers())
-            .addField(componentManagerField())
-            .addMethod(componentManagerMethod());
+            .addField(injectedField());
+
+    JavaPoetExtKt.addOriginatingElement(typeSpecBuilder, metadata.element());
+
+    typeSpecBuilder
+        .addField(componentManagerField())
+        .addMethod(componentManagerMethod());
 
     Generators.addGeneratedBaseClassJavadoc(typeSpecBuilder, AndroidClassNames.HILT_ANDROID_APP);
     Processors.addGeneratedAnnotation(typeSpecBuilder, env, getClass());
 
     metadata.baseElement().getTypeParameters().stream()
-        .map(TypeVariableName::get)
+        .map(XTypeParameterElement::getTypeVariableName)
         .forEachOrdered(typeSpecBuilder::addTypeVariable);
 
     Generators.copyLintAnnotations(metadata.element(), typeSpecBuilder);
@@ -82,39 +87,37 @@ public final class ApplicationGenerator {
 
     if (hasCustomInject()) {
       typeSpecBuilder.addSuperinterface(AndroidClassNames.HAS_CUSTOM_INJECT);
-      typeSpecBuilder.addMethod(customInjectMethod());
+        typeSpecBuilder.addMethod(customInjectMethod()).addMethod(injectionMethod());
     } else {
-      typeSpecBuilder.addMethod(onCreateMethod());
+        typeSpecBuilder.addMethod(onCreateMethod()).addMethod(injectionMethod());
     }
 
-    JavaFile.builder(metadata.elementClassName().packageName(), typeSpecBuilder.build())
-        .build()
-        .writeTo(env.getFiler());
+    env.getFiler()
+        .write(
+            JavaFile.builder(metadata.elementClassName().packageName(), typeSpecBuilder.build())
+                .build(),
+            XFiler.Mode.Isolating);
   }
 
   private boolean hasCustomInject() {
-    boolean hasCustomInject =
-        Processors.hasAnnotation(metadata.element(), AndroidClassNames.CUSTOM_INJECT);
+    boolean hasCustomInject = metadata.element().hasAnnotation(AndroidClassNames.CUSTOM_INJECT);
     if (hasCustomInject) {
       // Check that the Hilt base class does not already define a customInject implementation.
-      Set<ExecutableElement> customInjectMethods =
-          ElementFilter.methodsIn(
-                  ImmutableSet.<Element>builder()
-                      .addAll(metadata.element().getEnclosedElements())
-                      .addAll(env.getElementUtils().getAllMembers(metadata.baseElement()))
-                      .build())
-              .stream()
-              .filter(method -> method.getSimpleName().contentEquals("customInject"))
+      ImmutableSet<XMethodElement> customInjectMethods =
+          Stream.concat(
+                  metadata.element().getDeclaredMethods().stream(),
+                  asStream(metadata.baseElement().getAllMethods()))
+              .filter(method -> getSimpleName(method).contentEquals("customInject"))
               .filter(method -> method.getParameters().isEmpty())
-              .collect(Collectors.toSet());
+              .collect(toImmutableSet());
 
-      for (ExecutableElement customInjectMethod : customInjectMethods) {
+      for (XMethodElement customInjectMethod : customInjectMethods) {
         ProcessorErrors.checkState(
-            customInjectMethod.getModifiers().containsAll(ImmutableSet.of(ABSTRACT, PROTECTED)),
+            customInjectMethod.isAbstract() && customInjectMethod.isProtected(),
             customInjectMethod,
             "%s#%s, must have modifiers `abstract` and `protected` when using @CustomInject.",
-            customInjectMethod.getEnclosingElement(),
-            customInjectMethod);
+            XElements.toStableString(customInjectMethod.getEnclosingElement()),
+            XElements.toStableString(customInjectMethod));
       }
     }
     return hasCustomInject;
@@ -182,9 +185,7 @@ public final class ApplicationGenerator {
   // @CallSuper
   // @Override
   // public void onCreate() {
-  //   // This is a known unsafe cast but should be fine if the only use is
-  //   // $APP extends Hilt_$APP
-  //   generatedComponent().inject(($APP) this);
+  //   hiltInternalInject();
   //   super.onCreate();
   // }
   private MethodSpec onCreateMethod() {
@@ -192,22 +193,46 @@ public final class ApplicationGenerator {
         .addAnnotation(AndroidClassNames.CALL_SUPER)
         .addAnnotation(Override.class)
         .addModifiers(Modifier.PUBLIC)
-        .addCode(injectCodeBlock())
+        .addStatement("hiltInternalInject()")
         .addStatement("super.onCreate()")
+        .build();
+  }
+
+  // public void hiltInternalInject() {
+  //   if (!injected) {
+  //     injected = true;
+  //     // This is a known unsafe cast but should be fine if the only use is
+  //     // $APP extends Hilt_$APP
+  //     generatedComponent().inject(($APP) this);
+  //   }
+  // }
+  private MethodSpec injectionMethod() {
+    return MethodSpec.methodBuilder("hiltInternalInject")
+        .addModifiers(Modifier.PROTECTED)
+        .beginControlFlow("if (!injected)")
+        .addStatement("injected = true")
+        .addCode(injectCodeBlock())
+        .endControlFlow()
+        .build();
+  }
+
+  // private boolean injected = false;
+  private static FieldSpec injectedField() {
+    return FieldSpec.builder(TypeName.BOOLEAN, "injected")
+        .addModifiers(Modifier.PRIVATE)
+        .initializer("false")
         .build();
   }
 
   // @Override
   // public final void customInject() {
-  //   // This is a known unsafe cast but is safe in the only correct use case:
-  //   // $APP extends Hilt_$APP
-  //   generatedComponent().inject(($APP) this);
+  //   hiltInternalInject();
   // }
   private MethodSpec customInjectMethod() {
     return MethodSpec.methodBuilder("customInject")
         .addAnnotation(Override.class)
         .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
-        .addCode(injectCodeBlock())
+        .addStatement("hiltInternalInject()")
         .build();
   }
 

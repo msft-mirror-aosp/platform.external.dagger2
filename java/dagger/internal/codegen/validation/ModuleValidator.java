@@ -24,7 +24,10 @@ import static dagger.internal.codegen.base.ModuleAnnotation.isModuleAnnotation;
 import static dagger.internal.codegen.base.Util.reentrantComputeIfAbsent;
 import static dagger.internal.codegen.binding.ConfigurationAnnotations.getSubcomponentCreator;
 import static dagger.internal.codegen.extension.DaggerCollectors.toOptional;
+import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
+import static dagger.internal.codegen.validation.ModuleValidator.ModuleMethodKind.ABSTRACT_DECLARATION;
+import static dagger.internal.codegen.validation.ModuleValidator.ModuleMethodKind.INSTANCE_BINDING;
 import static dagger.internal.codegen.xprocessing.XAnnotations.getClassName;
 import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
 import static dagger.internal.codegen.xprocessing.XElements.hasAnyAnnotation;
@@ -34,7 +37,6 @@ import static dagger.internal.codegen.xprocessing.XTypeElements.isEffectivelyPub
 import static dagger.internal.codegen.xprocessing.XTypes.areEquivalentTypes;
 import static dagger.internal.codegen.xprocessing.XTypes.isDeclared;
 import static java.util.stream.Collectors.joining;
-import static kotlin.streams.jdk8.StreamsKt.asStream;
 
 import androidx.room.compiler.processing.XAnnotation;
 import androidx.room.compiler.processing.XAnnotationValue;
@@ -56,13 +58,14 @@ import dagger.internal.codegen.base.ComponentCreatorAnnotation;
 import dagger.internal.codegen.base.DaggerSuperficialValidation;
 import dagger.internal.codegen.base.ModuleKind;
 import dagger.internal.codegen.binding.BindingGraphFactory;
-import dagger.internal.codegen.binding.ComponentDescriptorFactory;
+import dagger.internal.codegen.binding.ComponentDescriptor;
 import dagger.internal.codegen.binding.InjectionAnnotations;
 import dagger.internal.codegen.binding.MethodSignatureFormatter;
 import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.model.BindingGraph;
+import dagger.internal.codegen.model.Scope;
 import dagger.internal.codegen.xprocessing.XElements;
-import dagger.spi.model.BindingGraph;
-import dagger.spi.model.Scope;
+import dagger.internal.codegen.xprocessing.XTypeElements;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
@@ -90,8 +93,8 @@ public final class ModuleValidator {
           TypeNames.PRODUCTION_SUBCOMPONENT_BUILDER,
           TypeNames.PRODUCTION_SUBCOMPONENT_FACTORY);
   private static final Optional<Class<?>> ANDROID_PROCESSOR;
-  private static final String CONTRIBUTES_ANDROID_INJECTOR_NAME =
-      "dagger.android.ContributesAndroidInjector";
+  private static final ClassName CONTRIBUTES_ANDROID_INJECTOR_NAME =
+      ClassName.get("dagger.android", "ContributesAndroidInjector");
   private static final String ANDROID_PROCESSOR_NAME = "dagger.android.processor.AndroidProcessor";
 
   static {
@@ -106,7 +109,7 @@ public final class ModuleValidator {
 
   private final AnyBindingMethodValidator anyBindingMethodValidator;
   private final MethodSignatureFormatter methodSignatureFormatter;
-  private final ComponentDescriptorFactory componentDescriptorFactory;
+  private final ComponentDescriptor.Factory componentDescriptorFactory;
   private final BindingGraphFactory bindingGraphFactory;
   private final BindingGraphValidator bindingGraphValidator;
   private final InjectionAnnotations injectionAnnotations;
@@ -119,7 +122,7 @@ public final class ModuleValidator {
   ModuleValidator(
       AnyBindingMethodValidator anyBindingMethodValidator,
       MethodSignatureFormatter methodSignatureFormatter,
-      ComponentDescriptorFactory componentDescriptorFactory,
+      ComponentDescriptor.Factory componentDescriptorFactory,
       BindingGraphFactory bindingGraphFactory,
       BindingGraphValidator bindingGraphValidator,
       InjectionAnnotations injectionAnnotations,
@@ -164,9 +167,6 @@ public final class ModuleValidator {
   private ValidationReport validateUncached(XTypeElement module, Set<XTypeElement> visitedModules) {
     ValidationReport.Builder builder = ValidationReport.about(module);
     ModuleKind moduleKind = ModuleKind.forAnnotatedElement(module).get();
-    Optional<XType> contributesAndroidInjector =
-        Optional.ofNullable(processingEnv.findTypeElement(CONTRIBUTES_ANDROID_INJECTOR_NAME))
-            .map(XTypeElement::getType);
     List<XMethodElement> moduleMethods = module.getDeclaredMethods();
     List<XMethodElement> bindingMethods = new ArrayList<>();
     for (XMethodElement moduleMethod : moduleMethods) {
@@ -174,28 +174,15 @@ public final class ModuleValidator {
         builder.addSubreport(anyBindingMethodValidator.validate(moduleMethod));
         bindingMethods.add(moduleMethod);
       }
-
-      for (XAnnotation annotation : moduleMethod.getAllAnnotations()) {
-        if (!ANDROID_PROCESSOR.isPresent()
-            && contributesAndroidInjector.isPresent()
-            && areEquivalentTypes(contributesAndroidInjector.get(), annotation.getType())) {
-          builder.addSubreport(
-              ValidationReport.about(moduleMethod)
-                  .addError(
-                      String.format(
-                          "@%s was used, but %s was not found on the processor path",
-                          CONTRIBUTES_ANDROID_INJECTOR_NAME, ANDROID_PROCESSOR_NAME))
-                  .build());
-          break;
-        }
-      }
     }
+
+    validateKotlinObjectDoesNotInheritInstanceBindingMethods(module, moduleKind, builder);
+    validateDaggerAndroidProcessorRequirements(module, builder);
 
     if (bindingMethods.stream()
         .map(ModuleMethodKind::ofMethod)
         .collect(toImmutableSet())
-        .containsAll(
-            EnumSet.of(ModuleMethodKind.ABSTRACT_DECLARATION, ModuleMethodKind.INSTANCE_BINDING))) {
+        .containsAll(EnumSet.of(ABSTRACT_DECLARATION, INSTANCE_BINDING))) {
       builder.addError(
           String.format(
               "A @%s may not contain both non-static and abstract binding methods",
@@ -231,6 +218,49 @@ public final class ModuleValidator {
     }
 
     return builder.build();
+  }
+
+  private void validateDaggerAndroidProcessorRequirements(
+      XTypeElement module, ValidationReport.Builder builder) {
+    if (ANDROID_PROCESSOR.isPresent()
+        || processingEnv.findTypeElement(CONTRIBUTES_ANDROID_INJECTOR_NAME) == null) {
+      return;
+    }
+    module.getDeclaredMethods().stream()
+        .filter(method -> method.hasAnnotation(CONTRIBUTES_ANDROID_INJECTOR_NAME))
+        .forEach(
+            method ->
+                builder.addSubreport(
+                    ValidationReport.about(method)
+                        .addError(
+                            String.format(
+                                "@%s was used, but %s was not found on the processor path",
+                                CONTRIBUTES_ANDROID_INJECTOR_NAME.simpleName(),
+                                ANDROID_PROCESSOR_NAME))
+                        .build()));
+  }
+
+  private void validateKotlinObjectDoesNotInheritInstanceBindingMethods(
+      XTypeElement module, ModuleKind moduleKind, ValidationReport.Builder builder) {
+    if (!module.isKotlinObject()) {
+      return;
+    }
+    XTypeElement currentClass = module;
+    while (!currentClass.getSuperType().getTypeName().equals(TypeName.OBJECT)) {
+      currentClass = currentClass.getSuperType().getTypeElement();
+      currentClass.getDeclaredMethods().stream()
+          .filter(anyBindingMethodValidator::isBindingMethod)
+          .filter(method -> ModuleMethodKind.ofMethod(method) == INSTANCE_BINDING)
+          .forEach(
+              method ->
+                  // TODO(b/264618194): Consider allowing this use case.
+                  builder.addError(
+                      String.format(
+                          "@%s-annotated Kotlin object cannot inherit instance (i.e. non-abstract, "
+                              + "non-JVM static) binding method: %s",
+                          moduleKind.annotation().simpleName(),
+                          methodSignatureFormatter.format(method))));
+    }
   }
 
   private void validateReferencedSubcomponents(
@@ -466,13 +496,12 @@ public final class ModuleValidator {
     // a binding method in Parent, and "c" because Child is defining a binding method that overrides
     // Parent.
     XTypeElement currentClass = subject;
-    XType objectType = processingEnv.findType(TypeName.OBJECT);
     // We keep track of visited methods so we don't spam with multiple failures.
     Set<XMethodElement> visitedMethods = Sets.newHashSet();
     ListMultimap<String, XMethodElement> allMethodsByName =
         MultimapBuilder.hashKeys().arrayListValues().build(moduleMethodsByName);
 
-    while (!currentClass.getSuperType().isSameType(objectType)) {
+    while (!currentClass.getSuperType().getTypeName().equals(TypeName.OBJECT)) {
       currentClass = currentClass.getSuperType().getTypeElement();
       List<XMethodElement> superclassMethods = currentClass.getDeclaredMethods();
       for (XMethodElement superclassMethod : superclassMethods) {
@@ -508,7 +537,7 @@ public final class ModuleValidator {
 
   private void validateModuleVisibility(
       XTypeElement moduleElement, ModuleKind moduleKind, ValidationReport.Builder reportBuilder) {
-    if (moduleElement.isPrivate()) {
+    if (moduleElement.isPrivate() || moduleElement.isKtPrivate()) {
       reportBuilder.addError("Modules cannot be private.", moduleElement);
     } else if (isEffectivelyPrivate(moduleElement)) {
       reportBuilder.addError("Modules cannot be enclosed in private types.", moduleElement);
@@ -524,7 +553,11 @@ public final class ModuleValidator {
                     + "reduce the visibility of this module, make the included modules "
                     + "public, or make all of the binding methods on the included modules "
                     + "abstract or static.",
-                formatListForErrorMessage(invalidVisibilityIncludes.asList())),
+                formatListForErrorMessage(
+                    invalidVisibilityIncludes.stream()
+                        .map(XTypeElement::getClassName)
+                        .map(ClassName::canonicalName)
+                        .collect(toImmutableList()))),
             moduleElement);
       }
     }
@@ -546,13 +579,13 @@ public final class ModuleValidator {
    * binding methods are considered {@code static}, requiring no module instance.
    */
   private boolean requiresModuleInstance(XTypeElement module) {
-    // Note: We use XTypeElement#getAllMethods() rather than XTypeElement#getDeclaredMethods() here
+    // Note: We use XTypeElements#getAllMethods() rather than XTypeElement#getDeclaredMethods() here
     // because we need to include binding methods declared in supertypes because unlike most other
     // validations being done in this class, which assume that supertype binding methods will be
     // validated in a separate call to the validator since the supertype itself must be a @Module,
     // we need to look at all the binding methods in the module's type hierarchy here.
     return !(module.isKotlinObject() || module.isCompanionObject())
-        && !asStream(module.getAllMethods())
+        && !XTypeElements.getAllMethods(module).stream()
             .filter(anyBindingMethodValidator::isBindingMethod)
             .allMatch(method -> method.isAbstract() || method.isStatic());
   }

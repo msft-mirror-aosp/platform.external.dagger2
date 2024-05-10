@@ -18,11 +18,13 @@
 load(
     "//:build_defs.bzl",
     "POM_VERSION",
-    "SOURCE_7_TARGET_7",
 )
 load("//tools:dejetify.bzl", "dejetified_library")
-load("//tools:maven.bzl", "pom_file")
-load("@google_bazel_common//tools/javadoc:javadoc.bzl", "javadoc_library")
+load(
+    "//tools:maven.bzl",
+    "gen_maven_artifact",
+    "pom_file",
+)
 
 package(default_visibility = ["//:src"])
 
@@ -34,8 +36,6 @@ filegroup(
 android_library(
     name = "support",
     srcs = glob(["*.java"]),
-    javacopts = SOURCE_7_TARGET_7,
-    manifest = "AndroidManifest.xml",
     tags = ["maven_coordinates=com.google.dagger:dagger-android-support:" + POM_VERSION],
     deps = [
         "//:dagger_with_compiler",
@@ -51,17 +51,34 @@ android_library(
     ],
 )
 
-pom_file(
-    name = "pom",
-    artifact_id = "dagger-android-support",
+gen_maven_artifact(
+    name = "artifact",
+    artifact_coordinates = "com.google.dagger:dagger-android-support:" + POM_VERSION,
     artifact_name = "Dagger Android Support",
+    artifact_target = ":support",
+    artifact_target_maven_deps = [
+        "androidx.activity:activity",
+        "androidx.annotation:annotation",
+        "androidx.appcompat:appcompat",
+        "androidx.fragment:fragment",
+        "androidx.lifecycle:lifecycle-common",
+        "androidx.lifecycle:lifecycle-viewmodel",
+        "androidx.lifecycle:lifecycle-viewmodel-savedstate",
+        "com.google.dagger:dagger",
+        "com.google.dagger:dagger-android",
+    ],
+    javadoc_android_api_level = 32,
+    javadoc_root_packages = [
+        "dagger.android.support",
+    ],
+    javadoc_srcs = [":support-srcs"],
+    manifest = "AndroidManifest.xml",
     packaging = "aar",
-    targets = [":support"],
 )
 
 dejetified_library(
     name = "dejetified-support",
-    input = ":support.aar",
+    input = ":artifact.aar",
     output = "support-legacy.aar",
 )
 
@@ -84,12 +101,4 @@ pom_file(
     artifact_name = "Dagger Android Legacy Support",
     packaging = "aar",
     targets = [":legacy-deps"],
-)
-
-javadoc_library(
-    name = "support-javadoc",
-    srcs = [":support-srcs"],
-    android_api_level = 30,
-    root_packages = ["dagger.android.support"],
-    deps = [":support"],
 )

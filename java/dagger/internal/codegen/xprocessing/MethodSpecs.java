@@ -16,7 +16,6 @@
 
 package dagger.internal.codegen.xprocessing;
 
-import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
 import static javax.lang.model.element.Modifier.PROTECTED;
 import static javax.lang.model.element.Modifier.PUBLIC;
 
@@ -35,7 +34,8 @@ public final class MethodSpecs {
   public static MethodSpec.Builder overriding(XMethodElement method, XType owner) {
     XMethodType methodType = method.asMemberOf(owner);
     MethodSpec.Builder builder =
-        MethodSpec.methodBuilder(getSimpleName(method))
+        // We're overriding the method so we have to use the jvm name here.
+        MethodSpec.methodBuilder(method.getJvmName())
             .addAnnotation(Override.class)
             .addTypeVariables(methodType.getTypeVariableNames())
             .varargs(method.isVarArgs())
@@ -46,7 +46,7 @@ public final class MethodSpecs {
       builder.addModifiers(PROTECTED);
     }
     for (int i = 0; i < methodType.getParameterTypes().size(); i++) {
-      String parameterName = getSimpleName(method.getParameters().get(i));
+      String parameterName = method.getParameters().get(i).getJvmName();
       TypeName parameterType = methodType.getParameterTypes().get(i).getTypeName();
       builder.addParameter(ParameterSpec.builder(parameterType, parameterName).build());
     }

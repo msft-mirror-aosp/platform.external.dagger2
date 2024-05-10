@@ -18,41 +18,37 @@ package dagger.internal.codegen.writing;
 
 import static dagger.internal.codegen.writing.ComponentImplementation.FieldSpecKind.FRAMEWORK_FIELD;
 import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
+import static dagger.internal.codegen.xprocessing.XProcessingEnvs.wrapType;
 import static javax.lang.model.element.Modifier.PRIVATE;
 
+import androidx.room.compiler.processing.XProcessingEnv;
+import androidx.room.compiler.processing.XType;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.FieldSpec;
-import com.squareup.javapoet.TypeName;
 import dagger.internal.codegen.binding.ComponentDescriptor.ComponentMethodDescriptor;
 import dagger.internal.codegen.javapoet.Expression;
 import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.internal.codegen.langmodel.DaggerTypes;
+import dagger.internal.codegen.model.RequestKind;
 import dagger.internal.codegen.writing.ComponentImplementation.ShardImplementation;
-import dagger.producers.Producer;
-import dagger.producers.internal.CancellationListener;
-import dagger.producers.internal.Producers;
-import dagger.spi.model.RequestKind;
 import java.util.Optional;
-import javax.lang.model.type.TypeMirror;
 
 /**
- * A factory of {@linkplain Producers#entryPointViewOf(Producer, CancellationListener) entry point
- * views} of {@link Producer}s.
+ * A factory of {@code Producers#entryPointViewOf(Producer, CancellationListener)} of
+ * {@code Producer}s.
  */
 final class ProducerEntryPointView {
   private final ShardImplementation shardImplementation;
-  private final DaggerTypes types;
+  private final XProcessingEnv processingEnv;
 
-  ProducerEntryPointView(ShardImplementation shardImplementation, DaggerTypes types) {
+  ProducerEntryPointView(ShardImplementation shardImplementation, XProcessingEnv processingEnv) {
     this.shardImplementation = shardImplementation;
-    this.types = types;
+    this.processingEnv = processingEnv;
   }
 
   /**
-   * Returns an expression for an {@linkplain Producers#entryPointViewOf(Producer,
-   * CancellationListener) entry point view} of a producer if the component method returns a {@link
-   * Producer} or {@link com.google.common.util.concurrent.ListenableFuture}.
+   * Returns an expression for an {@code Producers#entryPointViewOf(Producer, CancellationListener)}
+   * of a producer if the component method returns a {@code Producer} or {@code ListenableFuture}.
    *
    * <p>This is intended to be a replacement implementation for {@link
    * dagger.internal.codegen.writing.RequestRepresentation#getDependencyExpressionForComponentMethod(ComponentMethodDescriptor,
@@ -87,7 +83,7 @@ final class ProducerEntryPointView {
     String methodName = getSimpleName(componentMethod.methodElement());
     FieldSpec field =
         FieldSpec.builder(
-                TypeName.get(fieldType(componentMethod)),
+                fieldType(componentMethod).getTypeName(),
                 shardImplementation.getUniqueFieldName(methodName + "EntryPoint"),
                 PRIVATE)
             .build();
@@ -97,7 +93,7 @@ final class ProducerEntryPointView {
         CodeBlock.of(
             "this.$N = $T.entryPointViewOf($L, $L);",
             field,
-            Producers.class,
+            TypeNames.PRODUCERS,
             producerExpression.getDependencyExpression(shardImplementation.name()).codeBlock(),
             // Always pass in the componentShard reference here rather than the owning shard for
             // this key because this needs to be the root CancellationListener.
@@ -114,8 +110,10 @@ final class ProducerEntryPointView {
 
   // TODO(cgdecker): Can we use producerExpression.getDependencyExpression().type() instead of
   // needing to (re)compute this?
-  private TypeMirror fieldType(ComponentMethodDescriptor componentMethod) {
-    return types.wrapType(
-        componentMethod.dependencyRequest().get().key().type().java(), TypeNames.PRODUCER);
+  private XType fieldType(ComponentMethodDescriptor componentMethod) {
+    return wrapType(
+        TypeNames.PRODUCER,
+        componentMethod.dependencyRequest().get().key().type().xprocessing(),
+        processingEnv);
   }
 }

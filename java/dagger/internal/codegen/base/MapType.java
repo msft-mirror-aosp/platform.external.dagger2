@@ -18,18 +18,18 @@ package dagger.internal.codegen.base;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-import static dagger.internal.codegen.langmodel.DaggerTypes.unwrapType;
 import static dagger.internal.codegen.xprocessing.XTypes.isTypeOf;
+import static dagger.internal.codegen.xprocessing.XTypes.unwrapType;
 
 import androidx.room.compiler.processing.XType;
 import com.google.auto.value.AutoValue;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.TypeName;
 import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.spi.model.Key;
-import javax.lang.model.type.TypeMirror;
+import dagger.internal.codegen.model.Key;
+import dagger.internal.codegen.xprocessing.XTypes;
 
-/** Information about a {@link java.util.Map} {@link TypeMirror}. */
+/** Information about a {@link java.util.Map} type. */
 @AutoValue
 public abstract class MapType {
   private XType type;
@@ -44,7 +44,7 @@ public abstract class MapType {
 
   /** {@code true} if the map type is the raw {@link java.util.Map} type. */
   public boolean isRawType() {
-    return type().getTypeArguments().isEmpty();
+    return XTypes.isRawParameterizedType(type());
   }
 
   /**
@@ -113,6 +113,13 @@ public abstract class MapType {
   /** {@code true} if {@code key.type()} is a {@link java.util.Map} type. */
   public static boolean isMap(Key key) {
     return isMap(key.type().xprocessing());
+  }
+
+  public static boolean isMapOfProvider(XType keyType) {
+    if (MapType.isMap(keyType)) {
+      return MapType.from(keyType).valuesAreTypeOf(TypeNames.PROVIDER);
+    }
+    return false;
   }
 
   /**

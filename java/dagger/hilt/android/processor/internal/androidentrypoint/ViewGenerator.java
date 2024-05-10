@@ -16,36 +16,35 @@
 
 package dagger.hilt.android.processor.internal.androidentrypoint;
 
-import com.google.auto.common.MoreElements;
-import com.google.auto.common.Visibility;
+import static androidx.room.compiler.processing.XTypeKt.isInt;
+import static dagger.internal.codegen.xprocessing.XTypes.isDeclared;
+import static dagger.internal.codegen.xprocessing.XTypes.isPrimitive;
+
+import androidx.room.compiler.processing.JavaPoetExtKt;
+import androidx.room.compiler.processing.XConstructorElement;
+import androidx.room.compiler.processing.XExecutableParameterElement;
+import androidx.room.compiler.processing.XFiler;
+import androidx.room.compiler.processing.XProcessingEnv;
+import androidx.room.compiler.processing.XType;
+import androidx.room.compiler.processing.XTypeParameterElement;
 import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.TypeSpec;
-import com.squareup.javapoet.TypeVariableName;
 import dagger.hilt.android.processor.internal.AndroidClassNames;
 import dagger.hilt.processor.internal.Processors;
-import java.io.IOException;
 import java.util.List;
-import javax.annotation.processing.ProcessingEnvironment;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.VariableElement;
-import javax.lang.model.type.TypeKind;
-import javax.lang.model.type.TypeMirror;
-import javax.lang.model.util.ElementFilter;
 
 /** Generates an Hilt View class for the @AndroidEntryPoint annotated class. */
 public final class ViewGenerator {
-  private final ProcessingEnvironment env;
+  private final XProcessingEnv env;
   private final AndroidEntryPointMetadata metadata;
   private final ClassName generatedClassName;
 
-  public ViewGenerator(ProcessingEnvironment env, AndroidEntryPointMetadata metadata) {
+  public ViewGenerator(XProcessingEnv env, AndroidEntryPointMetadata metadata) {
     this.env = env;
     this.metadata = metadata;
-
     generatedClassName = metadata.generatedClassName();
   }
 
@@ -54,7 +53,7 @@ public final class ViewGenerator {
   //    ComponentManagerHolder<ViewComponentManager<$CLASS_EntryPoint>> {
   //   ...
   // }
-  public void generate() throws IOException {
+  public void generate() {
     // Note: we do not use the Generators helper methods here because injection is called
     // from the constructor where the double-check pattern doesn't work (due to the super
     // constructor being called before fields are initialized) and because it isn't necessary
@@ -62,37 +61,37 @@ public final class ViewGenerator {
 
     TypeSpec.Builder builder =
         TypeSpec.classBuilder(generatedClassName.simpleName())
-            .addOriginatingElement(metadata.element())
             .superclass(metadata.baseClassName())
             .addModifiers(metadata.generatedClassModifiers());
 
+    JavaPoetExtKt.addOriginatingElement(builder, metadata.element());
     Generators.addGeneratedBaseClassJavadoc(builder, AndroidClassNames.ANDROID_ENTRY_POINT);
     Processors.addGeneratedAnnotation(builder, env, getClass());
     Generators.copyLintAnnotations(metadata.element(), builder);
     Generators.copySuppressAnnotations(metadata.element(), builder);
 
     metadata.baseElement().getTypeParameters().stream()
-        .map(TypeVariableName::get)
+        .map(XTypeParameterElement::getTypeVariableName)
         .forEachOrdered(builder::addTypeVariable);
 
     Generators.addComponentOverride(metadata, builder);
-
     Generators.addInjectionMethods(metadata, builder);
 
-    ElementFilter.constructorsIn(metadata.baseElement().getEnclosedElements()).stream()
+    metadata.baseElement().getConstructors().stream()
         .filter(this::isConstructorVisibleToGeneratedClass)
-        .forEach(constructor -> builder.addMethod(constructorMethod(constructor)));
+        .map(this::constructorMethod)
+        .forEach(builder::addMethod);
 
-    JavaFile.builder(generatedClassName.packageName(), builder.build())
-        .build()
-        .writeTo(env.getFiler());
+    env.getFiler()
+        .write(
+            JavaFile.builder(generatedClassName.packageName(), builder.build()).build(),
+            XFiler.Mode.Isolating);
   }
 
-  private boolean isConstructorVisibleToGeneratedClass(ExecutableElement constructorElement) {
-    if (Visibility.ofElement(constructorElement) == Visibility.DEFAULT
-        && !isInOurPackage(constructorElement)) {
+  private boolean isConstructorVisibleToGeneratedClass(XConstructorElement constructor) {
+    if (Processors.hasJavaPackagePrivateVisibility(constructor) && !isInOurPackage(constructor)) {
       return false;
-    } else if (Visibility.ofElement(constructorElement) == Visibility.PRIVATE) {
+    } else if (constructor.isPrivate()) {
       return false;
     }
 
@@ -113,38 +112,41 @@ public final class ViewGenerator {
    *   }
    * </pre>
    */
-  private MethodSpec constructorMethod(ExecutableElement constructorElement) {
-    MethodSpec.Builder constructor =
-        Generators.copyConstructor(constructorElement).toBuilder();
+  private MethodSpec constructorMethod(XConstructorElement constructor) {
+    MethodSpec.Builder builder = Generators.copyConstructor(constructor).toBuilder();
 
-    if (isRestrictedApiConstructor(constructorElement)) {
+    // TODO(b/210544481): Once this bug is fixed we should require that the user adds this
+    // annotation to their constructor and we'll propagate it from there rather than trying to
+    // guess whether this needs @TargetApi from the signature. This check is a bit flawed. For
+    // example, the user could write a 5 parameter constructor that calls the restricted 4 parameter
+    // constructor and we would miss adding @TargetApi to it.
+    if (isRestrictedApiConstructor(constructor)) {
       // 4 parameter constructors are only available on @TargetApi(21).
-      constructor.addAnnotation(
+      builder.addAnnotation(
           AnnotationSpec.builder(AndroidClassNames.TARGET_API).addMember("value", "21").build());
     }
 
-    constructor.addStatement("inject()");
+    builder.addStatement("inject()");
 
-    return constructor.build();
+    return builder.build();
   }
 
-  private boolean isRestrictedApiConstructor(ExecutableElement constructor) {
+  private boolean isRestrictedApiConstructor(XConstructorElement constructor) {
     if (constructor.getParameters().size() != 4) {
       return false;
     }
 
-    List<? extends VariableElement> constructorParams = constructor.getParameters();
+    List<XExecutableParameterElement> constructorParams = constructor.getParameters();
     for (int i = 0; i < constructorParams.size(); i++) {
-      TypeMirror type = constructorParams.get(i).asType();
-      Element element = env.getTypeUtils().asElement(type);
+      XType type = constructorParams.get(i).getType();
       switch (i) {
         case 0:
-          if (!isFirstRestrictedParameter(element)) {
+          if (!isFirstRestrictedParameter(type)) {
             return false;
           }
           break;
         case 1:
-          if (!isSecondRestrictedParameter(element)) {
+          if (!isSecondRestrictedParameter(type)) {
             return false;
           }
           break;
@@ -166,29 +168,28 @@ public final class ViewGenerator {
     return true;
   }
 
-  private static boolean isFourthRestrictedParameter(TypeMirror type) {
-    return type.getKind().isPrimitive()
-        && Processors.getPrimitiveType(type).getKind() == TypeKind.INT;
+  private static boolean isFourthRestrictedParameter(XType type) {
+    return isPrimitive(type) && isInt(type);
   }
 
-  private static boolean isThirdRestrictedParameter(TypeMirror type) {
-    return type.getKind().isPrimitive()
-        && Processors.getPrimitiveType(type).getKind() == TypeKind.INT;
+  private static boolean isThirdRestrictedParameter(XType type) {
+    return isPrimitive(type) && isInt(type);
   }
 
-  private static boolean isSecondRestrictedParameter(Element element) {
-    return MoreElements.isType(element)
-        && Processors.isAssignableFrom(
-            MoreElements.asType(element), AndroidClassNames.ATTRIBUTE_SET);
+  private static boolean isSecondRestrictedParameter(XType type) {
+    return isDeclared(type)
+        && Processors.isAssignableFrom(type.getTypeElement(), AndroidClassNames.ATTRIBUTE_SET);
   }
 
-  private static boolean isFirstRestrictedParameter(Element element) {
-    return MoreElements.isType(element)
-        && Processors.isAssignableFrom(MoreElements.asType(element), AndroidClassNames.CONTEXT);
+  private static boolean isFirstRestrictedParameter(XType type) {
+    return isDeclared(type)
+        && Processors.isAssignableFrom(type.getTypeElement(), AndroidClassNames.CONTEXT);
   }
 
-  private boolean isInOurPackage(ExecutableElement constructorElement) {
-    return MoreElements.getPackage(constructorElement)
-        .equals(MoreElements.getPackage(metadata.element()));
+  private boolean isInOurPackage(XConstructorElement constructor) {
+    return constructor
+        .getEnclosingElement()
+        .getPackageName()
+        .contentEquals(metadata.element().getPackageName());
   }
 }

@@ -16,7 +16,7 @@
 
 package dagger.internal.codegen.writing;
 
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
+import static dagger.internal.codegen.xprocessing.XElements.asMethod;
 
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
@@ -36,7 +36,6 @@ final class ComponentProvisionRequestRepresentation extends RequestRepresentatio
   private final BindingGraph bindingGraph;
   private final ComponentRequirementExpressions componentRequirementExpressions;
   private final CompilerOptions compilerOptions;
-  private final boolean isExperimentalMergedMode;
 
   @AssistedInject
   ComponentProvisionRequestRepresentation(
@@ -49,21 +48,14 @@ final class ComponentProvisionRequestRepresentation extends RequestRepresentatio
     this.bindingGraph = bindingGraph;
     this.componentRequirementExpressions = componentRequirementExpressions;
     this.compilerOptions = compilerOptions;
-    this.isExperimentalMergedMode =
-        componentImplementation.compilerMode().isExperimentalMergedMode();
   }
 
   @Override
   Expression getDependencyExpression(ClassName requestingClass) {
-    CodeBlock componentDependency =
-        isExperimentalMergedMode
-            ? CodeBlock.of("(($T) dependencies[0])", componentRequirement().type().getTypeName())
-            : getComponentRequirementExpression(requestingClass);
+    CodeBlock componentDependency = getComponentRequirementExpression(requestingClass);
     CodeBlock invocation =
         CodeBlock.of(
-            "$L.$L()",
-            componentDependency,
-            toJavac(binding.bindingElement().get()).getSimpleName());
+            "$L.$L()", componentDependency, asMethod(binding.bindingElement().get()).getJvmName());
     return Expression.create(
         binding.contributedPrimitiveType().orElse(binding.key().type().xprocessing()),
         maybeCheckForNull(binding, compilerOptions, invocation));

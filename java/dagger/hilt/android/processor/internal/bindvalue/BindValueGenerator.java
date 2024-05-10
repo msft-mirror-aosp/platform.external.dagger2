@@ -20,8 +20,10 @@ import static com.google.common.base.CaseFormat.LOWER_CAMEL;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static java.util.Comparator.comparing;
 
+import androidx.room.compiler.processing.JavaPoetExtKt;
+import androidx.room.compiler.processing.XFiler.Mode;
+import androidx.room.compiler.processing.XProcessingEnv;
 import com.google.common.collect.ImmutableSet;
-import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.JavaFile;
@@ -34,11 +36,12 @@ import dagger.hilt.android.processor.internal.bindvalue.BindValueMetadata.BindVa
 import dagger.hilt.processor.internal.ClassNames;
 import dagger.hilt.processor.internal.Components;
 import dagger.hilt.processor.internal.Processors;
+import dagger.internal.codegen.xprocessing.XAnnotations;
+import dagger.internal.codegen.xprocessing.XElements;
 import dagger.multibindings.ElementsIntoSet;
 import dagger.multibindings.IntoMap;
 import dagger.multibindings.IntoSet;
 import java.io.IOException;
-import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Modifier;
 
 /**
@@ -47,15 +50,15 @@ import javax.lang.model.element.Modifier;
 final class BindValueGenerator {
   private static final String SUFFIX = "_BindValueModule";
 
-  private final ProcessingEnvironment env;
+  private final XProcessingEnv env;
   private final BindValueMetadata metadata;
   private final ClassName testClassName;
   private final ClassName className;
 
-  BindValueGenerator(ProcessingEnvironment env, BindValueMetadata metadata) {
+  BindValueGenerator(XProcessingEnv env, BindValueMetadata metadata) {
     this.env = env;
     this.metadata = metadata;
-    testClassName = ClassName.get(metadata.testElement());
+    testClassName = metadata.testElement().getClassName();
     className = Processors.append(testClassName, SUFFIX);
   }
 
@@ -65,16 +68,14 @@ final class BindValueGenerator {
   //     // providesMethods ...
   //  }
   void generate() throws IOException {
-    TypeSpec.Builder builder =
-        TypeSpec.classBuilder(className)
-            .addOriginatingElement(metadata.testElement())
-            .addAnnotation(Processors.getOriginatingElementAnnotation(metadata.testElement()))
-            .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
-            .addAnnotation(Module.class)
-            .addAnnotation(
-                Components.getInstallInAnnotationSpec(
-                    ImmutableSet.of(ClassNames.SINGLETON_COMPONENT)))
-            .addMethod(providesTestMethod());
+    TypeSpec.Builder builder = TypeSpec.classBuilder(className);
+    JavaPoetExtKt.addOriginatingElement(builder, metadata.testElement())
+        .addAnnotation(Processors.getOriginatingElementAnnotation(metadata.testElement()))
+        .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+        .addAnnotation(Module.class)
+        .addAnnotation(
+            Components.getInstallInAnnotationSpec(ImmutableSet.of(ClassNames.SINGLETON_COMPONENT)))
+        .addMethod(providesTestMethod());
 
     Processors.addGeneratedAnnotation(builder, env, getClass());
 
@@ -83,9 +84,8 @@ final class BindValueGenerator {
         .sorted(comparing(MethodSpec::toString))
         .forEachOrdered(builder::addMethod);
 
-    JavaFile.builder(className.packageName(), builder.build())
-        .build()
-        .writeTo(env.getFiler());
+    env.getFiler()
+        .write(JavaFile.builder(className.packageName(), builder.build()).build(), Mode.Isolating);
   }
 
   // @Provides
@@ -121,25 +121,24 @@ final class BindValueGenerator {
   // }
   private MethodSpec providesMethod(BindValueElement bindValue) {
     // We only allow fields in the Test class, which should have unique variable names.
-    String methodName = "provides"
-        + LOWER_CAMEL.to(UPPER_CAMEL, bindValue.variableElement().getSimpleName().toString());
+    String methodName =
+        "provides" + LOWER_CAMEL.to(UPPER_CAMEL, bindValue.fieldElement().getName());
     MethodSpec.Builder builder =
         MethodSpec.methodBuilder(methodName)
             .addAnnotation(Provides.class)
             .addModifiers(Modifier.STATIC)
-            .returns(ClassName.get(bindValue.variableElement().asType()));
+            .returns(bindValue.fieldElement().getType().getTypeName());
 
-    if (bindValue.variableElement().getModifiers().contains(Modifier.STATIC)) {
-      builder.addStatement(
-          "return $T.$L", testClassName, bindValue.variableElement().getSimpleName());
+    if (XElements.isStatic(bindValue.fieldElement())) {
+      builder.addStatement("return $T.$L", testClassName, bindValue.fieldElement().getName());
     } else {
       builder
           .addParameter(testClassName, "test")
           .addStatement(
               "return $L",
               bindValue.getterElement().isPresent()
-                  ? CodeBlock.of("test.$L()", bindValue.getterElement().get().getSimpleName())
-                  : CodeBlock.of("test.$L", bindValue.variableElement().getSimpleName()));
+                  ? CodeBlock.of("test.$L()", bindValue.getterElement().get().getJvmName())
+                  : CodeBlock.of("test.$L", bindValue.fieldElement().getName()));
     }
 
     ClassName annotationClassName = bindValue.annotationName();
@@ -148,13 +147,13 @@ final class BindValueGenerator {
       // It is safe to call get() on the Optional<AnnotationMirror> returned by mapKey()
       // because a @BindValueIntoMap is required to have one and is checked in
       // BindValueMetadata.BindValueElement.create().
-      builder.addAnnotation(AnnotationSpec.get(bindValue.mapKey().get()));
+      builder.addAnnotation(XAnnotations.getAnnotationSpec(bindValue.mapKey().get()));
     } else if (BindValueMetadata.BIND_VALUE_INTO_SET_ANNOTATIONS.contains(annotationClassName)) {
       builder.addAnnotation(IntoSet.class);
     } else if (BindValueMetadata.BIND_ELEMENTS_INTO_SET_ANNOTATIONS.contains(annotationClassName)) {
       builder.addAnnotation(ElementsIntoSet.class);
     }
-    bindValue.qualifier().ifPresent(q -> builder.addAnnotation(AnnotationSpec.get(q)));
+    bindValue.qualifier().ifPresent(q -> builder.addAnnotation(XAnnotations.getAnnotationSpec(q)));
     return builder.build();
   }
 }

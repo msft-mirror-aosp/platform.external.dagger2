@@ -16,14 +16,14 @@
 
 package dagger.hilt.processor.internal.root;
 
+import androidx.room.compiler.processing.XFiler.Mode;
+import androidx.room.compiler.processing.XProcessingEnv;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.TypeSpec;
 import dagger.hilt.processor.internal.ClassNames;
 import dagger.hilt.processor.internal.Processors;
-import java.io.IOException;
-import javax.annotation.processing.ProcessingEnvironment;
 
 /** Generator for the {@code EarlySingletonComponentCreator}. */
 final class EarlySingletonComponentCreatorGenerator {
@@ -36,29 +36,29 @@ final class EarlySingletonComponentCreatorGenerator {
       ClassName.get(
           "dagger.hilt.android.internal.testing.root", "DaggerDefault_HiltComponents_SingletonC");
 
-  static void generate(ProcessingEnvironment env) throws IOException {
+  static void generate(XProcessingEnv env) {
     TypeSpec.Builder builder =
         TypeSpec.classBuilder(EARLY_SINGLETON_COMPONENT_CREATOR_IMPL)
             .superclass(EARLY_SINGLETON_COMPONENT_CREATOR)
             .addMethod(
                 MethodSpec.methodBuilder("create")
+                    .addParameter(ClassNames.APPLICATION, "application")
                     .returns(ClassName.OBJECT)
                     .addStatement(
                         "return $T.builder()\n"
-                            + ".applicationContextModule(\n"
-                            + "    new $T($T.getApplication($T.getApplicationContext())))\n"
+                            + ".applicationContextModule(new $T(application))\n"
                             + ".build()",
                         DEFAULT_COMPONENT_IMPL,
-                        ClassNames.APPLICATION_CONTEXT_MODULE,
-                        ClassNames.CONTEXTS,
-                        ClassNames.APPLICATION_PROVIDER)
+                        ClassNames.APPLICATION_CONTEXT_MODULE)
                     .build());
 
     Processors.addGeneratedAnnotation(builder, env, ClassNames.ROOT_PROCESSOR.toString());
 
-    JavaFile.builder(EARLY_SINGLETON_COMPONENT_CREATOR_IMPL.packageName(), builder.build())
-        .build()
-        .writeTo(env.getFiler());
+    env.getFiler()
+        .write(
+            JavaFile.builder(EARLY_SINGLETON_COMPONENT_CREATOR_IMPL.packageName(), builder.build())
+                .build(),
+            Mode.Isolating);
   }
 
   private EarlySingletonComponentCreatorGenerator() {}

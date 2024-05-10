@@ -22,15 +22,13 @@ load(
     "DOCLINT_REFERENCES",
 )
 
-package(
-    default_visibility = [
-        # The dagger/spi should be the only direct dependent on this target.
-        # If you need to depend on :model, depend on dagger/spi instead so
-        # that pom files correctly pick up the spi maven dependency.
-        # TODO(bcorso): Consider if :model should have its own maven coordinates.
-        "//java/dagger/spi:__pkg__",
-    ],
-)
+package(default_visibility = [
+    # The dagger/spi should be the only direct dependent on this target.
+    # If you need to depend on :model, depend on dagger/spi instead so
+    # that pom files correctly pick up the spi maven dependency.
+    # TODO(bcorso): Consider if :model should have its own maven coordinates.
+    "//java/dagger/spi:__pkg__",
+])
 
 filegroup(
     name = "model-srcs",
@@ -46,7 +44,6 @@ java_library(
     deps = [
         "//java/dagger:core",
         "//java/dagger/internal/codegen/extension",
-        "//java/dagger/producers",
         "//third_party/java/auto:common",
         "//third_party/java/auto:value",
         "//third_party/java/error_prone:annotations",
