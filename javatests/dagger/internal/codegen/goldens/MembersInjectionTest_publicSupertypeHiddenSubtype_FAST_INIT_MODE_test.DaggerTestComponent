@@ -19,7 +19,8 @@ import other.Supertype_MembersInjector;
     "unchecked",
     "rawtypes",
     "KotlinInternal",
-    "KotlinInternalInJava"
+    "KotlinInternalInJava",
+    "cast"
 })
 final class DaggerTestComponent {
   private DaggerTestComponent() {

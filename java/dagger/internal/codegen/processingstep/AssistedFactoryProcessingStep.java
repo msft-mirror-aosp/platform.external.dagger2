@@ -23,6 +23,7 @@ import static dagger.internal.codegen.binding.SourceFiles.generatedClassNameForB
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
 import static dagger.internal.codegen.javapoet.CodeBlocks.toParametersCodeBlock;
 import static dagger.internal.codegen.javapoet.TypeNames.INSTANCE_FACTORY;
+import static dagger.internal.codegen.javapoet.TypeNames.daggerProviderOf;
 import static dagger.internal.codegen.javapoet.TypeNames.providerOf;
 import static dagger.internal.codegen.langmodel.Accessibility.accessibleTypeName;
 import static dagger.internal.codegen.xprocessing.MethodSpecs.overriding;
@@ -311,15 +312,40 @@ final class AssistedFactoryProcessingStep extends TypeCheckingProcessingStep<XTy
                       // use the parameter names of the @AssistedFactory method.
                       metadata.assistedInjectAssistedParameters().stream()
                           .map(metadata.assistedFactoryAssistedParametersMap()::get)
-                          .map(param -> CodeBlock.of("$L", getSimpleName(param)))
+                          .map(param -> CodeBlock.of("$L", param.getJvmName()))
                           .collect(toParametersCodeBlock()))
                   .build())
+          // In a future release, we should delete this javax method. This will still be a breaking
+          // change, but keeping compatibility for a while should reduce the likelihood of breakages
+          // as it would require components built at much older versions using factories built at
+          // newer versions to break.
           .addMethod(
               MethodSpec.methodBuilder("create")
                   .addModifiers(PUBLIC, STATIC)
                   .addParameter(delegateFactoryParam)
                   .addTypeVariables(typeVariableNames(metadata.assistedInjectElement()))
                   .returns(providerOf(factory.getType().getTypeName()))
+                  .addStatement(
+                      "return $T.$Lcreate(new $T($N))",
+                      INSTANCE_FACTORY,
+                      // Java 7 type inference requires the method call provide the exact type here.
+                      isPreJava8SourceVersion(processingEnv)
+                          ? CodeBlock.of(
+                              "<$T>",
+                              accessibleTypeName(metadata.factoryType(), name, processingEnv))
+                          : CodeBlock.of(""),
+                      name,
+                      delegateFactoryParam)
+                  .build())
+          // Normally we would have called this just "create", but because of backwards
+          // compatibility we can't have two methods with the same name/arguments returning
+          // different Provider types.
+          .addMethod(
+              MethodSpec.methodBuilder("createFactoryProvider")
+                  .addModifiers(PUBLIC, STATIC)
+                  .addParameter(delegateFactoryParam)
+                  .addTypeVariables(typeVariableNames(metadata.assistedInjectElement()))
+                  .returns(daggerProviderOf(factory.getType().getTypeName()))
                   .addStatement(
                       "return $T.$Lcreate(new $T($N))",
                       INSTANCE_FACTORY,

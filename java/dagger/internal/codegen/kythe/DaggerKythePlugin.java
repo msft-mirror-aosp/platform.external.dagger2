@@ -40,7 +40,7 @@ import dagger.internal.codegen.binding.Binding;
 import dagger.internal.codegen.binding.BindingDeclaration;
 import dagger.internal.codegen.binding.BindingGraphFactory;
 import dagger.internal.codegen.binding.BindingNode;
-import dagger.internal.codegen.binding.ComponentDescriptorFactory;
+import dagger.internal.codegen.binding.ComponentDescriptor;
 import dagger.internal.codegen.binding.ModuleDescriptor;
 import dagger.internal.codegen.javac.JavacPluginModule;
 import dagger.internal.codegen.javapoet.TypeNames;
@@ -64,7 +64,7 @@ public class DaggerKythePlugin extends Plugin.Scanner<Void, Void> {
   // TODO(ronshapiro): use flogger
   private static final Logger logger = Logger.getLogger(DaggerKythePlugin.class.getCanonicalName());
   private FactEmitter emitter;
-  @Inject ComponentDescriptorFactory componentDescriptorFactory;
+  @Inject ComponentDescriptor.Factory componentDescriptorFactory;
   @Inject BindingGraphFactory bindingGraphFactory;
   @Inject XProcessingEnv xProcessingEnv;
 
