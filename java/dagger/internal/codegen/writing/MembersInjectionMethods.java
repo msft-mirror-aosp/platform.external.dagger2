@@ -16,7 +16,6 @@
 
 package dagger.internal.codegen.writing;
 
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.squareup.javapoet.MethodSpec.methodBuilder;
 import static dagger.internal.codegen.base.Util.reentrantComputeIfAbsent;
@@ -27,6 +26,9 @@ import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
 import static javax.lang.model.element.Modifier.PRIVATE;
 import static javax.lang.model.element.Modifier.STATIC;
 
+import androidx.room.compiler.processing.XProcessingEnv;
+import androidx.room.compiler.processing.XType;
+import androidx.room.compiler.processing.XTypeElement;
 import com.google.common.collect.ImmutableSet;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
@@ -39,17 +41,12 @@ import dagger.internal.codegen.binding.MembersInjectionBinding;
 import dagger.internal.codegen.binding.MembersInjectionBinding.InjectionSite;
 import dagger.internal.codegen.binding.ProvisionBinding;
 import dagger.internal.codegen.javapoet.Expression;
-import dagger.internal.codegen.kotlin.KotlinMetadataUtil;
-import dagger.internal.codegen.langmodel.DaggerElements;
-import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.internal.codegen.writing.ComponentImplementation.ShardImplementation;
 import dagger.internal.codegen.writing.InjectionMethods.InjectionSiteMethod;
 import dagger.spi.model.Key;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.inject.Inject;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.type.TypeMirror;
 
 /** Manages the member injection methods for a component. */
 @PerComponentImplementation
@@ -59,24 +56,18 @@ final class MembersInjectionMethods {
   private final ComponentImplementation componentImplementation;
   private final ComponentRequestRepresentations bindingExpressions;
   private final BindingGraph graph;
-  private final DaggerElements elements;
-  private final DaggerTypes types;
-  private final KotlinMetadataUtil metadataUtil;
+  private final XProcessingEnv processingEnv;
 
   @Inject
   MembersInjectionMethods(
       ComponentImplementation componentImplementation,
       ComponentRequestRepresentations bindingExpressions,
       BindingGraph graph,
-      DaggerElements elements,
-      DaggerTypes types,
-      KotlinMetadataUtil metadataUtil) {
-    this.componentImplementation = checkNotNull(componentImplementation);
-    this.bindingExpressions = checkNotNull(bindingExpressions);
-    this.graph = checkNotNull(graph);
-    this.elements = checkNotNull(elements);
-    this.types = checkNotNull(types);
-    this.metadataUtil = metadataUtil;
+      XProcessingEnv processingEnv) {
+    this.componentImplementation = componentImplementation;
+    this.bindingExpressions = bindingExpressions;
+    this.graph = graph;
+    this.processingEnv = processingEnv;
   }
 
   /**
@@ -129,32 +120,32 @@ final class MembersInjectionMethods {
         useStaticInjectionMethod
             ? componentImplementation.getComponentShard()
             : componentImplementation.shardImplementation(binding);
-    TypeMirror keyType = binding.key().type().java();
-    TypeMirror membersInjectedType =
+    XType keyType = binding.key().type().xprocessing();
+    XType membersInjectedType =
         isTypeAccessibleFrom(keyType, shardImplementation.name().packageName())
             ? keyType
-            : elements.getTypeElement(TypeName.OBJECT).asType();
-    TypeName membersInjectedTypeName = TypeName.get(membersInjectedType);
+            : processingEnv.requireType(TypeName.OBJECT);
     String bindingTypeName = getSimpleName(binding.bindingTypeElement().get());
     // TODO(ronshapiro): include type parameters in this name e.g. injectFooOfT, and outer class
     // simple names Foo.Builder -> injectFooBuilder
     String methodName = shardImplementation.getUniqueMethodName("inject" + bindingTypeName);
-    ParameterSpec parameter = ParameterSpec.builder(membersInjectedTypeName, "instance").build();
+    ParameterSpec parameter =
+        ParameterSpec.builder(membersInjectedType.getTypeName(), "instance").build();
     MethodSpec.Builder methodBuilder =
         useStaticInjectionMethod
             ? methodBuilder(methodName)
                 .addModifiers(PRIVATE, STATIC)
-                .returns(membersInjectedTypeName)
+                .returns(membersInjectedType.getTypeName())
                 .addParameter(parameter)
                 .addParameter(Object[].class, "dependencies")
             : methodBuilder(methodName)
                 .addModifiers(PRIVATE)
-                .returns(membersInjectedTypeName)
+                .returns(membersInjectedType.getTypeName())
                 .addParameter(parameter);
-    TypeElement canIgnoreReturnValue =
-        elements.getTypeElement("com.google.errorprone.annotations.CanIgnoreReturnValue");
+    XTypeElement canIgnoreReturnValue =
+        processingEnv.findTypeElement("com.google.errorprone.annotations.CanIgnoreReturnValue");
     if (canIgnoreReturnValue != null) {
-      methodBuilder.addAnnotation(ClassName.get(canIgnoreReturnValue));
+      methodBuilder.addAnnotation(canIgnoreReturnValue.getClassName());
     }
     CodeBlock instance = CodeBlock.of("$N", parameter);
     methodBuilder.addCode(
@@ -171,14 +162,16 @@ final class MembersInjectionMethods {
                             .getDependencyExpression(request.kind(), (ProvisionBinding) binding)
                         : bindingExpressions.getDependencyArgumentExpression(
                             request, shardImplementation.name()))
-                    .codeBlock(),
-            types,
-            metadataUtil));
+                    .codeBlock()));
     methodBuilder.addStatement("return $L", instance);
 
     MethodSpec method = methodBuilder.build();
     shardImplementation.addMethod(MEMBERS_INJECTION_METHOD, method);
-    return Expression.create(membersInjectedType, CodeBlock.of("$N", method));
+    return Expression.create(
+        membersInjectedType,
+        useStaticInjectionMethod
+            ? CodeBlock.of("$T.$N", shardImplementation.name(), method)
+            : CodeBlock.of("$N", method));
   }
 
   private static ImmutableSet<InjectionSite> injectionSites(Binding binding) {

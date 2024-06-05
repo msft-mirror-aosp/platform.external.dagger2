@@ -16,11 +16,11 @@
 
 package dagger.internal.codegen.javapoet;
 
-
+import androidx.room.compiler.processing.XType;
+import com.google.common.collect.ImmutableSet;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
-import javax.lang.model.type.TypeMirror;
 
 /** Common names and convenience methods for JavaPoet {@link TypeName} usage. */
 public final class TypeNames {
@@ -56,6 +56,7 @@ public final class TypeNames {
   public static final ClassName DELEGATE_FACTORY =
       ClassName.get("dagger.internal", "DelegateFactory");
   public static final ClassName DOUBLE_CHECK = ClassName.get("dagger.internal", "DoubleCheck");
+
   public static final ClassName FACTORY = ClassName.get("dagger.internal", "Factory");
   public static final ClassName INJECTED_FIELD_SIGNATURE =
       ClassName.get("dagger.internal", "InjectedFieldSignature");
@@ -138,6 +139,7 @@ public final class TypeNames {
   public static final ClassName EXCEPTION = ClassName.get("java.lang", "Exception");
   public static final ClassName RUNTIME_EXCEPTION = ClassName.get("java.lang", "RuntimeException");
   public static final ClassName MAP = ClassName.get("java.util", "Map");
+  public static final ClassName KOTLIN_METADATA = ClassName.get("kotlin", "Metadata");
   public static final ClassName IMMUTABLE_MAP =
       ClassName.get("com.google.common.collect", "ImmutableMap");
   public static final ClassName SINGLETON = ClassName.get("jakarta.inject", "Singleton");
@@ -157,11 +159,15 @@ public final class TypeNames {
       ClassName.get("com.google.common.util.concurrent", "Futures");
   public static final ClassName LISTENABLE_FUTURE =
       ClassName.get("com.google.common.util.concurrent", "ListenableFuture");
+  public static final ClassName FLUENT_FUTURE =
+      ClassName.get("com.google.common.util.concurrent", "FluentFuture");
   public static final ClassName GUAVA_OPTIONAL =
       ClassName.get("com.google.common.base", "Optional");
   public static final ClassName JDK_OPTIONAL = ClassName.get("java.util", "Optional");
   public static final ClassName OVERRIDE = ClassName.get("java.lang", "Override");
   public static final ClassName JVM_STATIC = ClassName.get("kotlin.jvm", "JvmStatic");
+  public static final ClassName CLASS = ClassName.get("java.lang", "Class");
+  public static final ClassName KCLASS = ClassName.get("kotlin.reflect", "KClass");
 
   /**
    * {@link TypeName#VOID} is lowercase-v {@code void} whereas this represents the class, {@link
@@ -213,6 +219,17 @@ public final class TypeNames {
     return ParameterizedTypeName.get(SET, elementType);
   }
 
+  private static final ImmutableSet<ClassName> FUTURE_TYPES =
+      ImmutableSet.of(LISTENABLE_FUTURE, FLUENT_FUTURE);
+
+  public static boolean isFutureType(XType type) {
+    return isFutureType(type.getTypeName());
+  }
+
+  public static boolean isFutureType(TypeName typeName) {
+    return FUTURE_TYPES.contains(rawTypeName(typeName));
+  }
+
   /**
    * Returns the {@link TypeName} for the raw type of the given {@link TypeName}. If the argument
    * isn't a parameterized type, it returns the argument unchanged.
@@ -221,14 +238,6 @@ public final class TypeNames {
     return (typeName instanceof ParameterizedTypeName)
         ? ((ParameterizedTypeName) typeName).rawType
         : typeName;
-  }
-
-  /**
-   * Returns the {@link TypeName} for the raw type of the given {@link TypeMirror}. If the argument
-   * isn't a parameterized type, it returns the argument unchanged.
-   */
-  public static TypeName rawTypeName(TypeMirror type) {
-    return rawTypeName(TypeName.get(type));
   }
 
   private TypeNames() {}

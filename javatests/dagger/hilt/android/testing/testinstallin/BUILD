@@ -19,6 +19,7 @@ package(default_visibility = ["//:src"])
 android_local_test(
     name = "TestInstallInFooTest",
     srcs = ["TestInstallInFooTest.java"],
+    manifest = "AndroidManifest.xml",
     manifest_values = {
         "minSdkVersion": "15",
         "targetSdkVersion": "27",
@@ -27,14 +28,18 @@ android_local_test(
         ":TestInstallInModules",
         "//:android_local_test_exports",
         "//:dagger_with_compiler",
-        "@maven//:junit_junit",
-        
-                        "@maven//:org_robolectric_robolectric",
-                        "@maven//:androidx_test_ext_junit",
-                        "@maven//:androidx_test_core",
-                        
-        "//third_party/java/truth",
+        "//java/dagger/hilt/android:android_entry_point",
         "//java/dagger/hilt/android/testing:hilt_android_test",
+        "//third_party/java/truth",
+        "@maven//:androidx_activity_activity",
+        "@maven//:androidx_fragment_fragment",
+        "@maven//:androidx_lifecycle_lifecycle_common",
+        "@maven//:androidx_lifecycle_lifecycle_viewmodel",
+        "@maven//:androidx_lifecycle_lifecycle_viewmodel_savedstate",
+        "@maven//:androidx_test_core",
+        "@maven//:androidx_test_ext_junit",
+        "@maven//:junit_junit",
+        "@maven//:org_robolectric_robolectric",
     ],
 )
 
@@ -49,16 +54,14 @@ android_local_test(
         ":TestInstallInModules",
         "//:android_local_test_exports",
         "//:dagger_with_compiler",
-        "@maven//:junit_junit",
-        
-                        "@maven//:org_robolectric_robolectric",
-                        "@maven//:androidx_test_ext_junit",
-                        "@maven//:androidx_test_core",
-                        
-        "//third_party/java/truth",
         "//java/dagger/hilt/android/testing:hilt_android_test",
         "//java/dagger/hilt/android/testing:uninstall_modules",
         "//java/dagger/hilt/testing:test_install_in",
+        "//third_party/java/truth",
+        "@maven//:androidx_test_core",
+        "@maven//:androidx_test_ext_junit",
+        "@maven//:junit_junit",
+        "@maven//:org_robolectric_robolectric",
     ],
 )
 
@@ -73,13 +76,11 @@ android_local_test(
         ":TestInstallInApp",
         ":TestInstallInModules",
         "//:android_local_test_exports",
-        "@maven//:junit_junit",
-        
-                        "@maven//:org_robolectric_robolectric",
-                        "@maven//:androidx_test_ext_junit",
-                        "@maven//:androidx_test_core",
-                        
         "//third_party/java/truth",
+        "@maven//:androidx_test_core",
+        "@maven//:androidx_test_ext_junit",
+        "@maven//:junit_junit",
+        "@maven//:org_robolectric_robolectric",
     ],
 )
 
@@ -89,6 +90,7 @@ android_library(
     srcs = ["TestInstallInApp.java"],
     deps = [
         ":TestInstallInModules",
+        "//:android_local_test_exports",
         "//:dagger_with_compiler",
         "//java/dagger/hilt/android:hilt_android_app",
     ],
@@ -103,5 +105,10 @@ android_library(
         "//java/dagger/hilt:install_in",
         "//java/dagger/hilt/android/components",
         "//java/dagger/hilt/testing:test_install_in",
+        "@maven//:androidx_activity_activity",
+        "@maven//:androidx_fragment_fragment",
+        "@maven//:androidx_lifecycle_lifecycle_common",
+        "@maven//:androidx_lifecycle_lifecycle_viewmodel",
+        "@maven//:androidx_lifecycle_lifecycle_viewmodel_savedstate",
     ],
 )

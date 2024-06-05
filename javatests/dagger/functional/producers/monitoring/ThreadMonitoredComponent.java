@@ -17,7 +17,6 @@
 package dagger.functional.producers.monitoring;
 
 import com.google.common.util.concurrent.ListenableFuture;
-import dagger.functional.producers.ExecutorModule;
 import dagger.functional.producers.monitoring.ThreadQualifiers.EntryPoint;
 import dagger.producers.ProductionComponent;
 import javax.inject.Singleton;

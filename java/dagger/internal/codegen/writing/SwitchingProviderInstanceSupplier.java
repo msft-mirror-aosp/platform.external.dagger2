@@ -26,6 +26,7 @@ import dagger.assisted.AssistedInject;
 import dagger.internal.codegen.binding.Binding;
 import dagger.internal.codegen.binding.BindingGraph;
 import dagger.internal.codegen.binding.ProvisionBinding;
+import dagger.internal.codegen.writing.ComponentImplementation.ShardImplementation;
 import dagger.internal.codegen.writing.FrameworkFieldInitializer.FrameworkInstanceCreationExpression;
 import dagger.spi.model.BindingKind;
 
@@ -39,17 +40,17 @@ final class SwitchingProviderInstanceSupplier implements FrameworkInstanceSuppli
   @AssistedInject
   SwitchingProviderInstanceSupplier(
       @Assisted ProvisionBinding binding,
-      SwitchingProviders switchingProviders,
-      ExperimentalSwitchingProviders experimentalSwitchingProviders,
       BindingGraph graph,
       ComponentImplementation componentImplementation,
       UnscopedDirectInstanceRequestRepresentationFactory
           unscopedDirectInstanceRequestRepresentationFactory) {
+    ShardImplementation shardImplementation = componentImplementation.shardImplementation(binding);
     FrameworkInstanceCreationExpression frameworkInstanceCreationExpression =
         componentImplementation.compilerMode().isExperimentalMergedMode()
-            ? experimentalSwitchingProviders.newFrameworkInstanceCreationExpression(
-                binding, unscopedDirectInstanceRequestRepresentationFactory.create(binding))
-            : switchingProviders.newFrameworkInstanceCreationExpression(
+            ? shardImplementation.getExperimentalSwitchingProviders()
+                .newFrameworkInstanceCreationExpression(
+                    binding, unscopedDirectInstanceRequestRepresentationFactory.create(binding))
+            : shardImplementation.getSwitchingProviders().newFrameworkInstanceCreationExpression(
                 binding, unscopedDirectInstanceRequestRepresentationFactory.create(binding));
     this.frameworkInstanceSupplier =
         new FrameworkFieldInitializer(
@@ -72,7 +73,9 @@ final class SwitchingProviderInstanceSupplier implements FrameworkInstanceSuppli
         CodeBlock.of(
             "$T.provider($L)",
             binding.scope().isPresent()
-                ? (binding.scope().get().isReusable() ? SINGLE_CHECK : DOUBLE_CHECK)
+                ? (binding.scope().get().isReusable()
+                    ? SINGLE_CHECK
+                    : DOUBLE_CHECK)
                 : SINGLE_CHECK,
             unscoped.creationExpression());
   }

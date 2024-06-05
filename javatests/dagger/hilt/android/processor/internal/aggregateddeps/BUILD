@@ -30,13 +30,13 @@ compiler_test(
         "//java/dagger/hilt/android/internal/modules",
         "//java/dagger/hilt/testing:test_install_in",
         "//java/dagger/hilt/android/testing:hilt_android_test",
-        "@androidsdk//:platforms/android-30/android.jar",
+        "@androidsdk//:platforms/android-32/android.jar",
     ],
     deps = [
+        "//java/dagger/hilt/android/testing/compile",
         "//third_party/java/compile_testing",
         "//third_party/java/junit",
         "//third_party/java/truth",
-        "//java/dagger/hilt/android/testing/compile",
     ],
 )
 
@@ -49,13 +49,13 @@ compiler_test(
         "//java/dagger/hilt/android:early_entry_point",
         "//java/dagger/hilt/android/components",
         "//java/dagger/hilt/android/testing:hilt_android_test",
-        "@androidsdk//:platforms/android-30/android.jar",
+        "@androidsdk//:platforms/android-32/android.jar",
     ],
     deps = [
+        "//java/dagger/hilt/android/testing/compile",
         "//third_party/java/compile_testing",
         "//third_party/java/junit",
         "//third_party/java/truth",
-        "//java/dagger/hilt/android/testing/compile",
     ],
 )
 

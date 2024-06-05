@@ -17,7 +17,6 @@
 package dagger.internal.codegen.writing;
 
 import static dagger.internal.codegen.base.Util.reentrantComputeIfAbsent;
-import static dagger.internal.codegen.writing.BindingRepresentations.scope;
 import static dagger.spi.model.BindingKind.MULTIBOUND_MAP;
 import static dagger.spi.model.BindingKind.MULTIBOUND_SET;
 
@@ -27,7 +26,6 @@ import dagger.assisted.AssistedInject;
 import dagger.internal.codegen.binding.BindingRequest;
 import dagger.internal.codegen.binding.FrameworkType;
 import dagger.internal.codegen.binding.ProductionBinding;
-import dagger.internal.codegen.langmodel.DaggerTypes;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -53,7 +51,7 @@ final class ProductionBindingRepresentation implements BindingRepresentation {
           producerNodeInstanceRequestRepresentationFactory,
       UnscopedFrameworkInstanceCreationExpressionFactory
           unscopedFrameworkInstanceCreationExpressionFactory,
-      DaggerTypes types) {
+      BindingRepresentations bindingRepresentations) {
     this.binding = binding;
     this.derivedFromFrameworkInstanceRequestRepresentationFactory =
         derivedFromFrameworkInstanceRequestRepresentationFactory;
@@ -65,7 +63,7 @@ final class ProductionBindingRepresentation implements BindingRepresentation {
                 componentImplementation,
                 binding,
                 binding.scope().isPresent()
-                    ? scope(
+                    ? bindingRepresentations.scope(
                         binding, unscopedFrameworkInstanceCreationExpressionFactory.create(binding))
                     : unscopedFrameworkInstanceCreationExpressionFactory.create(binding));
     this.frameworkInstanceRequestRepresentation =

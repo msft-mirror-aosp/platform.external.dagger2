@@ -28,9 +28,10 @@ final class SomeStaticModule {
     return SomeStaticModule.class + ".contributeStringFromAStaticMethod";
   }
 
+  @SuppressWarnings("StaticModuleMethods") // Purposely non-static for tests
   @Provides
   @IntoSet
-  static String contributeStringFromAnInstanceMethod() {
+  String contributeStringFromAnInstanceMethod() {
     return SomeStaticModule.class + ".contributeStringFromAnInstanceMethod";
   }
 }

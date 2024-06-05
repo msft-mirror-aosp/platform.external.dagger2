@@ -150,7 +150,7 @@ public final class FragmentGenerator {
             AndroidClassNames.FRAGMENT_COMPONENT_MANAGER,
             COMPONENT_CONTEXT_FIELD,
             "onAttach called multiple times with different Context! "
-        + "Hilt Fragments should not be retained.")
+                + "Hilt Fragments should not be retained.")
         .addStatement("initializeComponentContext()")
         // The inject method will internally check if injected already
         .addStatement("inject()")
@@ -245,8 +245,7 @@ public final class FragmentGenerator {
             "$T inflater = super.onGetLayoutInflater(savedInstanceState)",
             AndroidClassNames.LAYOUT_INFLATER)
         .addStatement(
-            "return $T.from($T.createContextWrapper(inflater, this))",
-            AndroidClassNames.LAYOUT_INFLATER,
+            "return inflater.cloneInContext($T.createContextWrapper(inflater, this))",
             metadata.componentManager())
         .build();
   }

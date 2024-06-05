@@ -16,20 +16,15 @@
 
 package dagger.internal.codegen;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static dagger.internal.codegen.CompilerMode.DEFAULT_MODE;
-import static dagger.internal.codegen.CompilerMode.FAST_INIT_MODE;
-import static dagger.internal.codegen.Compilers.compilerWithOptions;
 import static java.util.stream.Collectors.joining;
 
-import com.google.common.collect.ImmutableCollection;
+import androidx.room.compiler.processing.util.Source;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.Compiler;
-import com.google.testing.compile.JavaFileObjects;
+import com.google.common.collect.ImmutableMap;
+import dagger.testing.compile.CompilerTests;
+import dagger.testing.golden.GoldenFileRule;
 import java.util.Arrays;
-import javax.tools.JavaFileObject;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -40,9 +35,11 @@ public class ComponentShardTest {
   private static final int BINDINGS_PER_SHARD = 2;
 
   @Parameters(name = "{0}")
-  public static ImmutableCollection<Object[]> parameters() {
+  public static ImmutableList<Object[]> parameters() {
     return CompilerMode.TEST_PARAMETERS;
   }
+
+  @Rule public GoldenFileRule goldenFileRule = new GoldenFileRule();
 
   private final CompilerMode compilerMode;
 
@@ -51,14 +48,14 @@ public class ComponentShardTest {
   }
 
   @Test
-  public void testNewShardCreated() {
+  public void testNewShardCreated() throws Exception {
     // Add all bindings.
     //
     //     1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
     //          ^--------/
     //
-    ImmutableList.Builder<JavaFileObject> javaFileObjects = ImmutableList.builder();
-    javaFileObjects
+    ImmutableList.Builder<Source> sources = ImmutableList.builder();
+    sources
         // Shard 2: Bindings (1)
         .add(createBinding("Binding1", "Binding2 binding2"))
         // Shard 1: Bindings (2, 3, 4, 5). Contains more than 2 bindings due to cycle.
@@ -71,8 +68,8 @@ public class ComponentShardTest {
         .add(createBinding("Binding7"));
 
     // Add the component with entry points for each binding and its provider.
-    javaFileObjects.add(
-        JavaFileObjects.forSourceLines(
+    sources.add(
+        CompilerTests.javaSource(
             "dagger.internal.codegen.TestComponent",
             "package dagger.internal.codegen;",
             "",
@@ -99,205 +96,139 @@ public class ComponentShardTest {
             "  Provider<Binding7> providerBinding7();",
             "}"));
 
-    Compilation compilation = compiler().compile(javaFileObjects.build());
-    assertThat(compilation).succeededWithoutWarnings();
-    assertThat(compilation)
-        .generatedSourceFile("dagger.internal.codegen.DaggerTestComponent")
-        .containsElementsIn(
-            compilerMode
-                .javaFileBuilder("dagger.internal.codegen.DaggerTestComponent")
-                .addLines(
-                    "package dagger.internal.codegen;",
-                    "",
-                    GeneratedLines.generatedAnnotations(),
-                    "final class DaggerTestComponent implements TestComponent {",
-                    "  private Shard1 shard1;",
-                    "  private Shard2 shard2;",
-                    "  private final DaggerTestComponent testComponent = this;",
-                    "  private Provider<Binding7> binding7Provider;",
-                    "  private Provider<Binding6> binding6Provider;",
-                    "",
-                    "  private DaggerTestComponent() {",
-                    "    initialize();",
-                    "    shard1 = new Shard1();",
-                    "    shard2 = new Shard2();",
-                    "  }")
-                .addLinesIn(
-                    DEFAULT_MODE,
-                    "  @SuppressWarnings(\"unchecked\")",
-                    "  private void initialize() {",
-                    "    this.binding7Provider =",
-                    "        DoubleCheck.provider(Binding7_Factory.create());",
-                    "    this.binding6Provider =",
-                    "        DoubleCheck.provider(Binding6_Factory.create(binding7Provider));",
-                    "  }")
-                .addLinesIn(
-                    FAST_INIT_MODE,
-                    "  @SuppressWarnings(\"unchecked\")",
-                    "  private void initialize() {",
-                    "    this.binding7Provider = DoubleCheck.provider(",
-                    "        new SwitchingProvider<Binding7>(testComponent, 6));",
-                    "    this.binding6Provider = DoubleCheck.provider(",
-                    "        new SwitchingProvider<Binding6>(testComponent, 5));",
-                    "  }")
-                .addLines(
-                    "  @Override",
-                    "  public Binding1 binding1() {",
-                    "    return testComponent.shard2.binding1Provider.get();",
-                    "  }",
-                    "",
-                    "  @Override",
-                    "  public Binding2 binding2() {",
-                    "    return testComponent.shard1.binding2Provider.get();",
-                    "  }",
-                    "",
-                    "  @Override",
-                    "  public Binding3 binding3() {",
-                    "    return testComponent.shard1.binding3Provider.get();",
-                    "  }",
-                    "",
-                    "  @Override",
-                    "  public Binding4 binding4() {",
-                    "    return testComponent.shard1.binding4Provider.get();",
-                    "  }",
-                    "",
-                    "  @Override",
-                    "  public Binding5 binding5() {",
-                    "    return testComponent.shard1.binding5Provider.get();",
-                    "  }",
-                    "",
-                    "  @Override",
-                    "  public Binding6 binding6() {",
-                    "    return binding6Provider.get();",
-                    "  }",
-                    "",
-                    "  @Override",
-                    "  public Binding7 binding7() {",
-                    "    return binding7Provider.get();",
-                    "  }",
-                    "",
-                    "  @Override",
-                    "  public Provider<Binding1> providerBinding1() {",
-                    "    return testComponent.shard2.binding1Provider;",
-                    "  }",
-                    "",
-                    "  @Override",
-                    "  public Provider<Binding2> providerBinding2() {",
-                    "    return testComponent.shard1.binding2Provider;",
-                    "  }",
-                    "",
-                    "  @Override",
-                    "  public Provider<Binding3> providerBinding3() {",
-                    "    return testComponent.shard1.binding3Provider;",
-                    "  }",
-                    "",
-                    "  @Override",
-                    "  public Provider<Binding4> providerBinding4() {",
-                    "    return testComponent.shard1.binding4Provider;",
-                    "  }",
-                    "",
-                    "  @Override",
-                    "  public Provider<Binding5> providerBinding5() {",
-                    "    return testComponent.shard1.binding5Provider;",
-                    "  }",
-                    "",
-                    "  @Override",
-                    "  public Provider<Binding6> providerBinding6() {",
-                    "    return binding6Provider;",
-                    "  }",
-                    "",
-                    "  @Override",
-                    "  public Provider<Binding7> providerBinding7() {",
-                    "    return binding7Provider;",
-                    "  }",
-                    "",
-                    "  private final class Shard1 {",
-                    "    private Provider<Binding5> binding5Provider;",
-                    "    private Provider<Binding2> binding2Provider;",
-                    "    private Provider<Binding4> binding4Provider;",
-                    "    private Provider<Binding3> binding3Provider;")
-                .addLinesIn(
-                    DEFAULT_MODE,
-                    "    @SuppressWarnings(\"unchecked\")",
-                    "    private void initialize() {",
-                    "      this.binding5Provider =",
-                    "          DoubleCheck.provider(",
-                    "              Binding5_Factory.create(testComponent.binding6Provider));",
-                    "      this.binding2Provider = new DelegateFactory<>();",
-                    "      this.binding4Provider =",
-                    "          DoubleCheck.provider(",
-                    "              Binding4_Factory.create(binding5Provider, binding2Provider));",
-                    "      this.binding3Provider =",
-                    "          DoubleCheck.provider(Binding3_Factory.create(binding4Provider));",
-                    "      DelegateFactory.setDelegate(",
-                    "          binding2Provider,",
-                    "          DoubleCheck.provider(Binding2_Factory.create(binding3Provider)));",
-                    "    }",
-                    "  }")
-                .addLinesIn(
-                    FAST_INIT_MODE,
-                    "    @SuppressWarnings(\"unchecked\")",
-                    "    private void initialize() {",
-                    "      this.binding5Provider = DoubleCheck.provider(",
-                    "          new SwitchingProvider<Binding5>(testComponent, 4));",
-                    "      this.binding4Provider = DoubleCheck.provider(",
-                    "          new SwitchingProvider<Binding4>(testComponent, 3));",
-                    "      this.binding3Provider = DoubleCheck.provider(",
-                    "          new SwitchingProvider<Binding3>(testComponent, 2));",
-                    "      this.binding2Provider = DoubleCheck.provider(",
-                    "          new SwitchingProvider<Binding2>(testComponent, 1));",
-                    "    }",
-                    "  }")
-                .addLines(
-                    "  private final class Shard2 {",
-                    "    private Provider<Binding1> binding1Provider;")
-                .addLinesIn(
-                    DEFAULT_MODE,
-                    "    @SuppressWarnings(\"unchecked\")",
-                    "    private void initialize() {",
-                    "      this.binding1Provider =",
-                    "          DoubleCheck.provider(",
-                    "              Binding1_Factory.create(",
-                    "                  testComponent.shard1.binding2Provider));",
-                    "    }",
-                    "  }")
-                .addLinesIn(
-                    FAST_INIT_MODE,
-                    "    @SuppressWarnings(\"unchecked\")",
-                    "    private void initialize() {",
-                    "      this.binding1Provider = DoubleCheck.provider(",
-                    "          new SwitchingProvider<Binding1>(testComponent, 0));",
-                    "    }",
-                    "  }",
-                    "",
-                    "  private static final class SwitchingProvider<T> implements Provider<T> {",
-                    "    @SuppressWarnings(\"unchecked\")",
-                    "    @Override",
-                    "    public T get() {",
-                    "      switch (id) {",
-                    "        case 0: return (T) new Binding1(",
-                    "            testComponent.shard1.binding2Provider.get());",
-                    "        case 1: return (T) new Binding2(",
-                    "            testComponent.shard1.binding3Provider.get());",
-                    "        case 2: return (T) new Binding3(",
-                    "            testComponent.shard1.binding4Provider.get());",
-                    "        case 3: return (T) new Binding4(",
-                    "            testComponent.shard1.binding5Provider.get(),",
-                    "            testComponent.shard1.binding2Provider);",
-                    "        case 4: return (T) new Binding5(",
-                    "            testComponent.binding6Provider.get());",
-                    "        case 5: return (T) new Binding6(",
-                    "            testComponent.binding7Provider.get());",
-                    "        case 6: return (T) new Binding7();",
-                    "        default: throw new AssertionError(id);",
-                    "      }",
-                    "    }",
-                    "  }")
-                .build());
+    CompilerTests.daggerCompiler(sources.build())
+        .withProcessingOptions(compilerOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(0);
+              subject.generatedSource(
+                  goldenFileRule.goldenSource("dagger/internal/codegen/DaggerTestComponent"));
+            });
   }
 
-  private static JavaFileObject createBinding(String bindingName, String... deps) {
-    return JavaFileObjects.forSourceLines(
+  @Test
+  public void testNewShardCreatedWithDependencies() throws Exception {
+    ImmutableList.Builder<Source> sources = ImmutableList.builder();
+    sources.add(
+        createBinding("Binding1"),
+        createBinding("Binding2"),
+        CompilerTests.javaSource(
+            "dagger.internal.codegen.Binding3",
+            "package dagger.internal.codegen;",
+            "",
+            "class Binding3 {}"),
+        CompilerTests.javaSource(
+            "dagger.internal.codegen.Dependency",
+            "package dagger.internal.codegen;",
+            "",
+            "interface Dependency {",
+            "  Binding3 binding3();",
+            "}"),
+        CompilerTests.javaSource(
+            "dagger.internal.codegen.TestComponent",
+            "package dagger.internal.codegen;",
+            "",
+            "import dagger.Component;",
+            "import javax.inject.Provider;",
+            "import javax.inject.Singleton;",
+            "",
+            "@Singleton",
+            "@Component(dependencies = Dependency.class)",
+            "interface TestComponent {",
+            "  Binding1 binding1();",
+            "  Binding2 binding2();",
+            "  Binding3 binding3();",
+            "  Provider<Binding1> providerBinding1();",
+            "  Provider<Binding2> providerBinding2();",
+            "  Provider<Binding3> providerBinding3();",
+            "}"));
+
+    CompilerTests.daggerCompiler(sources.build())
+        .withProcessingOptions(compilerOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(0);
+              subject.generatedSource(
+                  goldenFileRule.goldenSource("dagger/internal/codegen/DaggerTestComponent"));
+            });
+  }
+
+  @Test
+  public void testNewShardSubcomponentCreated() throws Exception {
+    ImmutableList.Builder<Source> sources = ImmutableList.builder();
+    sources.add(
+        CompilerTests.javaSource(
+            "dagger.internal.codegen.SubcomponentScope",
+            "package dagger.internal.codegen;",
+            "",
+            "import javax.inject.Scope;",
+            "",
+            "@Scope",
+            "public @interface SubcomponentScope {}"),
+        CompilerTests.javaSource(
+            "dagger.internal.codegen.Binding1",
+            "package dagger.internal.codegen;",
+            "",
+            "@SubcomponentScope",
+            "final class Binding1 {",
+            "  @javax.inject.Inject Binding1() {}",
+            "}"),
+        CompilerTests.javaSource(
+            "dagger.internal.codegen.Binding2",
+            "package dagger.internal.codegen;",
+            "",
+            "@SubcomponentScope",
+            "final class Binding2 {",
+            "  @javax.inject.Inject Binding2() {}",
+            "}"),
+        CompilerTests.javaSource(
+            "dagger.internal.codegen.Binding3",
+            "package dagger.internal.codegen;",
+            "",
+            "@SubcomponentScope",
+            "final class Binding3 {",
+            "  @javax.inject.Inject Binding3() {}",
+            "}"),
+        CompilerTests.javaSource(
+            "dagger.internal.codegen.TestComponent",
+            "package dagger.internal.codegen;",
+            "",
+            "import dagger.Component;",
+            "",
+            "@Component",
+            "interface TestComponent {",
+            "  TestSubcomponent subcomponent();",
+            "}"),
+        CompilerTests.javaSource(
+            "dagger.internal.codegen.TestSubcomponent",
+            "package dagger.internal.codegen;",
+            "",
+            "import dagger.Subcomponent;",
+            "import javax.inject.Provider;",
+            "",
+            "@SubcomponentScope",
+            "@Subcomponent",
+            "interface TestSubcomponent {",
+            "  Binding1 binding1();",
+            "  Binding2 binding2();",
+            "  Binding3 binding3();",
+            "  Provider<Binding1> providerBinding1();",
+            "  Provider<Binding2> providerBinding2();",
+            "  Provider<Binding3> providerBinding3();",
+            "}"));
+
+    CompilerTests.daggerCompiler(sources.build())
+        .withProcessingOptions(compilerOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(0);
+              subject.generatedSource(
+                  goldenFileRule.goldenSource("dagger/internal/codegen/DaggerTestComponent"));
+            });
+  }
+
+  private static Source createBinding(String bindingName, String... deps) {
+    return CompilerTests.javaSource(
         "dagger.internal.codegen." + bindingName,
         "package dagger.internal.codegen;",
         "",
@@ -312,11 +243,11 @@ public class ComponentShardTest {
         "}");
   }
 
-  private Compiler compiler() {
-    return compilerWithOptions(
-        ImmutableSet.<String>builder()
-            .add("-Adagger.keysPerComponentShard=" + BINDINGS_PER_SHARD)
-            .addAll(compilerMode.javacopts())
-            .build());
+  private ImmutableMap<String, String> compilerOptions() {
+    return ImmutableMap.<String, String>builder()
+        .putAll(compilerMode.processorOptions())
+        .put("dagger.generatedClassExtendsComponent", "DISABLED")
+        .put("dagger.keysPerComponentShard", Integer.toString(BINDINGS_PER_SHARD))
+        .buildOrThrow();
   }
 }

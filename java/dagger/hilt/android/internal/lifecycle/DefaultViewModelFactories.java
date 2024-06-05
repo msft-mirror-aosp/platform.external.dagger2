@@ -16,14 +16,11 @@
 
 package dagger.hilt.android.internal.lifecycle;
 
-import android.app.Application;
-import android.os.Bundle;
-import androidx.annotation.Nullable;
+import static dagger.hilt.internal.Preconditions.checkNotNull;
+
 import androidx.fragment.app.Fragment;
 import androidx.activity.ComponentActivity;
-import androidx.lifecycle.SavedStateViewModelFactory;
 import androidx.lifecycle.ViewModelProvider;
-import androidx.savedstate.SavedStateRegistryOwner;
 import dagger.Module;
 import dagger.hilt.EntryPoint;
 import dagger.hilt.EntryPoints;
@@ -72,16 +69,13 @@ public final class DefaultViewModelFactories {
   /** Internal factory for the Hilt ViewModel Factory. */
   public static final class InternalFactoryFactory {
 
-    private final Application application;
     private final Set<String> keySet;
     private final ViewModelComponentBuilder viewModelComponentBuilder;
 
     @Inject
     InternalFactoryFactory(
-            Application application,
         @HiltViewModelMap.KeySet Set<String> keySet,
         ViewModelComponentBuilder viewModelComponentBuilder) {
-      this.application = application;
       this.keySet = keySet;
       this.viewModelComponentBuilder = viewModelComponentBuilder;
     }
@@ -89,25 +83,17 @@ public final class DefaultViewModelFactories {
     ViewModelProvider.Factory fromActivity(
         ComponentActivity activity, ViewModelProvider.Factory delegateFactory) {
       return getHiltViewModelFactory(
-          activity,
-          activity.getIntent() != null ? activity.getIntent().getExtras() : null,
           delegateFactory);
     }
 
     ViewModelProvider.Factory fromFragment(
         Fragment fragment, ViewModelProvider.Factory delegateFactory) {
-      return getHiltViewModelFactory(fragment, fragment.getArguments(), delegateFactory);
+      return getHiltViewModelFactory(delegateFactory);
     }
 
     private ViewModelProvider.Factory getHiltViewModelFactory(
-        SavedStateRegistryOwner owner,
-        @Nullable Bundle defaultArgs,
-        @Nullable ViewModelProvider.Factory extensionDelegate) {
-      ViewModelProvider.Factory delegate = extensionDelegate == null
-          ? new SavedStateViewModelFactory(application, owner, defaultArgs)
-          : extensionDelegate;
-      return new HiltViewModelFactory(
-          owner, defaultArgs, keySet, delegate, viewModelComponentBuilder);
+        ViewModelProvider.Factory delegate) {
+      return new HiltViewModelFactory(keySet, checkNotNull(delegate), viewModelComponentBuilder);
     }
   }
 

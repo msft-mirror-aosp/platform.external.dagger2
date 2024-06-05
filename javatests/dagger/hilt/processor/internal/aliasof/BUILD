@@ -24,7 +24,7 @@ compiler_test(
     size = "small",
     srcs = ["AliasOfProcessorTest.java"],
     compiler_deps = [
-        "@androidsdk//:platforms/android-30/android.jar",
+        "@androidsdk//:platforms/android-32/android.jar",
         "//third_party/java/jsr330_inject",
         "//java/dagger/hilt/android:hilt_android_app",
         "//java/dagger/hilt/android/components",
@@ -32,9 +32,9 @@ compiler_test(
         "//java/dagger/hilt/migration:alias_of",
     ],
     deps = [
+        "//java/dagger/hilt/android/testing/compile",
         "//third_party/java/compile_testing",
         "//third_party/java/junit",
         "//third_party/java/truth",
-        "//java/dagger/hilt/android/testing/compile",
     ],
 )

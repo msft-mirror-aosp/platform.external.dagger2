@@ -16,7 +16,6 @@
 
 package dagger.internal.codegen.writing;
 
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.getLast;
 import static com.google.common.collect.Iterables.getOnlyElement;
@@ -31,6 +30,7 @@ import static javax.lang.model.element.Modifier.PRIVATE;
 import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
 
+import androidx.room.compiler.processing.XProcessingEnv;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.squareup.javapoet.ClassName;
@@ -39,19 +39,17 @@ import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 import com.squareup.javapoet.TypeVariableName;
-import dagger.internal.codegen.base.UniqueNameSet;
 import dagger.internal.codegen.binding.ContributionBinding;
 import dagger.internal.codegen.javapoet.CodeBlocks;
-import dagger.internal.codegen.langmodel.DaggerTypes;
 import dagger.internal.codegen.writing.ComponentImplementation.ShardImplementation;
 import dagger.internal.codegen.writing.FrameworkFieldInitializer.FrameworkInstanceCreationExpression;
+import dagger.internal.codegen.xprocessing.XProcessingEnvs;
 import dagger.spi.model.BindingKind;
 import dagger.spi.model.Key;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
-import javax.inject.Inject;
 
 /**
  * Keeps track of all provider expression requests for a component.
@@ -59,7 +57,6 @@ import javax.inject.Inject;
  * <p>The provider expression request will be satisfied by a single generated {@code Provider} class
  * that can provide instances for all types by switching on an id.
  */
-@PerComponentImplementation
 final class SwitchingProviders {
   /**
    * Each switch size is fixed at 100 cases each and put in its own method. This is to limit the
@@ -82,14 +79,11 @@ final class SwitchingProviders {
       new LinkedHashMap<>();
 
   private final ShardImplementation shardImplementation;
-  private final DaggerTypes types;
-  private final UniqueNameSet switchingProviderNames = new UniqueNameSet();
+  private final XProcessingEnv processingEnv;
 
-  @Inject
-  SwitchingProviders(ComponentImplementation componentImplementation, DaggerTypes types) {
-    // Currently, the SwitchingProviders types are only added to the componentShard.
-    this.shardImplementation = checkNotNull(componentImplementation).getComponentShard();
-    this.types = checkNotNull(types);
+  SwitchingProviders(ShardImplementation shardImplementation, XProcessingEnv processingEnv) {
+    this.shardImplementation = checkNotNull(shardImplementation);
+    this.processingEnv = checkNotNull(processingEnv);
   }
 
   /** Returns the framework instance creation expression for an inner switching provider class. */
@@ -107,7 +101,7 @@ final class SwitchingProviders {
 
   private SwitchingProviderBuilder getSwitchingProviderBuilder() {
     if (switchingProviderBuilders.size() % MAX_CASES_PER_CLASS == 0) {
-      String name = switchingProviderNames.getUniqueName("SwitchingProvider");
+      String name = shardImplementation.getUniqueClassName("SwitchingProvider");
       SwitchingProviderBuilder switchingProviderBuilder =
           new SwitchingProviderBuilder(shardImplementation.name().nestedClass(name));
       shardImplementation.addTypeSupplier(switchingProviderBuilder::build);
@@ -143,9 +137,11 @@ final class SwitchingProviders {
           // Add the type parameter explicitly when the binding is scoped because Java can't resolve
           // the type when wrapped. For example, the following will error:
           //   fooProvider = DoubleCheck.provider(new SwitchingProvider<>(1));
-          (binding.scope().isPresent() || binding.kind().equals(BindingKind.ASSISTED_FACTORY))
+          (binding.scope().isPresent()
+              || binding.kind().equals(BindingKind.ASSISTED_FACTORY)
+              || XProcessingEnvs.isPreJava8SourceVersion(processingEnv))
               ? CodeBlock.of(
-                  "$T", shardImplementation.accessibleType(toJavac(binding.contributedType())))
+                  "$T", shardImplementation.accessibleTypeName(binding.contributedType()))
               : "",
           shardImplementation.componentFieldsByImplementation().values().stream()
               .map(field -> CodeBlock.of("$N", field))
@@ -161,7 +157,7 @@ final class SwitchingProviders {
       CodeBlock instanceCodeBlock =
           unscopedInstanceRequestRepresentation
               .getDependencyExpression(switchingProviderType)
-              .box(types)
+              .box()
               .codeBlock();
 
       return CodeBlock.builder()
