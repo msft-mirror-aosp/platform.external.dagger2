@@ -48,14 +48,14 @@ import dagger.internal.codegen.base.OptionalType;
 import dagger.internal.codegen.base.RequestKinds;
 import dagger.internal.codegen.base.SetType;
 import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.model.DaggerAnnotation;
+import dagger.internal.codegen.model.DaggerExecutableElement;
+import dagger.internal.codegen.model.DaggerType;
+import dagger.internal.codegen.model.DaggerTypeElement;
+import dagger.internal.codegen.model.Key;
+import dagger.internal.codegen.model.RequestKind;
 import dagger.internal.codegen.xprocessing.XAnnotations;
 import dagger.multibindings.Multibinds;
-import dagger.spi.model.DaggerAnnotation;
-import dagger.spi.model.DaggerExecutableElement;
-import dagger.spi.model.DaggerType;
-import dagger.spi.model.DaggerTypeElement;
-import dagger.spi.model.Key;
-import dagger.spi.model.RequestKind;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -105,11 +105,11 @@ public final class KeyFactory {
       XMethodElement subcomponentCreatorMethod, XType declaredContainer) {
     checkArgument(isDeclared(declaredContainer));
     XMethodType resolvedMethod = subcomponentCreatorMethod.asMemberOf(declaredContainer);
-    return Key.builder(DaggerType.from(resolvedMethod.getReturnType())).build();
+    return forType(resolvedMethod.getReturnType());
   }
 
   public Key forSubcomponentCreator(XType creatorType) {
-    return Key.builder(DaggerType.from(creatorType)).build();
+    return forType(creatorType);
   }
 
   public Key forProvidesMethod(XMethodElement method, XTypeElement contributingModule) {
@@ -234,16 +234,15 @@ public final class KeyFactory {
   }
 
   public Key forInjectConstructorWithResolvedType(XType type) {
-    return Key.builder(DaggerType.from(type)).build();
+    return forType(type);
   }
 
-  // TODO(ronshapiro): Remove these conveniences which are simple wrappers around Key.Builder
   Key forType(XType type) {
     return Key.builder(DaggerType.from(type)).build();
   }
 
   public Key forMembersInjectedType(XType type) {
-    return Key.builder(DaggerType.from(type)).build();
+    return forType(type);
   }
 
   Key forQualifiedType(Optional<XAnnotation> qualifier, XType type) {
@@ -265,9 +264,7 @@ public final class KeyFactory {
   }
 
   public Key forProductionComponentMonitor() {
-    return Key.builder(
-            DaggerType.from(processingEnv.requireType(TypeNames.PRODUCTION_COMPONENT_MONITOR)))
-        .build();
+    return forType(processingEnv.requireType(TypeNames.PRODUCTION_COMPONENT_MONITOR));
   }
 
   /**

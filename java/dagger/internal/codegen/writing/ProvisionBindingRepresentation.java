@@ -16,8 +16,8 @@
 
 package dagger.internal.codegen.writing;
 
+import static dagger.internal.codegen.model.BindingKind.DELEGATE;
 import static dagger.internal.codegen.writing.DelegateRequestRepresentation.isBindsScopeStrongerThanDependencyScope;
-import static dagger.spi.model.BindingKind.DELEGATE;
 
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
@@ -25,9 +25,8 @@ import dagger.assisted.AssistedInject;
 import dagger.internal.codegen.binding.BindingGraph;
 import dagger.internal.codegen.binding.BindingRequest;
 import dagger.internal.codegen.binding.ProvisionBinding;
-import dagger.internal.codegen.compileroption.CompilerOptions;
+import dagger.internal.codegen.model.RequestKind;
 import dagger.internal.codegen.writing.ComponentImplementation.CompilerMode;
-import dagger.spi.model.RequestKind;
 
 /**
  * A binding representation that wraps code generation methods that satisfy all kinds of request for
@@ -43,34 +42,17 @@ final class ProvisionBindingRepresentation implements BindingRepresentation {
   @AssistedInject
   ProvisionBindingRepresentation(
       @Assisted ProvisionBinding binding,
-      BindingGraph graph,
-      ComponentImplementation componentImplementation,
       DirectInstanceBindingRepresentation.Factory directInstanceBindingRepresentationFactory,
       FrameworkInstanceBindingRepresentation.Factory frameworkInstanceBindingRepresentationFactory,
-      SwitchingProviderInstanceSupplier.Factory switchingProviderInstanceSupplierFactory,
-      ProviderInstanceSupplier.Factory providerInstanceSupplierFactory,
-      StaticFactoryInstanceSupplier.Factory staticFactoryInstanceSupplierFactory,
-      CompilerOptions compilerOptions) {
+      BindingGraph graph,
+      ComponentImplementation componentImplementation) {
     this.binding = binding;
     this.graph = graph;
     this.compilerMode = componentImplementation.compilerMode();
     this.directInstanceBindingRepresentation =
         directInstanceBindingRepresentationFactory.create(binding);
-    FrameworkInstanceSupplier frameworkInstanceSupplier = null;
-    switch (FrameworkInstanceKind.from(binding, compilerMode)) {
-      case SWITCHING_PROVIDER:
-      case EXPERIMENTAL_SWITCHING_PROVIDER:
-        frameworkInstanceSupplier = switchingProviderInstanceSupplierFactory.create(binding);
-        break;
-      case STATIC_FACTORY:
-        frameworkInstanceSupplier = staticFactoryInstanceSupplierFactory.create(binding);
-        break;
-      case PROVIDER_FIELD:
-        frameworkInstanceSupplier = providerInstanceSupplierFactory.create(binding);
-        break;
-    }
     this.frameworkInstanceBindingRepresentation =
-        frameworkInstanceBindingRepresentationFactory.create(binding, frameworkInstanceSupplier);
+        frameworkInstanceBindingRepresentationFactory.create(binding);
   }
 
   @Override
@@ -81,9 +63,6 @@ final class ProvisionBindingRepresentation implements BindingRepresentation {
   }
 
   private boolean usesDirectInstanceExpression(RequestKind requestKind) {
-    if (compilerMode.isExperimentalMergedMode()) {
-      return false;
-    }
     if (requestKind != RequestKind.INSTANCE && requestKind != RequestKind.FUTURE) {
       return false;
     }

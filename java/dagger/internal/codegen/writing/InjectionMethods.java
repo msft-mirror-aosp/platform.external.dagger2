@@ -18,17 +18,16 @@ package dagger.internal.codegen.writing;
 
 import static androidx.room.compiler.processing.XElementKt.isConstructor;
 import static androidx.room.compiler.processing.XElementKt.isMethod;
+import static androidx.room.compiler.processing.XElementKt.isMethodParameter;
 import static androidx.room.compiler.processing.XTypeKt.isVoid;
 import static com.google.common.base.CaseFormat.LOWER_CAMEL;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.squareup.javapoet.MethodSpec.methodBuilder;
 import static dagger.internal.codegen.binding.AssistedInjectionAnnotations.isAssistedParameter;
-import static dagger.internal.codegen.binding.ConfigurationAnnotations.getNullableType;
 import static dagger.internal.codegen.binding.SourceFiles.generatedClassNameForBinding;
 import static dagger.internal.codegen.binding.SourceFiles.memberInjectedFieldSignatureForVariable;
 import static dagger.internal.codegen.binding.SourceFiles.membersInjectorNameForType;
-import static dagger.internal.codegen.binding.SourceFiles.protectAgainstKeywords;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableMap;
 import static dagger.internal.codegen.javapoet.CodeBlocks.makeParametersCodeBlock;
@@ -71,17 +70,17 @@ import com.squareup.javapoet.TypeName;
 import dagger.internal.Preconditions;
 import dagger.internal.codegen.base.UniqueNameSet;
 import dagger.internal.codegen.binding.MembersInjectionBinding.InjectionSite;
+import dagger.internal.codegen.binding.Nullability;
 import dagger.internal.codegen.binding.ProvisionBinding;
 import dagger.internal.codegen.compileroption.CompilerOptions;
 import dagger.internal.codegen.extension.DaggerCollectors;
 import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.model.DaggerAnnotation;
+import dagger.internal.codegen.model.DependencyRequest;
 import dagger.internal.codegen.xprocessing.XAnnotations;
-import dagger.spi.model.DaggerAnnotation;
-import dagger.spi.model.DependencyRequest;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
-import javax.lang.model.SourceVersion;
 
 /** Convenience methods for creating and invoking {@link InjectionMethod}s. */
 final class InjectionMethods {
@@ -145,7 +144,7 @@ final class InjectionMethods {
     static CodeBlock invoke(
         ProvisionBinding binding,
         Function<DependencyRequest, CodeBlock> dependencyUsage,
-        Function<XVariableElement, String> uniqueAssistedParameterName,
+        Function<XExecutableParameterElement, String> uniqueAssistedParameterName,
         ClassName requestingClass,
         Optional<CodeBlock> moduleReference,
         CompilerOptions compilerOptions) {
@@ -162,7 +161,7 @@ final class InjectionMethods {
     static ImmutableList<CodeBlock> invokeArguments(
         ProvisionBinding binding,
         Function<DependencyRequest, CodeBlock> dependencyUsage,
-        Function<XVariableElement, String> uniqueAssistedParameterName) {
+        Function<XExecutableParameterElement, String> uniqueAssistedParameterName) {
       ImmutableMap<XExecutableParameterElement, DependencyRequest> dependencyRequestMap =
           binding.provisionDependencies().stream()
               .collect(
@@ -406,10 +405,10 @@ final class InjectionMethods {
     if (isVoid(method.getReturnType())) {
       return builder.addStatement("$L", invocation).build();
     } else {
-      getNullableType(method)
-          .map(XType::getTypeElement)
-          .map(XTypeElement::getClassName)
-          .ifPresent(builder::addAnnotation);
+      Nullability nullability = Nullability.of(method);
+      nullability
+          .nullableAnnotations()
+          .forEach(builder::addAnnotation);
       return builder
           .returns(method.getReturnType().getTypeName())
           .addStatement("return $L", invocation)
@@ -463,7 +462,11 @@ final class InjectionMethods {
     return parameters.stream()
         .map(
             parameter -> {
-              String name = parameterNameSet.getUniqueName(validJavaName(getSimpleName(parameter)));
+              String name =
+                  parameterNameSet.getUniqueName(
+                      isMethodParameter(parameter)
+                          ? asMethodParameter(parameter).getJvmName()
+                          : getSimpleName(parameter));
               boolean useObject = !isRawTypePubliclyAccessible(parameter.getType());
               return copyParameter(methodBuilder, parameter.getType(), name, useObject);
             })
@@ -486,20 +489,5 @@ final class InjectionMethods {
         copyParameter(methodBuilder, type, parameterNameSet.getUniqueName("instance"), useObject);
     // If we had to cast the instance add an extra parenthesis incase we're calling a method on it.
     return useObject ? CodeBlock.of("($L)", instance) : instance;
-  }
-
-  private static String validJavaName(CharSequence name) {
-    if (SourceVersion.isIdentifier(name)) {
-      return protectAgainstKeywords(name.toString());
-    }
-
-    StringBuilder newName = new StringBuilder(name.length());
-    char firstChar = name.charAt(0);
-    if (!Character.isJavaIdentifierStart(firstChar)) {
-      newName.append('_');
-    }
-
-    name.chars().forEach(c -> newName.append(Character.isJavaIdentifierPart(c) ? c : '_'));
-    return newName.toString();
   }
 }

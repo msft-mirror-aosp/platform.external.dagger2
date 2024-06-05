@@ -24,7 +24,7 @@ import static com.squareup.javapoet.TypeSpec.classBuilder;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
 import static dagger.internal.codegen.javapoet.AnnotationSpecs.Suppression.UNCHECKED;
 import static dagger.internal.codegen.javapoet.AnnotationSpecs.suppressWarnings;
-import static dagger.internal.codegen.javapoet.TypeNames.providerOf;
+import static dagger.internal.codegen.javapoet.TypeNames.daggerProviderOf;
 import static javax.lang.model.element.Modifier.FINAL;
 import static javax.lang.model.element.Modifier.PRIVATE;
 import static javax.lang.model.element.Modifier.PUBLIC;
@@ -41,11 +41,11 @@ import com.squareup.javapoet.TypeSpec;
 import com.squareup.javapoet.TypeVariableName;
 import dagger.internal.codegen.binding.ContributionBinding;
 import dagger.internal.codegen.javapoet.CodeBlocks;
+import dagger.internal.codegen.model.BindingKind;
+import dagger.internal.codegen.model.Key;
 import dagger.internal.codegen.writing.ComponentImplementation.ShardImplementation;
 import dagger.internal.codegen.writing.FrameworkFieldInitializer.FrameworkInstanceCreationExpression;
 import dagger.internal.codegen.xprocessing.XProcessingEnvs;
-import dagger.spi.model.BindingKind;
-import dagger.spi.model.Key;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -172,7 +172,7 @@ final class SwitchingProviders {
           classBuilder(switchingProviderType)
               .addModifiers(PRIVATE, FINAL, STATIC)
               .addTypeVariable(T)
-              .addSuperinterface(providerOf(T))
+              .addSuperinterface(daggerProviderOf(T))
               .addMethods(getMethods());
 
       // The SwitchingProvider constructor lists all component parameters first and switch id last.

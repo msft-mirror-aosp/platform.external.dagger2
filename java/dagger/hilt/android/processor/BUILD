@@ -36,7 +36,6 @@ gen_maven_artifact(
     artifact_target = ":artifact-lib",
     artifact_target_libs = [
         "//java/dagger/hilt/android/processor/internal:android_classnames",
-        "//java/dagger/hilt/android/processor/internal:utils",
         "//java/dagger/hilt/android/processor/internal/androidentrypoint:android_generators",
         "//java/dagger/hilt/android/processor/internal/androidentrypoint:metadata",
         "//java/dagger/hilt/android/processor/internal/androidentrypoint:processor_lib",
@@ -48,10 +47,12 @@ gen_maven_artifact(
         "//java/dagger/hilt/processor/internal:base_processor",
         "//java/dagger/hilt/processor/internal:classnames",
         "//java/dagger/hilt/processor/internal:compiler_options",
+        "//java/dagger/hilt/processor/internal:dagger_models",
         "//java/dagger/hilt/processor/internal:component_descriptor",
         "//java/dagger/hilt/processor/internal:component_names",
         "//java/dagger/hilt/processor/internal:components",
-        "//java/dagger/hilt/processor/internal:element_descriptors",
+        "//java/dagger/hilt/processor/internal:hilt_processing_env_configs",
+        "//java/dagger/hilt/processor/internal:method_signature",
         "//java/dagger/hilt/processor/internal:processor_errors",
         "//java/dagger/hilt/processor/internal:processors",
         "//java/dagger/hilt/processor/internal/aggregateddeps:component_dependencies",
@@ -60,6 +61,7 @@ gen_maven_artifact(
         "//java/dagger/hilt/processor/internal/aliasof:alias_ofs",
         "//java/dagger/hilt/processor/internal/aliasof:processor_lib",
         "//java/dagger/hilt/processor/internal/definecomponent:define_components",
+        "//java/dagger/hilt/processor/internal/definecomponent:metadatas",
         "//java/dagger/hilt/processor/internal/definecomponent:processor_lib",
         "//java/dagger/hilt/processor/internal/earlyentrypoint:aggregated_early_entry_point_metadata",
         "//java/dagger/hilt/processor/internal/earlyentrypoint:processor_lib",
@@ -77,19 +79,18 @@ gen_maven_artifact(
         "//java/dagger/hilt/processor/internal/uninstallmodules:aggregated_uninstall_modules_metadata",
     ],
     artifact_target_maven_deps = [
-        "com.google.auto:auto-common",
         "com.google.code.findbugs:jsr305",
         "com.google.dagger:dagger-compiler",
         "com.google.dagger:dagger",
         "com.google.dagger:dagger-spi",
+        "com.google.devtools.ksp:symbol-processing-api",
         "com.google.guava:failureaccess",
         "com.google.guava:guava",
         "com.squareup:javapoet",
-        "javax.annotation:javax.annotation-api",
+        "com.squareup:kotlinpoet",
         "javax.inject:javax.inject",
         "net.ltgt.gradle.incap:incap",
         "org.jetbrains.kotlin:kotlin-stdlib",
-        "org.jetbrains.kotlinx:kotlinx-metadata-jvm",
     ],
     javadoc_android_api_level = 32,
     javadoc_root_packages = [
@@ -100,10 +101,6 @@ gen_maven_artifact(
     javadoc_srcs = [
         "//java/dagger/hilt:hilt_processing_filegroup",
     ],
-    # The shaded deps are added using jarjar, but they won't be shaded until later
-    # due to: https://github.com/google/dagger/issues/2765. For the shaded rules see
-    # util/deploy-hilt.sh
-    shaded_deps = ["//third_party/java/auto:common"],
 )
 
 filegroup(

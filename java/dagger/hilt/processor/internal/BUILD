@@ -15,23 +15,37 @@
 # Description:
 #   Internal code for implementing Hilt processors.
 
+load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_jvm_library")
+
 package(default_visibility = ["//:src"])
 
 java_library(
     name = "base_processor",
     srcs = [
-        "BaseProcessor.java",
+        "BaseProcessingStep.java",
+        "JavacBaseProcessingStepProcessor.java",
+        "KspBaseProcessingStepProcessor.java",
         "ProcessorErrorHandler.java",
     ],
     deps = [
         ":compiler_options",
+        ":hilt_processing_env_configs",
         ":processor_errors",
-        ":processors",
-        "//third_party/java/auto:common",
+        "//java/dagger/internal/codegen/extension",
+        "//java/dagger/internal/codegen/xprocessing",
         "//third_party/java/auto:value",
         "//third_party/java/guava/base",
         "//third_party/java/guava/collect",
         "//third_party/java/javapoet",
+        "@maven//:com_google_devtools_ksp_symbol_processing_api",
+    ],
+)
+
+java_library(
+    name = "hilt_processing_env_configs",
+    srcs = ["HiltProcessingEnvConfigs.java"],
+    deps = [
+        "//java/dagger/internal/codegen/xprocessing",
     ],
 )
 
@@ -43,7 +57,7 @@ java_library(
         "ProcessorErrors.java",
     ],
     deps = [
-        "//third_party/java/auto:common",
+        "//java/dagger/internal/codegen/xprocessing",
         "//third_party/java/error_prone:annotations",
         "//third_party/java/guava/base",
         "//third_party/java/guava/collect",
@@ -54,7 +68,6 @@ java_library(
 java_library(
     name = "processors",
     srcs = [
-        "AnnotationValues.java",
         "Processors.java",
     ],
     deps = [
@@ -62,11 +75,26 @@ java_library(
         ":processor_errors",
         "//java/dagger/hilt/processor/internal/kotlin",
         "//java/dagger/internal/codegen/extension",
-        "//third_party/java/auto:common",
+        "//java/dagger/internal/codegen/xprocessing",
         "//third_party/java/guava/base",
         "//third_party/java/guava/collect",
         "//third_party/java/javapoet",
+        "@maven//:com_google_devtools_ksp_symbol_processing_api",
         "@maven//:org_jetbrains_kotlin_kotlin_stdlib",
+    ],
+)
+
+java_library(
+    name = "method_signature",
+    srcs = [
+        "MethodSignature.java",
+    ],
+    deps = [
+        "//java/dagger/internal/codegen/extension",
+        "//java/dagger/internal/codegen/xprocessing",
+        "//third_party/java/auto:value",
+        "//third_party/java/guava/collect",
+        "//third_party/java/javapoet",
     ],
 )
 
@@ -77,16 +105,6 @@ java_library(
     ],
     deps = [
         "//third_party/java/javapoet",
-    ],
-)
-
-java_library(
-    name = "element_descriptors",
-    srcs = [
-        "ElementDescriptors.java",
-    ],
-    deps = [
-        "//third_party/java/auto:common",
     ],
 )
 
@@ -113,6 +131,7 @@ java_library(
         ":processor_errors",
         ":processors",
         "//java/dagger/internal/codegen/extension",
+        "//java/dagger/internal/codegen/xprocessing",
         "//third_party/java/auto:common",
         "//third_party/java/guava/collect",
         "//third_party/java/javapoet",
@@ -136,13 +155,10 @@ java_library(
     ],
     deps = [
         ":classnames",
-        ":component_descriptor",
         ":processor_errors",
         ":processors",
-        "//java/dagger/hilt/processor/internal/definecomponent:define_components",
-        "//java/dagger/hilt/processor/internal/kotlin",
         "//java/dagger/internal/codegen/extension",
-        "//third_party/java/auto:common",
+        "//java/dagger/internal/codegen/xprocessing",
         "//third_party/java/guava/base",
         "//third_party/java/guava/collect",
         "//third_party/java/javapoet",
@@ -156,10 +172,29 @@ java_library(
         ":processor_errors",
         "//java/dagger/hilt/processor/internal/optionvalues",
         "//java/dagger/internal/codegen/extension",
+        "//java/dagger/internal/codegen/xprocessing",
         "//third_party/java/guava/base",
         "//third_party/java/guava/collect",
         "//third_party/java/javapoet",
     ],
+)
+
+kt_jvm_library(
+    name = "dagger_models",
+    srcs = ["DaggerModels.kt"],
+    deps = [
+        ":processors",
+        "//:spi",
+        "//third_party/java/auto:common",
+        "//third_party/java/javapoet",
+        "@maven//:com_google_devtools_ksp_symbol_processing_api",
+    ],
+)
+
+# See: https://github.com/bazelbuild/rules_kotlin/issues/324
+alias(
+    name = "libdagger_models-src.jar",
+    actual = ":dagger_models-sources.jar",
 )
 
 filegroup(

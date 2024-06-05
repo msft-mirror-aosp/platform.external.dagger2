@@ -16,30 +16,41 @@
 
 package dagger.spi.model;
 
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
-
-import androidx.room.compiler.processing.XProcessingEnv;
-import com.google.auto.value.AutoValue;
+import com.google.devtools.ksp.processing.Resolver;
+import com.google.devtools.ksp.processing.SymbolProcessorEnvironment;
+import com.google.errorprone.annotations.DoNotMock;
 import javax.annotation.processing.ProcessingEnvironment;
 
 /** Wrapper type for an element. */
-@AutoValue
+@DoNotMock("Only use real implementations created by Dagger")
 public abstract class DaggerProcessingEnv {
   /** Represents a type of backend used for compilation. */
-  public enum Backend { JAVAC, KSP }
-
-  public static DaggerProcessingEnv from(XProcessingEnv processingEnv) {
-    return new AutoValue_DaggerProcessingEnv(processingEnv);
+  public enum Backend {
+    JAVAC,
+    KSP
   }
 
-  public abstract XProcessingEnv xprocessing();
+  /**
+   * Returns the Javac representation for the processing environment.
+   *
+   * @throws IllegalStateException if the current backend isn't Javac.
+   */
+  public abstract ProcessingEnvironment javac();
+
+  /**
+   * Returns the KSP representation for the processing environment.
+   *
+   * @throws IllegalStateException if the current backend isn't KSP.
+   */
+  public abstract SymbolProcessorEnvironment ksp();
+
+  /**
+   * Returns the KSP representation for the resolver.
+   *
+   * @throws IllegalStateException if the current backend isn't KSP.
+   */
+  public abstract Resolver resolver();
 
   /** Returns the backend used in this compilation. */
-  public Backend getBackend() {
-    return Backend.valueOf(xprocessing().getBackend().name());
-  }
-
-  public ProcessingEnvironment java() {
-    return toJavac(xprocessing());
-  }
+  public abstract DaggerProcessingEnv.Backend backend();
 }

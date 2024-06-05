@@ -30,11 +30,14 @@ java_library(
     deps = [
         ":xprocessing-lib",
         "//java/dagger/internal/codegen/extension",
+        "//java/dagger/spi",
         "//third_party/java/auto:common",
         "//third_party/java/guava/base",
         "//third_party/java/guava/collect",
         "//third_party/java/javapoet",
+        "//third_party/java/jsr305_annotations",
         "//third_party/kotlin/kotlinpoet",
+        "@maven//:com_google_devtools_ksp_symbol_processing_api",
         "@maven//:org_jetbrains_kotlin_kotlin_stdlib",
     ],
 )

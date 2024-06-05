@@ -15,12 +15,7 @@
 # Description:
 #   Dagger's core APIs exposed for plugins
 
-load("@rules_java//java:defs.bzl", "java_library")
-load(
-    "//:build_defs.bzl",
-    "DOCLINT_HTML_AND_SYNTAX",
-    "DOCLINT_REFERENCES",
-)
+load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_jvm_library")
 
 package(default_visibility = [
     # The dagger/spi should be the only direct dependent on this target.
@@ -32,18 +27,19 @@ package(default_visibility = [
 
 filegroup(
     name = "model-srcs",
-    srcs = glob(["*.java"]),
+    srcs = glob([
+        "*.java",
+        "*.kt",
+    ]),
 )
 
-java_library(
+kt_jvm_library(
     name = "model",
     srcs = [":model-srcs"],
-    javacopts = DOCLINT_HTML_AND_SYNTAX + DOCLINT_REFERENCES,
+    # TODO(wanyingd): Add javacopts explicitly once kt_jvm_library supports them.
     deps = [
         "//java/dagger:core",
         "//java/dagger/internal/codegen/extension",
-        "//java/dagger/internal/codegen/xprocessing",
-        "//java/dagger/producers",
         "//third_party/java/auto:common",
         "//third_party/java/auto:value",
         "//third_party/java/error_prone:annotations",
@@ -51,8 +47,13 @@ java_library(
         "//third_party/java/guava/collect",
         "//third_party/java/guava/graph",
         "//third_party/java/javapoet",
-        "//third_party/java/jsr305_annotations",
         "//third_party/java/jsr330_inject",
         "@maven//:com_google_devtools_ksp_symbol_processing_api",
     ],
+)
+
+# See: https://github.com/bazelbuild/rules_kotlin/issues/324
+alias(
+    name = "libmodel-src.jar",
+    actual = ":model-sources.jar",
 )

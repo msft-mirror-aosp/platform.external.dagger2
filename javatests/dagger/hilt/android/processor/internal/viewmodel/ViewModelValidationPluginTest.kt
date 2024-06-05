@@ -16,23 +16,33 @@
 
 package dagger.hilt.android.processor.internal.viewmodel
 
-import com.google.testing.compile.CompilationSubject.assertThat
-import com.google.testing.compile.Compiler
-import dagger.hilt.android.testing.compile.HiltCompilerTests.compiler
+import androidx.room.compiler.processing.ExperimentalProcessingApi
+import androidx.room.compiler.processing.util.Source
+import com.google.common.collect.ImmutableList
+import dagger.hilt.android.testing.compile.HiltCompilerTests
 import dagger.internal.codegen.ComponentProcessor
+import dagger.internal.codegen.KspComponentProcessor
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 
+@ExperimentalProcessingApi
 @RunWith(JUnit4::class)
 class ViewModelValidationPluginTest {
 
-  private fun testCompiler(): Compiler = compiler(
-    ComponentProcessor.forTesting(ViewModelValidationPlugin()),
-    ViewModelProcessor()
-  )
+  private fun testCompiler(vararg sources: Source): HiltCompilerTests.HiltCompiler =
+    HiltCompilerTests.hiltCompiler(ImmutableList.copyOf(sources))
+      .withAdditionalJavacProcessors(
+        ComponentProcessor.withTestPlugins(ViewModelValidationPlugin()),
+        ViewModelProcessor()
+      )
+      .withAdditionalKspProcessors(
+        KspComponentProcessor.Provider.withTestPlugins(ViewModelValidationPlugin()),
+        KspViewModelProcessor.Provider()
+      )
 
-  private val hiltAndroidApp = """
+  private val hiltAndroidApp =
+    """
       package test;
 
       import android.app.Application;
@@ -40,11 +50,13 @@ class ViewModelValidationPluginTest {
 
       @HiltAndroidApp(Application.class)
       public class TestApplication extends Hilt_TestApplication {}
-      """.toJFO("test.TestApplication")
+      """
+      .toJFO("test.TestApplication")
 
   @Test
   fun injectViewModelIsProhibited() {
-    val hiltActivity = """
+    val hiltActivity =
+      """
       package test;
 
       import androidx.fragment.app.FragmentActivity;
@@ -55,8 +67,10 @@ class ViewModelValidationPluginTest {
       public class TestActivity extends Hilt_TestActivity {
         @Inject Foo foo;
       }
-      """.toJFO("test.TestActivity")
-    val hiltViewModel = """
+      """
+        .toJFO("test.TestActivity")
+    val hiltViewModel =
+      """
         package test;
 
         import androidx.lifecycle.ViewModel;
@@ -67,8 +81,10 @@ class ViewModelValidationPluginTest {
         class MyViewModel extends ViewModel {
             @Inject MyViewModel() { }
         }
-        """.toJFO("test.MyViewModel")
-    val foo = """
+        """
+        .toJFO("test.MyViewModel")
+    val foo =
+      """
         package test;
 
         import javax.inject.Inject;
@@ -76,21 +92,20 @@ class ViewModelValidationPluginTest {
         final class Foo {
             @Inject Foo(MyViewModel viewModel) {}
         }
-    """.toJFO("test.Foo")
+    """
+        .toJFO("test.Foo")
 
-    val compilation = testCompiler().compile(foo, hiltViewModel, hiltAndroidApp, hiltActivity)
-    assertThat(compilation).apply {
-      failed()
-      hadErrorCount(1)
-      hadErrorContainingMatch(
-        "Injection of an @HiltViewModel class is prohibited"
-      )
+    testCompiler(foo, hiltViewModel, hiltAndroidApp, hiltActivity).compile() { subject ->
+      subject.compilationDidFail()
+      subject.hasErrorCount(1)
+      subject.hasErrorContaining("Injection of an @HiltViewModel class is prohibited")
     }
   }
 
   @Test
   fun fieldInjectedViewModelIsProhibited() {
-    val hiltActivity = """
+    val hiltActivity =
+      """
       package test;
 
       import androidx.fragment.app.FragmentActivity;
@@ -101,8 +116,10 @@ class ViewModelValidationPluginTest {
       public class TestActivity extends Hilt_TestActivity {
         @Inject MyViewModel viewModel;
       }
-      """.toJFO("test.TestActivity")
-    val hiltViewModel = """
+      """
+        .toJFO("test.TestActivity")
+    val hiltViewModel =
+      """
         package test;
 
         import androidx.lifecycle.ViewModel;
@@ -113,22 +130,21 @@ class ViewModelValidationPluginTest {
         class MyViewModel extends ViewModel {
             @Inject MyViewModel() { }
         }
-        """.toJFO("test.MyViewModel")
+        """
+        .toJFO("test.MyViewModel")
 
-    val compilation = testCompiler().compile(hiltViewModel, hiltAndroidApp, hiltActivity)
-    assertThat(compilation).apply {
-      failed()
-      hadErrorCount(1)
-      hadErrorContainingMatch(
-        "Injection of an @HiltViewModel class is prohibited"
-      )
+    testCompiler(hiltViewModel, hiltAndroidApp, hiltActivity).compile() { subject ->
+      subject.compilationDidFail()
+      subject.hasErrorCount(1)
+      subject.hasErrorContaining("Injection of an @HiltViewModel class is prohibited")
     }
   }
 
   @Test
   fun injectViewModelFromViewModelComponentIsProhibited() {
     // Use an @HiltViewModel that injects a Foo to get the binding inside the ViewModelComponent
-    val hiltViewModel = """
+    val hiltViewModel =
+      """
         package test;
 
         import androidx.lifecycle.ViewModel;
@@ -139,9 +155,11 @@ class ViewModelValidationPluginTest {
         class MyViewModel extends ViewModel {
             @Inject MyViewModel(Foo foo) { }
         }
-        """.toJFO("test.MyViewModel")
+        """
+        .toJFO("test.MyViewModel")
 
-    val foo = """
+    val foo =
+      """
         package test;
 
         import javax.inject.Inject;
@@ -150,21 +168,20 @@ class ViewModelValidationPluginTest {
         final class Foo {
             @Inject Foo(Provider<MyViewModel> viewModelProvider) {}
         }
-    """.toJFO("test.Foo")
+    """
+        .toJFO("test.Foo")
 
-    val compilation = testCompiler().compile(foo, hiltViewModel, hiltAndroidApp)
-    assertThat(compilation).apply {
-      failed()
-      hadErrorCount(1)
-      hadErrorContainingMatch(
-        "Injection of an @HiltViewModel class is prohibited"
-      )
+    testCompiler(foo, hiltViewModel, hiltAndroidApp).compile() { subject ->
+      subject.compilationDidFail()
+      subject.hasErrorCount(1)
+      subject.hasErrorContaining("Injection of an @HiltViewModel class is prohibited")
     }
   }
 
   @Test
   fun injectOverriddenViewModelBindingIsAllowed() {
-    val hiltActivity = """
+    val hiltActivity =
+      """
       package test;
 
       import androidx.fragment.app.FragmentActivity;
@@ -175,8 +192,10 @@ class ViewModelValidationPluginTest {
       public class TestActivity extends Hilt_TestActivity {
         @Inject Foo foo;
       }
-      """.toJFO("test.TestActivity")
-    val hiltViewModel = """
+      """
+        .toJFO("test.TestActivity")
+    val hiltViewModel =
+      """
         package test;
 
         import androidx.lifecycle.ViewModel;
@@ -187,8 +206,10 @@ class ViewModelValidationPluginTest {
         class MyViewModel extends ViewModel {
             @Inject MyViewModel() { }
         }
-        """.toJFO("test.MyViewModel")
-    val foo = """
+        """
+        .toJFO("test.MyViewModel")
+    val foo =
+      """
         package test;
 
         import javax.inject.Inject;
@@ -196,8 +217,10 @@ class ViewModelValidationPluginTest {
         final class Foo {
             @Inject Foo(MyViewModel viewModel) {}
         }
-    """.toJFO("test.Foo")
-    val activityModule = """
+    """
+        .toJFO("test.Foo")
+    val activityModule =
+      """
         package test;
 
         import dagger.Module;
@@ -215,17 +238,19 @@ class ViewModelValidationPluginTest {
             return null;
           }
         }
-    """.toJFO("test.ActivityModule")
+    """
+        .toJFO("test.ActivityModule")
 
-    val compilation = testCompiler().compile(
-      foo, activityModule, hiltViewModel, hiltAndroidApp, hiltActivity
-    )
-    assertThat(compilation).succeeded()
+    testCompiler(foo, activityModule, hiltViewModel, hiltAndroidApp, hiltActivity).compile() {
+      subject ->
+      subject.hasErrorCount(0)
+    }
   }
 
   @Test
   fun injectQualifiedViewModelBindingIsAllowed() {
-    val hiltActivity = """
+    val hiltActivity =
+      """
       package test;
 
       import androidx.fragment.app.FragmentActivity;
@@ -236,8 +261,10 @@ class ViewModelValidationPluginTest {
       public class TestActivity extends Hilt_TestActivity {
         @Inject Foo foo;
       }
-      """.toJFO("test.TestActivity")
-    val hiltViewModel = """
+      """
+        .toJFO("test.TestActivity")
+    val hiltViewModel =
+      """
         package test;
 
         import androidx.lifecycle.ViewModel;
@@ -248,8 +275,10 @@ class ViewModelValidationPluginTest {
         class MyViewModel extends ViewModel {
             @Inject MyViewModel() { }
         }
-        """.toJFO("test.MyViewModel")
-    val foo = """
+        """
+        .toJFO("test.MyViewModel")
+    val foo =
+      """
         package test;
 
         import javax.inject.Inject;
@@ -257,8 +286,10 @@ class ViewModelValidationPluginTest {
         final class Foo {
             @Inject Foo(@ActivityModule.MyQualifier MyViewModel viewModel) {}
         }
-    """.toJFO("test.Foo")
-    val activityModule = """
+    """
+        .toJFO("test.Foo")
+    val activityModule =
+      """
         package test;
 
         import dagger.Module;
@@ -282,18 +313,20 @@ class ViewModelValidationPluginTest {
             return null;
           }
         }
-    """.toJFO("test.ActivityModule")
+    """
+        .toJFO("test.ActivityModule")
 
-    val compilation = testCompiler().compile(
-      foo, activityModule, hiltViewModel, hiltAndroidApp, hiltActivity
-    )
-    assertThat(compilation).succeeded()
+    testCompiler(foo, activityModule, hiltViewModel, hiltAndroidApp, hiltActivity).compile() {
+      subject ->
+      subject.hasErrorCount(0)
+    }
   }
 
   // Regression test for not handling array types properly
   @Test
   fun correctlyAllowsOtherBindings() {
-    val hiltActivity = """
+    val hiltActivity =
+      """
       package test;
 
       import androidx.fragment.app.FragmentActivity;
@@ -304,8 +337,10 @@ class ViewModelValidationPluginTest {
       public class TestActivity extends Hilt_TestActivity {
         @Inject Foo foo;
       }
-      """.toJFO("test.TestActivity")
-    val hiltViewModel = """
+      """
+        .toJFO("test.TestActivity")
+    val hiltViewModel =
+      """
         package test;
 
         import androidx.lifecycle.ViewModel;
@@ -316,8 +351,10 @@ class ViewModelValidationPluginTest {
         class MyViewModel extends ViewModel {
             @Inject MyViewModel() { }
         }
-        """.toJFO("test.MyViewModel")
-    val foo = """
+        """
+        .toJFO("test.MyViewModel")
+    val foo =
+      """
         package test;
 
         import javax.inject.Inject;
@@ -325,8 +362,10 @@ class ViewModelValidationPluginTest {
         final class Foo {
             @Inject Foo(Long[] longArray) {}
         }
-    """.toJFO("test.Foo")
-    val activityModule = """
+    """
+        .toJFO("test.Foo")
+    val activityModule =
+      """
         package test;
 
         import dagger.Module;
@@ -342,11 +381,12 @@ class ViewModelValidationPluginTest {
             return null;
           }
         }
-    """.toJFO("test.ActivityModule")
+    """
+        .toJFO("test.ActivityModule")
 
-    val compilation = testCompiler().compile(
-      foo, activityModule, hiltViewModel, hiltAndroidApp, hiltActivity
-    )
-    assertThat(compilation).succeeded()
+    testCompiler(foo, activityModule, hiltViewModel, hiltAndroidApp, hiltActivity).compile() {
+      subject ->
+      subject.hasErrorCount(0)
+    }
   }
 }

@@ -16,9 +16,15 @@
 
 package dagger.internal.codegen;
 
+import static com.google.common.truth.Truth.assertThat;
+
+import androidx.room.compiler.processing.XProcessingEnv;
+import androidx.room.compiler.processing.util.DiagnosticMessage;
 import androidx.room.compiler.processing.util.Source;
 import com.google.common.collect.ImmutableList;
 import dagger.testing.compile.CompilerTests;
+import java.util.List;
+import javax.tools.Diagnostic;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -343,18 +349,21 @@ public class MissingBindingValidationTest {
             subject -> {
               subject.hasErrorCount(1);
               subject.hasErrorContaining(
-                  "TestClass.A cannot be provided without an @Provides-annotated method.");
-              subject.hasErrorContaining("    TestClass.A is injected at");
-              subject.hasErrorContaining("        TestClass.B(a)");
-              subject.hasErrorContaining("    TestClass.B is injected at");
-              subject.hasErrorContaining("        TestClass.C.b");
-              subject.hasErrorContaining("    TestClass.C is injected at");
-              subject.hasErrorContaining("        TestClass.AComponent.injectC(TestClass.C)");
-              subject.hasErrorContaining("The following other entry points also depend on it:");
-              subject.hasErrorContaining("    TestClass.AComponent.getFoo()");
-              subject.hasErrorContaining("    TestClass.AComponent.cProvider()");
-              subject.hasErrorContaining("    TestClass.AComponent.lazyC()");
-              subject.hasErrorContaining("    TestClass.AComponent.lazyCProvider()")
+                  String.join(
+                      "\n",
+                      "TestClass.A cannot be provided without an @Provides-annotated method.",
+                      "",
+                      "    TestClass.A is injected at",
+                      "        [TestClass.AComponent] TestClass.B(a)",
+                      "    TestClass.B is injected at",
+                      "        [TestClass.AComponent] TestClass.C.b",
+                      "    TestClass.C is injected at",
+                      "        [TestClass.AComponent] TestClass.AComponent.injectC(TestClass.C)",
+                      "The following other entry points also depend on it:",
+                      "    TestClass.AComponent.getFoo()",
+                      "    TestClass.AComponent.cProvider()",
+                      "    TestClass.AComponent.lazyC()",
+                      "    TestClass.AComponent.lazyCProvider()"))
                   .onSource(component)
                   .onLineContaining("interface AComponent");
             });
@@ -398,14 +407,17 @@ public class MissingBindingValidationTest {
             subject -> {
               subject.hasErrorCount(1);
               subject.hasErrorContaining(
-                  "String cannot be provided without an @Inject constructor or an "
-                      + "@Provides-annotated method.");
-              subject.hasErrorContaining("    String is injected at");
-              subject.hasErrorContaining("        TestImplementation(missingBinding)");
-              subject.hasErrorContaining("    TestImplementation is injected at");
-              subject.hasErrorContaining("        TestModule.bindTestInterface(implementation)");
-              subject.hasErrorContaining("    TestInterface is requested at");
-              subject.hasErrorContaining("        TestComponent.testInterface()")
+                  String.join(
+                      "\n",
+                      "String cannot be provided without an @Inject constructor or an "
+                          + "@Provides-annotated method.",
+                      "",
+                      "    String is injected at",
+                      "        [TestComponent] TestImplementation(missingBinding)",
+                      "    TestImplementation is injected at",
+                      "        [TestComponent] TestModule.bindTestInterface(implementation)",
+                      "    TestInterface is requested at",
+                      "        [TestComponent] TestComponent.testInterface()"))
                   .onSource(component)
                   .onLineContaining("interface TestComponent");
             });
@@ -458,15 +470,18 @@ public class MissingBindingValidationTest {
             subject -> {
               subject.hasErrorCount(1);
               subject.hasErrorContaining(
-                  "List cannot be provided without an @Provides-annotated method.");
-              subject.hasErrorContaining("    List is injected at");
-              subject.hasErrorContaining("        TestClass(list)");
-              subject.hasErrorContaining("    TestClass is injected at");
-              subject.hasErrorContaining("        Generic(t)");
-              subject.hasErrorContaining("    Generic<TestClass> is injected at");
-              subject.hasErrorContaining("        UsesTest(genericTestClass)");
-              subject.hasErrorContaining("    UsesTest is requested at");
-              subject.hasErrorContaining("        TestComponent.usesTest()");
+                  String.join(
+                      "\n",
+                      "List cannot be provided without an @Provides-annotated method.",
+                      "",
+                      "    List is injected at",
+                      "        [TestComponent] TestClass(list)",
+                      "    TestClass is injected at",
+                      "        [TestComponent] Generic(t)",
+                      "    Generic<TestClass> is injected at",
+                      "        [TestComponent] UsesTest(genericTestClass)",
+                      "    UsesTest is requested at",
+                      "        [TestComponent] TestComponent.usesTest()"));
             });
   }
 
@@ -522,15 +537,18 @@ public class MissingBindingValidationTest {
             subject -> {
               subject.hasErrorCount(1);
               subject.hasErrorContaining(
-                  "List cannot be provided without an @Provides-annotated method.");
-              subject.hasErrorContaining("    List is injected at");
-              subject.hasErrorContaining("        TestClass(list)");
-              subject.hasErrorContaining("    TestClass is injected at");
-              subject.hasErrorContaining("        Generic.t");
-              subject.hasErrorContaining("    Generic<TestClass> is injected at");
-              subject.hasErrorContaining("        UsesTest(genericTestClass)");
-              subject.hasErrorContaining("    UsesTest is requested at");
-              subject.hasErrorContaining("        TestComponent.usesTest()");
+                  String.join(
+                      "\n",
+                      "List cannot be provided without an @Provides-annotated method.",
+                      "",
+                      "    List is injected at",
+                      "        [TestComponent] TestClass(list)",
+                      "    TestClass is injected at",
+                      "        [TestComponent] Generic.t",
+                      "    Generic<TestClass> is injected at",
+                      "        [TestComponent] UsesTest(genericTestClass)",
+                      "    UsesTest is requested at",
+                      "        [TestComponent] TestComponent.usesTest()"));
             });
   }
 
@@ -664,16 +682,19 @@ public class MissingBindingValidationTest {
               subject.hasErrorCount(1);
               // TODO(b/243720787): Replace with CompilationResultSubject#hasErrorContainingMatch()
               subject.hasErrorContaining(
-                  "Double cannot be provided without an @Inject constructor or an "
-                      + "@Provides-annotated method.");
-              subject.hasErrorContaining("Double is injected at");
-              subject.hasErrorContaining("    ParentModule.missingDependency(dub)");
-              subject.hasErrorContaining("Integer is injected at");
-              subject.hasErrorContaining("    ChildModule.contributesToSet(i)");
-              subject.hasErrorContaining("Set<String> is injected at");
-              subject.hasErrorContaining("    ParentModule.dependsOnSet(strings)");
-              subject.hasErrorContaining("Object is requested at");
-              subject.hasErrorContaining("    Grandchild.object() [Parent → Child → Grandchild]")
+                  String.join(
+                      "\n",
+                      "Double cannot be provided without an @Inject constructor or an "
+                          + "@Provides-annotated method.",
+                      "",
+                      "    Double is injected at",
+                      "        [Parent] ParentModule.missingDependency(dub)",
+                      "    Integer is injected at",
+                      "        [Child] ChildModule.contributesToSet(i)",
+                      "    Set<String> is injected at",
+                      "        [Child] ParentModule.dependsOnSet(strings)",
+                      "    Object is requested at",
+                      "        [Grandchild] Grandchild.object() [Parent → Child → Grandchild]"))
                   .onSource(parent)
                   .onLineContaining("interface Parent");
             });
@@ -722,16 +743,18 @@ public class MissingBindingValidationTest {
             subject -> {
               subject.hasErrorCount(1);
               subject.hasErrorContaining(
-                  "\033[1;31m[Dagger/MissingBinding]\033[0m "
-                      + "NotBound cannot be provided without an @Provides-annotated method.");
-              subject.hasErrorContaining("    NotBound is injected at");
-              subject.hasErrorContaining("        TestModule.object(notBound)");
-              subject.hasErrorContaining("    Object is requested at");
-              subject.hasErrorContaining("        TestComponent.object()");
-              subject.hasErrorContaining("It is also requested at:");
-              subject.hasErrorContaining("    TestModule.string(notBound, …)");
-              subject.hasErrorContaining("The following other entry points also depend on it:");
-              subject.hasErrorContaining("    TestComponent.string()")
+                  String.join(
+                      "\n",
+                      "NotBound cannot be provided without an @Provides-annotated method.",
+                      "",
+                      "    NotBound is injected at",
+                      "        [TestComponent] TestModule.object(notBound)",
+                      "    Object is requested at",
+                      "        [TestComponent] TestComponent.object()",
+                      "It is also requested at:",
+                      "    TestModule.string(notBound, …)",
+                      "The following other entry points also depend on it:",
+                      "    TestComponent.string()"))
                   .onSource(component)
                   .onLineContaining("interface TestComponent");
             });
@@ -782,22 +805,27 @@ public class MissingBindingValidationTest {
             subject -> {
               subject.hasErrorCount(1);
               subject.hasErrorContaining(
-                  "\033[1;31m[Dagger/MissingBinding]\033[0m String cannot be provided without an "
-                      + "@Inject constructor or an @Provides-annotated method.");
-              subject.hasErrorContaining("    String is requested at");
-              subject.hasErrorContaining("        TestComponent.string()");
-              subject.hasErrorContaining("It is also requested at:");
-              subject.hasErrorContaining("    Foo(one, …)");
-              subject.hasErrorContaining("    Foo(…, two, …)");
-              subject.hasErrorContaining("    Foo(…, three, …)");
-              subject.hasErrorContaining("    Foo(…, four, …)");
-              subject.hasErrorContaining("    Foo(…, five, …)");
-              subject.hasErrorContaining("    Foo(…, six, …)");
-              subject.hasErrorContaining("    Foo(…, seven, …)");
-              subject.hasErrorContaining("    Foo(…, eight, …)");
-              subject.hasErrorContaining("    Foo(…, nine, …)");
-              subject.hasErrorContaining("    Foo(…, ten, …)");
-              subject.hasErrorContaining("    and 3 others")
+                  String.join(
+                      "\n",
+                      "String cannot be provided without an @Inject constructor or an "
+                          + "@Provides-annotated method.",
+                      "",
+                      "    String is requested at",
+                      "        [TestComponent] TestComponent.string()",
+                      "It is also requested at:",
+                      "    Foo(one, …)",
+                      "    Foo(…, two, …)",
+                      "    Foo(…, three, …)",
+                      "    Foo(…, four, …)",
+                      "    Foo(…, five, …)",
+                      "    Foo(…, six, …)",
+                      "    Foo(…, seven, …)",
+                      "    Foo(…, eight, …)",
+                      "    Foo(…, nine, …)",
+                      "    Foo(…, ten, …)",
+                      "    and 3 others",
+                      "The following other entry points also depend on it:",
+                      "    TestComponent.foo()"))
                   .onSource(component)
                   .onLineContaining("interface TestComponent");
             });
@@ -834,22 +862,25 @@ public class MissingBindingValidationTest {
             subject -> {
               subject.hasErrorCount(1);
               subject.hasErrorContaining(
-                  "\033[1;31m[Dagger/MissingBinding]\033[0m String cannot be provided without an "
-                      + "@Inject constructor or an @Provides-annotated method.");
-              subject.hasErrorContaining("    String is requested at");
-              subject.hasErrorContaining("        TestComponent.string1()");
-              subject.hasErrorContaining("The following other entry points also depend on it:");
-              subject.hasErrorContaining("    TestComponent.string2()");
-              subject.hasErrorContaining("    TestComponent.string3()");
-              subject.hasErrorContaining("    TestComponent.string4()");
-              subject.hasErrorContaining("    TestComponent.string5()");
-              subject.hasErrorContaining("    TestComponent.string6()");
-              subject.hasErrorContaining("    TestComponent.string7()");
-              subject.hasErrorContaining("    TestComponent.string8()");
-              subject.hasErrorContaining("    TestComponent.string9()");
-              subject.hasErrorContaining("    TestComponent.string10()");
-              subject.hasErrorContaining("    TestComponent.string11()");
-              subject.hasErrorContaining("    and 1 other")
+                  String.join(
+                      "\n",
+                      "String cannot be provided without an @Inject constructor or an "
+                          + "@Provides-annotated method.",
+                      "",
+                      "    String is requested at",
+                      "        [TestComponent] TestComponent.string1()",
+                      "The following other entry points also depend on it:",
+                      "    TestComponent.string2()",
+                      "    TestComponent.string3()",
+                      "    TestComponent.string4()",
+                      "    TestComponent.string5()",
+                      "    TestComponent.string6()",
+                      "    TestComponent.string7()",
+                      "    TestComponent.string8()",
+                      "    TestComponent.string9()",
+                      "    TestComponent.string10()",
+                      "    TestComponent.string11()",
+                      "    and 1 other"))
                   .onSource(component)
                   .onLineContaining("interface TestComponent");
             });
@@ -903,16 +934,19 @@ public class MissingBindingValidationTest {
             subject -> {
               subject.hasErrorCount(1);
               subject.hasErrorContaining(
-                  "\033[1;31m[Dagger/MissingBinding]\033[0m Baz cannot be provided without an "
-                      + "@Inject constructor or an @Provides-annotated method.");
-              subject.hasErrorContaining("    Baz is injected at");
-              subject.hasErrorContaining("        Bar(baz)");
-              subject.hasErrorContaining("    Bar is requested at");
-              subject.hasErrorContaining("        Parent.bar()");
-              subject.hasErrorContaining("The following other entry points also depend on it:");
-              subject.hasErrorContaining("    Parent.foo()");
-              subject.hasErrorContaining("    Child.foo() [Parent → Child]");
-              subject.hasErrorContaining("    Child.baz() [Parent → Child]")
+                  String.join(
+                      "\n",
+                      "Baz cannot be provided without an @Inject constructor or an "
+                          + "@Provides-annotated method.",
+                      "",
+                      "    Baz is injected at",
+                      "        [Parent] Bar(baz)",
+                      "    Bar is requested at",
+                      "        [Parent] Parent.bar()",
+                      "The following other entry points also depend on it:",
+                      "    Parent.foo()",
+                      "    Child.foo() [Parent → Child]",
+                      "    Child.baz() [Parent → Child]"))
                   .onSource(parent)
                   .onLineContaining("interface Parent");
             });
@@ -1056,9 +1090,14 @@ public class MissingBindingValidationTest {
               subject.hasErrorContaining(
                   String.join(
                       "\n",
-                      "A binding for Object exists in Child2:",
-                      "Object is requested at",
-                      "[Child1] Child1.getObject() [Parent → Child1]"));
+                      "Object cannot be provided without an @Inject constructor or an "
+                          + "@Provides-annotated method.",
+                      "",
+                      "    Object is requested at",
+                      "        [Child1] Child1.getObject() [Parent → Child1]",
+                      "",
+                      "Note: Object is provided in the following other components:",
+                      "    [Child2] Child2Module.provideObject()"));
             });
   }
 
@@ -1169,10 +1208,17 @@ public class MissingBindingValidationTest {
             subject -> {
               subject.hasErrorCount(1);
               subject.hasErrorContaining(
-                  "A binding for Object exists in [Parent → Child2 → RepeatedSub]:");
-              subject.hasErrorContaining(
-                  "[Parent → Child1 → RepeatedSub] RepeatedSub.getObject() [Parent → Child1 →"
-                      + " RepeatedSub]");
+                  String.join(
+                      "\n",
+                      "Object cannot be provided without an @Inject constructor or an "
+                          + "@Provides-annotated method.",
+                      "",
+                      "    Object is requested at",
+                      "        [RepeatedSub] RepeatedSub.getObject() "
+                          + "[Parent → Child1 → RepeatedSub]",
+                      "",
+                      "Note: Object is provided in the following other components:",
+                      "    [Child2] Child2Module.provideObject(…)"));
             });
   }
 
@@ -1293,9 +1339,588 @@ public class MissingBindingValidationTest {
         .compile(
             subject -> {
               subject.hasErrorCount(1);
-              subject.hasErrorContaining("A binding for Object exists in bar.Sub:");
               subject.hasErrorContaining(
-                  "[foo.Sub] foo.Sub.getObject() [Parent → Child1 → foo.Sub]");
+                  String.join(
+                      "\n",
+                      "Object cannot be provided without an @Inject constructor or an "
+                          + "@Provides-annotated method.",
+                      "",
+                      "    Object is requested at",
+                      "        [Sub] Sub.getObject() [Parent → Child1 → Sub]",
+                      "",
+                      "Note: Object is provided in the following other components:",
+                      "    [Child2] Child2Module.provideObject(…)"));
+            });
+  }
+
+  @Test
+  public void requestWildcardTypeWithNonWildcardTypeBindingProvided_failsWithMissingBinding() {
+    Source component =
+        CompilerTests.javaSource(
+            "test.MyComponent",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "import java.util.Set;",
+            "",
+            "@Component(modules = TestModule.class)",
+            "interface MyComponent {",
+            "  Foo getFoo();",
+            "  Child getChild();",
+            "}");
+    Source child =
+        CompilerTests.javaSource(
+            "test.Child",
+            "package test;",
+            "",
+            "import dagger.Subcomponent;",
+            "",
+            "@Subcomponent(modules = ChildModule.class)",
+            "interface Child {}");
+    Source childModule =
+        CompilerTests.javaSource(
+            "test.ChildModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import java.util.Set;",
+            "import java.util.HashSet;",
+            "",
+            "@Module",
+            "interface ChildModule {",
+            "  @Provides",
+            "  static Set<? extends Bar> provideBar() {",
+            "    return new HashSet<Bar>();",
+            "  }",
+            "}");
+    Source fooSrc =
+        CompilerTests.javaSource(
+            "test.Foo",
+            "package test;",
+            "",
+            "import javax.inject.Inject;",
+            "import java.util.Set;",
+            "",
+            "class Foo {",
+            "  @Inject Foo(Set<? extends Bar> bar) {}",
+            "}");
+    Source barSrc =
+        CompilerTests.javaSource("test.Bar", "package test;", "", "public interface Bar {}");
+    Source moduleSrc =
+        CompilerTests.javaSource(
+            "test.TestModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import dagger.multibindings.ElementsIntoSet;",
+            "import java.util.Set;",
+            "import java.util.HashSet;",
+            "",
+            "@Module",
+            "public class TestModule {",
+            "   @ElementsIntoSet",
+            "   @Provides",
+            "   Set<Bar> provideBars() {",
+            "     return new HashSet<Bar>();",
+            "   }",
+            "}");
+
+    CompilerTests.daggerCompiler(component, child, childModule, fooSrc, barSrc, moduleSrc)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject
+                  .hasErrorContaining(
+                      String.join(
+                          "\n",
+                          "Set<? extends Bar> cannot be provided without an @Provides-annotated "
+                              + "method.",
+                          "",
+                          "    Set<? extends Bar> is injected at",
+                          "        [MyComponent] Foo(bar)",
+                          "    Foo is requested at",
+                          "        [MyComponent] MyComponent.getFoo()",
+                          "",
+                          "Note: Set<? extends Bar> is provided in the following other components:",
+                          "    [Child] ChildModule.provideBar()",
+                          "",
+                          "Note: A similar binding is provided in the following other components:",
+                          "    Set<Bar> is provided at:",
+                          "        [MyComponent] Dagger-generated binding for Set<Bar>"))
+                  .onSource(component)
+                  .onLineContaining("interface MyComponent");
+            });
+  }
+
+  @Test
+  public void
+      injectParameterDoesNotSuppressWildcardGeneration_conflictsWithNonWildcardTypeBinding() {
+    Source component =
+        CompilerTests.javaSource(
+            "test.MyComponent",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "import java.util.Set;",
+            "",
+            "@Component(modules = TestModule.class)",
+            "interface MyComponent {",
+            "  Foo getFoo();",
+            "}");
+    Source fooSrc =
+        CompilerTests.kotlinSource(
+            "Foo.kt",
+            "package test",
+            "",
+            "import javax.inject.Inject",
+            "",
+            "class Foo @Inject constructor(val bar: Set<Bar>) {}");
+    Source barSrc =
+        CompilerTests.javaSource("test.Bar", "package test;", "", "public interface Bar {}");
+    Source moduleSrc =
+        CompilerTests.javaSource(
+            "test.TestModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import dagger.multibindings.ElementsIntoSet;",
+            "import java.util.Set;",
+            "import java.util.HashSet;",
+            "",
+            "@Module",
+            "public class TestModule {",
+            "   @ElementsIntoSet",
+            "   @Provides",
+            "   Set<Bar> provideBars() {",
+            "     return new HashSet<Bar>();",
+            "   }",
+            "}");
+
+    CompilerTests.daggerCompiler(component, fooSrc, barSrc, moduleSrc)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject
+                  .hasErrorContaining(
+                      String.join(
+                          "\n",
+                          "Set<? extends Bar> cannot be provided without an @Provides-annotated "
+                              + "method.",
+                          "",
+                          "    Set<? extends Bar> is injected at",
+                          "        [MyComponent] Foo(bar)",
+                          "    Foo is requested at",
+                          "        [MyComponent] MyComponent.getFoo()",
+                          "",
+                          "Note: A similar binding is provided in the following other components:",
+                          "    Set<Bar> is provided at:",
+                          "        [MyComponent] Dagger-generated binding for Set<Bar>"))
+                  .onSource(component)
+                  .onLineContaining("interface MyComponent");
+            });
+  }
+
+  @Test
+  public void injectWildcardTypeWithNonWildcardTypeBindingProvided_failsWithMissingBinding() {
+    Source component =
+        CompilerTests.javaSource(
+            "test.MyComponent",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "import java.util.Set;",
+            "",
+            "@Component(modules = TestModule.class)",
+            "interface MyComponent {",
+            "  Foo getFoo();",
+            "}");
+    Source fooSrc =
+        CompilerTests.javaSource(
+            "test.Foo",
+            "package test;",
+            "",
+            "import javax.inject.Inject;",
+            "import java.util.Set;",
+            "",
+            "class Foo {",
+            "  @Inject Set<? extends Bar> bar;",
+            "  @Inject Foo() {}",
+            "}");
+    Source barSrc =
+        CompilerTests.javaSource("test.Bar", "package test;", "", "public interface Bar {}");
+    Source moduleSrc =
+        CompilerTests.javaSource(
+            "test.TestModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import dagger.multibindings.ElementsIntoSet;",
+            "import java.util.Set;",
+            "import java.util.HashSet;",
+            "",
+            "@Module",
+            "public class TestModule {",
+            "   @ElementsIntoSet",
+            "   @Provides",
+            "   Set<Bar> provideBars() {",
+            "     return new HashSet<Bar>();",
+            "   }",
+            "}");
+
+    CompilerTests.daggerCompiler(component, fooSrc, barSrc, moduleSrc)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject
+                  .hasErrorContaining(
+                      String.join(
+                          "\n",
+                          "Set<? extends Bar> cannot be provided without an @Provides-annotated "
+                              + "method.",
+                          "",
+                          "    Set<? extends Bar> is injected at",
+                          "        [MyComponent] Foo.bar",
+                          "    Foo is requested at",
+                          "        [MyComponent] MyComponent.getFoo()",
+                          "",
+                          "Note: A similar binding is provided in the following other components:",
+                          "    Set<Bar> is provided at:",
+                          "        [MyComponent] Dagger-generated binding for Set<Bar>"))
+                  .onSource(component)
+                  .onLineContaining("interface MyComponent");
+            });
+  }
+
+  @Test
+  public void requestFinalClassWithWildcardAnnotation_missingWildcardTypeBinding() {
+    Source component =
+        CompilerTests.javaSource(
+            "test.MyComponent",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "import java.util.Set;",
+            "",
+            "@Component(modules = TestModule.class)",
+            "interface MyComponent {",
+            "  Foo getFoo();",
+            "}");
+    Source fooSrc =
+        CompilerTests.kotlinSource(
+            "test.Foo.kt",
+            "package test",
+            "",
+            "import javax.inject.Inject",
+            "",
+            "class Foo @Inject constructor(val bar: List<Bar>) {}");
+    Source barSrc =
+        CompilerTests.javaSource("test.Bar", "package test;", "", "public final class Bar {}");
+    Source moduleSrc =
+        CompilerTests.kotlinSource(
+            "test.TestModule.kt",
+            "package test",
+            "",
+            "import dagger.Module",
+            "import dagger.Provides",
+            "import dagger.multibindings.ElementsIntoSet",
+            "",
+            "@Module",
+            "object TestModule {",
+            "   @Provides fun provideBars(): List<@JvmWildcard Bar> = setOf()",
+            "}");
+
+    CompilerTests.daggerCompiler(component, fooSrc, barSrc, moduleSrc)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject
+                  .hasErrorContaining(
+                      String.join(
+                          "\n",
+                          "List<Bar> cannot be provided without an @Provides-annotated method.",
+                          "",
+                          "    List<Bar> is injected at",
+                          "        [MyComponent] Foo(bar)",
+                          "    Foo is requested at",
+                          "        [MyComponent] MyComponent.getFoo()",
+                          "",
+                          "Note: A similar binding is provided in the following other components:",
+                          "    List<? extends Bar> is provided at:",
+                          "        [MyComponent] TestModule.provideBars()"))
+                  .onSource(component)
+                  .onLineContaining("interface MyComponent");
+            });
+  }
+
+  @Test
+  public void multipleTypeParameters_notSuppressWildcardType_failsWithMissingBinding() {
+    Source component =
+        CompilerTests.javaSource(
+            "test.MyComponent",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "import java.util.Set;",
+            "",
+            "@Component(modules = TestModule.class)",
+            "interface MyComponent {",
+            "  Foo getFoo();",
+            "}");
+    Source fooSrc =
+        CompilerTests.kotlinSource(
+            "test.Foo.kt",
+            "package test",
+            "",
+            "import javax.inject.Inject",
+            "",
+            "class Foo @Inject constructor(val bar: Bar<Baz, Baz, Set<Baz>>) {}");
+    Source barSrc =
+        CompilerTests.kotlinSource(
+            "test.Bar.kt", "package test", "", "class Bar<out T1, T2, T3> {}");
+
+    Source bazSrc =
+        CompilerTests.javaSource("test.Baz", "package test;", "", "public interface Baz {}");
+
+    Source moduleSrc =
+        CompilerTests.javaSource(
+            "test.TestModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import java.util.Set;",
+            "",
+            "@Module",
+            "public class TestModule {",
+            "   @Provides",
+            "   Bar<Baz, Baz, Set<Baz>> provideBar() {",
+            "     return new Bar<Baz, Baz, Set<Baz>>();",
+            "   }",
+            "}");
+
+    CompilerTests.daggerCompiler(component, fooSrc, barSrc, bazSrc, moduleSrc)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject
+                  .hasErrorContaining(
+                      String.join(
+                          "\n",
+                          // TODO(b/324325095): Align KSP and KAPT error message.
+                          CompilerTests.backend(subject) == XProcessingEnv.Backend.KSP
+                              ? "Bar<? extends Baz,Baz,Set<Baz>> cannot be provided without an "
+                                  + "@Inject constructor or an @Provides-annotated method."
+                              : "Bar<? extends Baz,Baz,Set<Baz>> cannot be provided without an "
+                                  + "@Provides-annotated method.",
+                          "",
+                          "    Bar<? extends Baz,Baz,Set<Baz>> is injected at",
+                          "        [MyComponent] Foo(bar)",
+                          "    Foo is requested at",
+                          "        [MyComponent] MyComponent.getFoo()",
+                          "",
+                          "Note: A similar binding is provided in the following other components:",
+                          "    Bar<Baz,Baz,Set<Baz>> is provided at:",
+                          "        [MyComponent] TestModule.provideBar()"))
+                  .onSource(component)
+                  .onLineContaining("interface MyComponent");
+            });
+  }
+
+  @Test
+  public void missingBindingWithoutQualifier_warnAboutSimilarTypeWithQualifierExists() {
+    Source qualifierSrc =
+        CompilerTests.javaSource(
+            "test.MyQualifier",
+            "package test;",
+            "",
+            "import javax.inject.Qualifier;",
+            "",
+            "@Qualifier",
+            "@interface MyQualifier {}");
+    Source component =
+        CompilerTests.javaSource(
+            "test.MyComponent",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "import java.util.Set;",
+            "",
+            "@Component(modules = TestModule.class)",
+            "interface MyComponent {",
+            "  Foo getFoo();",
+            "}");
+    Source fooSrc =
+        CompilerTests.kotlinSource(
+            "Foo.kt",
+            "package test",
+            "",
+            "import javax.inject.Inject",
+            "",
+            "class Foo @Inject constructor(val bar: Set<Bar>) {}");
+    Source barSrc =
+        CompilerTests.javaSource("test.Bar", "package test;", "", "public interface Bar {}");
+    Source moduleSrc =
+        CompilerTests.javaSource(
+            "test.TestModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import dagger.multibindings.ElementsIntoSet;",
+            "import java.util.Set;",
+            "import java.util.HashSet;",
+            "",
+            "@Module",
+            "public class TestModule {",
+            "   @ElementsIntoSet",
+            "   @Provides",
+            "   @MyQualifier",
+            "   Set<Bar> provideBars() {",
+            "     return new HashSet<Bar>();",
+            "   }",
+            "}");
+
+    CompilerTests.daggerCompiler(qualifierSrc, component, fooSrc, barSrc, moduleSrc)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining("MissingBinding");
+              List<DiagnosticMessage> diagnostics =
+                  subject.getCompilationResult().getDiagnostics().get(Diagnostic.Kind.ERROR);
+              assertThat(diagnostics).hasSize(1);
+              assertThat(diagnostics.get(0).getMsg())
+                  .doesNotContain("bindings with similar types exists in the graph");
+            });
+  }
+
+  @Test
+  public void missingWildcardTypeWithObjectBound_providedRawType_warnAboutSimilarTypeExists() {
+    Source component =
+        CompilerTests.javaSource(
+            "test.MyComponent",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "import java.util.Set;",
+            "",
+            "@Component(modules = TestModule.class)",
+            "interface MyComponent {",
+            "  Foo getFoo();",
+            "}");
+    Source fooSrc =
+        CompilerTests.kotlinSource(
+            "test.Foo.kt",
+            "package test",
+            "",
+            "import javax.inject.Inject",
+            "",
+            "class Foo @Inject constructor(val bar: Bar<Object>) {}");
+    Source barSrc =
+        CompilerTests.kotlinSource("test.Bar.kt", "package test", "", "class Bar<out T1> {}");
+    Source moduleSrc =
+        CompilerTests.javaSource(
+            "test.TestModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import java.util.Set;",
+            "",
+            "@Module",
+            "public class TestModule {",
+            "   @Provides",
+            "   Bar provideBar() {",
+            "     return new Bar<Object>();",
+            "   }",
+            "}");
+
+    CompilerTests.daggerCompiler(component, fooSrc, barSrc, moduleSrc)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(
+                  String.join(
+                      "\n",
+                      // TODO(b/324325095): Align KSP and KAPT error message.
+                      CompilerTests.backend(subject) == XProcessingEnv.Backend.KSP
+                          ? "Bar<?> cannot be provided without an @Inject constructor or an "
+                              + "@Provides-annotated method."
+                          : "Bar<?> cannot be provided without an @Provides-annotated method.",
+                      "",
+                      "    Bar<?> is injected at",
+                      "        [MyComponent] Foo(bar)",
+                      "    Foo is requested at",
+                      "        [MyComponent] MyComponent.getFoo()",
+                      "",
+                      "Note: A similar binding is provided in the following other components:",
+                      "    Bar is provided at:",
+                      "        [MyComponent] TestModule.provideBar()"));
+            });
+  }
+
+  @Test
+  public void missingWildcardType_providedRawType_warnAboutSimilarTypeExists() {
+    Source component =
+        CompilerTests.javaSource(
+            "test.MyComponent",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "import java.util.Set;",
+            "",
+            "@Component(modules = TestModule.class)",
+            "interface MyComponent {",
+            "  Foo getFoo();",
+            "}");
+    Source fooSrc =
+        CompilerTests.kotlinSource(
+            "test.Foo.kt",
+            "package test",
+            "",
+            "import javax.inject.Inject",
+            "",
+            "class Foo @Inject constructor(val bar: Bar<String>) {}");
+    Source barSrc =
+        CompilerTests.kotlinSource("test.Bar.kt", "package test", "", "class Bar<out T1> {}");
+    Source moduleSrc =
+        CompilerTests.javaSource(
+            "test.TestModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import java.util.Set;",
+            "",
+            "@Module",
+            "public class TestModule {",
+            "   @Provides",
+            "   Bar provideBar() {",
+            "     return new Bar<Object>();",
+            "   }",
+            "}");
+
+    CompilerTests.daggerCompiler(component, fooSrc, barSrc, moduleSrc)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining("MissingBinding");
+              List<DiagnosticMessage> diagnostics =
+                  subject.getCompilationResult().getDiagnostics().get(Diagnostic.Kind.ERROR);
+              assertThat(diagnostics).hasSize(1);
+              assertThat(diagnostics.get(0).getMsg())
+                  .doesNotContain("bindings with similar types exists in the graph");
             });
   }
 }

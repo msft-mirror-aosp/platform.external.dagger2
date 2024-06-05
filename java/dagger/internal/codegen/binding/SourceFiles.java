@@ -34,14 +34,14 @@ import static dagger.internal.codegen.javapoet.TypeNames.PROVIDER_OF_LAZY;
 import static dagger.internal.codegen.javapoet.TypeNames.SET_FACTORY;
 import static dagger.internal.codegen.javapoet.TypeNames.SET_OF_PRODUCED_PRODUCER;
 import static dagger.internal.codegen.javapoet.TypeNames.SET_PRODUCER;
+import static dagger.internal.codegen.model.BindingKind.ASSISTED_INJECTION;
+import static dagger.internal.codegen.model.BindingKind.INJECTION;
+import static dagger.internal.codegen.model.BindingKind.MULTIBOUND_MAP;
+import static dagger.internal.codegen.model.BindingKind.MULTIBOUND_SET;
 import static dagger.internal.codegen.xprocessing.XElements.asExecutable;
 import static dagger.internal.codegen.xprocessing.XElements.asTypeElement;
 import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
 import static dagger.internal.codegen.xprocessing.XTypeElements.typeVariableNames;
-import static dagger.spi.model.BindingKind.ASSISTED_INJECTION;
-import static dagger.spi.model.BindingKind.INJECTION;
-import static dagger.spi.model.BindingKind.MULTIBOUND_MAP;
-import static dagger.spi.model.BindingKind.MULTIBOUND_SET;
 import static javax.lang.model.SourceVersion.isName;
 
 import androidx.room.compiler.processing.XExecutableElement;
@@ -62,8 +62,8 @@ import com.squareup.javapoet.TypeVariableName;
 import dagger.internal.codegen.base.MapType;
 import dagger.internal.codegen.base.SetType;
 import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.spi.model.DependencyRequest;
-import dagger.spi.model.RequestKind;
+import dagger.internal.codegen.model.DependencyRequest;
+import dagger.internal.codegen.model.RequestKind;
 import javax.inject.Inject;
 import javax.lang.model.SourceVersion;
 
@@ -95,11 +95,23 @@ public final class SourceFiles {
 
     return Maps.toMap(
         binding.dependencies(),
-        dependency ->
-            FrameworkField.create(
-                frameworkTypeMapper.getFrameworkType(dependency.kind()).frameworkClassName(),
-                dependency.key().type().xprocessing().getTypeName(),
-                DependencyVariableNamer.name(dependency)));
+        dependency -> {
+          ClassName frameworkClassName =
+              frameworkTypeMapper.getFrameworkType(dependency.kind()).frameworkClassName();
+          // Remap factory fields back to javax.inject.Provider to maintain backwards compatibility
+          // for now. In a future release, we should change this to Dagger Provider. This will still
+          // be a breaking change, but keeping compatibility for a while should reduce the
+          // likelihood of breakages as it would require components built at much older versions
+          // using factories built at newer versions to break.
+          if (frameworkClassName.equals(TypeNames.DAGGER_PROVIDER)) {
+            frameworkClassName = TypeNames.PROVIDER;
+          }
+          return FrameworkField.create(
+              ParameterizedTypeName.get(
+                  frameworkClassName,
+                  dependency.key().type().xprocessing().getTypeName()),
+              DependencyVariableNamer.name(dependency));
+        });
   }
 
   public CodeBlock frameworkTypeUsageStatement(

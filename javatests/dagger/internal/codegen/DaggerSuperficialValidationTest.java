@@ -28,6 +28,7 @@ import androidx.room.compiler.processing.XTypeElement;
 import androidx.room.compiler.processing.XVariableElement;
 import androidx.room.compiler.processing.util.Source;
 import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import dagger.BindsInstance;
 import dagger.Component;
@@ -39,93 +40,108 @@ import java.util.Set;
 import javax.inject.Singleton;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class DaggerSuperficialValidationTest {
+  enum SourceKind {
+    JAVA,
+    KOTLIN
+  }
+
+  @Parameters(name = "sourceKind={0}")
+  public static ImmutableList<Object[]> parameters() {
+    return ImmutableList.of(new Object[] {SourceKind.JAVA}, new Object[] {SourceKind.KOTLIN});
+  }
+
+  private final SourceKind sourceKind;
+
+  public DaggerSuperficialValidationTest(SourceKind sourceKind) {
+    this.sourceKind = sourceKind;
+  }
+
   private static final Joiner NEW_LINES = Joiner.on("\n  ");
 
   @Test
   public void missingReturnType() {
-    Source javaFileObject =
+    runTest(
         CompilerTests.javaSource(
             "test.TestClass",
             "package test;",
             "",
-            "@javax.inject.Singleton", // TODO(b/249322175): Used to trigger processing step
             "abstract class TestClass {",
             "  abstract MissingType blah();",
-            "}");
-    CompilerTests.daggerCompiler(javaFileObject)
-        .withProcessingSteps(
-            () -> new AssertingStep() {
-              @Override
-              void runAssertions(
-                  XProcessingEnv processingEnv, DaggerSuperficialValidation superficialValidation) {
-                XTypeElement testClassElement = processingEnv.findTypeElement("test.TestClass");
-                ValidationException exception =
-                    assertThrows(
-                        ValidationException.KnownErrorType.class,
-                        () -> superficialValidation.validateElement(testClassElement));
-                // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
-                boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
-                assertThat(exception)
-                    .hasMessageThat()
-                    .contains(
-                        String.format(
-                            NEW_LINES.join(
-                                "Validation trace:",
-                                "  => element (CLASS): test.TestClass",
-                                "  => element (METHOD): blah()",
-                                "  => type (ERROR return type): %1$s"),
-                            isJavac ? "MissingType" : "error.NonExistentClass"));
-              }
-            })
-        .compile(subject -> subject.hasError());
+            "}"),
+        CompilerTests.kotlinSource(
+            "test.TestClass.kt",
+            "package test",
+            "",
+            "abstract class TestClass {",
+            "  abstract fun blah(): MissingType",
+            "}"),
+        (processingEnv, superficialValidation) -> {
+          XTypeElement testClassElement = processingEnv.findTypeElement("test.TestClass");
+          ValidationException exception =
+              assertThrows(
+                  ValidationException.KnownErrorType.class,
+                  () -> superficialValidation.validateElement(testClassElement));
+          // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
+          boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
+          assertThat(exception)
+              .hasMessageThat()
+              .contains(
+                  String.format(
+                      NEW_LINES.join(
+                          "Validation trace:",
+                          "  => element (CLASS): test.TestClass",
+                          "  => element (METHOD): blah()",
+                          "  => type (ERROR return type): %1$s"),
+                      isJavac ? "MissingType" : "error.NonExistentClass"));
+        });
   }
 
   @Test
   public void missingGenericReturnType() {
-    Source javaFileObject =
+    runTest(
         CompilerTests.javaSource(
             "test.TestClass",
             "package test;",
             "",
-            "@javax.inject.Singleton", // TODO(b/249322175): Used to trigger processing step
             "abstract class TestClass {",
             "  abstract MissingType<?> blah();",
-            "}");
-    CompilerTests.daggerCompiler(javaFileObject)
-        .withProcessingSteps(
-            () -> new AssertingStep() {
-              @Override
-              void runAssertions(
-                  XProcessingEnv processingEnv, DaggerSuperficialValidation superficialValidation) {
-                XTypeElement testClassElement = processingEnv.findTypeElement("test.TestClass");
-                ValidationException exception =
-                    assertThrows(
-                        ValidationException.KnownErrorType.class,
-                        () -> superficialValidation.validateElement(testClassElement));
-                // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
-                boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
-                assertThat(exception)
-                    .hasMessageThat()
-                    .contains(
-                        String.format(
-                            NEW_LINES.join(
-                                "Validation trace:",
-                                "  => element (CLASS): test.TestClass",
-                                "  => element (METHOD): blah()",
-                                "  => type (ERROR return type): %1$s"),
-                            isJavac ? "<any>" : "error.NonExistentClass"));
-              }
-            })
-        .compile(subject -> subject.hasError());
+            "}"),
+        CompilerTests.kotlinSource(
+            "test.TestClass.kt",
+            "package test",
+            "",
+            "abstract class TestClass {",
+            "  abstract fun blah(): MissingType<*>",
+            "}"),
+        (processingEnv, superficialValidation) -> {
+          XTypeElement testClassElement = processingEnv.findTypeElement("test.TestClass");
+          ValidationException exception =
+              assertThrows(
+                  ValidationException.KnownErrorType.class,
+                  () -> superficialValidation.validateElement(testClassElement));
+          // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
+          boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
+          assertThat(exception)
+              .hasMessageThat()
+              .contains(
+                  String.format(
+                      NEW_LINES.join(
+                          "Validation trace:",
+                          "  => element (CLASS): test.TestClass",
+                          "  => element (METHOD): blah()",
+                          "  => type (ERROR return type): %1$s"),
+                      isJavac ? "<any>" : "error.NonExistentClass"));
+        });
   }
 
   @Test
   public void missingReturnTypeTypeParameter() {
-    Source javaFileObject =
+    runTest(
         CompilerTests.javaSource(
             "test.TestClass",
             "package test;",
@@ -133,295 +149,289 @@ public class DaggerSuperficialValidationTest {
             "import java.util.Map;",
             "import java.util.Set;",
             "",
-            "@javax.inject.Singleton", // TODO(b/249322175): Used to trigger processing step
             "abstract class TestClass {",
             "  abstract Map<Set<?>, MissingType<?>> blah();",
-            "}");
-    CompilerTests.daggerCompiler(javaFileObject)
-        .withProcessingSteps(
-            () -> new AssertingStep() {
-              @Override
-              void runAssertions(
-                  XProcessingEnv processingEnv, DaggerSuperficialValidation superficialValidation) {
-                XTypeElement testClassElement = processingEnv.findTypeElement("test.TestClass");
-                ValidationException exception =
-                    assertThrows(
-                        ValidationException.KnownErrorType.class,
-                        () -> superficialValidation.validateElement(testClassElement));
-                // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
-                boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
-                assertThat(exception)
-                    .hasMessageThat()
-                    .contains(
-                        String.format(
-                            NEW_LINES.join(
-                                "Validation trace:",
-                                "  => element (CLASS): test.TestClass",
-                                "  => element (METHOD): blah()",
-                                "  => type (DECLARED return type): "
-                                    + "java.util.Map<java.util.Set<?>,%1$s>",
-                                "  => type (ERROR type argument): %1$s"),
-                            isJavac ? "<any>" : "error.NonExistentClass"));
-              }
-            })
-        .compile(subject -> subject.hasError());
+            "}"),
+        CompilerTests.kotlinSource(
+            "test.TestClass.kt",
+            "package test",
+            "",
+            "abstract class TestClass {",
+            "  abstract fun blah(): Map<Set<*>, MissingType<*>>",
+            "}"),
+        (processingEnv, superficialValidation) -> {
+          XTypeElement testClassElement = processingEnv.findTypeElement("test.TestClass");
+          ValidationException exception =
+              assertThrows(
+                  ValidationException.KnownErrorType.class,
+                  () -> superficialValidation.validateElement(testClassElement));
+          // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
+          boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
+          assertThat(exception)
+              .hasMessageThat()
+              .contains(
+                  String.format(
+                      NEW_LINES.join(
+                          "Validation trace:",
+                          "  => element (CLASS): test.TestClass",
+                          "  => element (METHOD): blah()",
+                          "  => type (DECLARED return type): "
+                              + "java.util.Map<java.util.Set<?>,%1$s>",
+                          "  => type (ERROR type argument): %1$s"),
+                      isJavac ? "<any>" : "error.NonExistentClass"));
+        });
   }
 
   @Test
   public void missingTypeParameter() {
-    Source javaFileObject =
+    runTest(
         CompilerTests.javaSource(
             "test.TestClass", //
             "package test;",
             "",
-            "@javax.inject.Singleton", // TODO(b/249322175): Used to trigger processing step
-            "class TestClass<T extends MissingType> {}");
-    CompilerTests.daggerCompiler(javaFileObject)
-        .withProcessingSteps(
-            () -> new AssertingStep() {
-              @Override
-              void runAssertions(
-                  XProcessingEnv processingEnv, DaggerSuperficialValidation superficialValidation) {
-                XTypeElement testClassElement = processingEnv.findTypeElement("test.TestClass");
-                ValidationException exception =
-                    assertThrows(
-                        ValidationException.KnownErrorType.class,
-                        () -> superficialValidation.validateElement(testClassElement));
-                // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
-                boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
-                assertThat(exception)
-                    .hasMessageThat()
-                    .contains(
-                        String.format(
-                            NEW_LINES.join(
-                                "Validation trace:",
-                                "  => element (CLASS): test.TestClass",
-                                "  => element (TYPE_PARAMETER): T",
-                                "  => type (ERROR bound type): %s"),
-                            isJavac ? "MissingType" : "error.NonExistentClass"));
-              }
-            })
-        .compile(subject -> subject.hasError());
+            "class TestClass<T extends MissingType> {}"),
+        CompilerTests.kotlinSource(
+            "test.TestClass.kt", //
+            "package test",
+            "",
+            "class TestClass<T : MissingType>"),
+        (processingEnv, superficialValidation) -> {
+          if (isKAPT(processingEnv)) {
+            // TODO(b/268536260): Figure out why XProcessing Testing infra fails when using KAPT.
+            return;
+          }
+          XTypeElement testClassElement = processingEnv.findTypeElement("test.TestClass");
+          ValidationException exception =
+              assertThrows(
+                  ValidationException.KnownErrorType.class,
+                  () -> superficialValidation.validateElement(testClassElement));
+          // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
+          boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
+          assertThat(exception)
+              .hasMessageThat()
+              .contains(
+                  String.format(
+                      NEW_LINES.join(
+                          "Validation trace:",
+                          "  => element (CLASS): test.TestClass",
+                          "  => element (TYPE_PARAMETER): T",
+                          "  => type (ERROR bound type): %s"),
+                      isJavac ? "MissingType" : "error.NonExistentClass"));
+        });
   }
 
   @Test
   public void missingParameterType() {
-    Source javaFileObject =
+    runTest(
         CompilerTests.javaSource(
             "test.TestClass",
             "package test;",
             "",
-            "@javax.inject.Singleton", // TODO(b/249322175): Used to trigger processing step
             "abstract class TestClass {",
             "  abstract void foo(MissingType param);",
-            "}");
-    CompilerTests.daggerCompiler(javaFileObject)
-        .withProcessingSteps(
-            () -> new AssertingStep() {
-              @Override
-              void runAssertions(
-                  XProcessingEnv processingEnv, DaggerSuperficialValidation superficialValidation) {
-                XTypeElement testClassElement = processingEnv.findTypeElement("test.TestClass");
-                ValidationException exception =
-                    assertThrows(
-                        ValidationException.KnownErrorType.class,
-                        () -> superficialValidation.validateElement(testClassElement));
-                // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
-                boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
-                assertThat(exception)
-                    .hasMessageThat()
-                    .contains(
-                        String.format(
-                            NEW_LINES.join(
-                                "Validation trace:",
-                                "  => element (CLASS): test.TestClass",
-                                "  => element (METHOD): foo(%1$s)",
-                                "  => element (PARAMETER): param",
-                                "  => type (ERROR parameter type): %1$s"),
-                            isJavac ? "MissingType" : "error.NonExistentClass"));
-              }
-            })
-        .compile(subject -> subject.hasError());
+            "}"),
+        CompilerTests.kotlinSource(
+            "test.TestClass.kt",
+            "package test",
+            "",
+            "abstract class TestClass {",
+            "  abstract fun foo(param: MissingType);",
+            "}"),
+        (processingEnv, superficialValidation) -> {
+          XTypeElement testClassElement = processingEnv.findTypeElement("test.TestClass");
+          ValidationException exception =
+              assertThrows(
+                  ValidationException.KnownErrorType.class,
+                  () -> superficialValidation.validateElement(testClassElement));
+          // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
+          boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
+          assertThat(exception)
+              .hasMessageThat()
+              .contains(
+                  String.format(
+                      NEW_LINES.join(
+                          "Validation trace:",
+                          "  => element (CLASS): test.TestClass",
+                          "  => element (METHOD): foo(%1$s)",
+                          "  => element (PARAMETER): param",
+                          "  => type (ERROR parameter type): %1$s"),
+                      isJavac ? "MissingType" : "error.NonExistentClass"));
+        });
   }
 
   @Test
   public void missingAnnotation() {
-    Source javaFileObject =
+    runTest(
         CompilerTests.javaSource(
             "test.TestClass", //
             "package test;",
             "",
-            "@javax.inject.Singleton", // TODO(b/249322175): Used to trigger processing step
             "@MissingAnnotation",
-            "class TestClass {}");
-    CompilerTests.daggerCompiler(javaFileObject)
-        .withProcessingSteps(
-            () -> new AssertingStep() {
-              @Override
-              void runAssertions(
-                  XProcessingEnv processingEnv, DaggerSuperficialValidation superficialValidation) {
-                XTypeElement testClassElement = processingEnv.findTypeElement("test.TestClass");
-                ValidationException exception =
-                    assertThrows(
-                        ValidationException.KnownErrorType.class,
-                        () -> superficialValidation.validateElement(testClassElement));
-                // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
-                boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
-                assertThat(exception)
-                    .hasMessageThat()
-                    .contains(
-                        String.format(
-                            NEW_LINES.join(
-                                "Validation trace:",
-                                "  => element (CLASS): test.TestClass",
-                                "  => annotation: @MissingAnnotation",
-                                "  => type (ERROR annotation type): %s"),
-                            isJavac ? "MissingAnnotation" : "error.NonExistentClass"));
-              }
-            })
-        .compile(subject -> subject.hasError());
+            "class TestClass {}"),
+        CompilerTests.kotlinSource(
+            "test.TestClass.kt", //
+            "package test",
+            "",
+            "@MissingAnnotation",
+            "class TestClass"),
+        (processingEnv, superficialValidation) -> {
+          XTypeElement testClassElement = processingEnv.findTypeElement("test.TestClass");
+          ValidationException exception =
+              assertThrows(
+                  ValidationException.KnownErrorType.class,
+                  () -> superficialValidation.validateElement(testClassElement));
+          // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
+          boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
+          assertThat(exception)
+              .hasMessageThat()
+              .contains(
+                  String.format(
+                      NEW_LINES.join(
+                          "Validation trace:",
+                          "  => element (CLASS): test.TestClass",
+                          "  => annotation type: MissingAnnotation",
+                          "  => type (ERROR annotation type): %s"),
+                      isJavac ? "MissingAnnotation" : "error.NonExistentClass"));
+        });
   }
 
   @Test
   public void handlesRecursiveTypeParams() {
-    Source javaFileObject =
+    runSuccessfulTest(
         CompilerTests.javaSource(
             "test.TestClass", //
             "package test;",
             "",
-            "@javax.inject.Singleton", // TODO(b/249322175): Used to trigger processing step
-            "class TestClass<T extends Comparable<T>> {}");
-    CompilerTests.daggerCompiler(javaFileObject)
-        .withProcessingSteps(
-            () -> new AssertingStep() {
-              @Override
-              void runAssertions(
-                  XProcessingEnv processingEnv, DaggerSuperficialValidation superficialValidation) {
-                XTypeElement testClassElement = processingEnv.findTypeElement("test.TestClass");
-                superficialValidation.validateElement(testClassElement);
-              }
-            })
-        .compile(subject -> subject.hasErrorCount(0));
+            "class TestClass<T extends Comparable<T>> {}"),
+        CompilerTests.kotlinSource(
+            "test.TestClass.kt", //
+            "package test",
+            "",
+            "class TestClass<T : Comparable<T>>"),
+        (processingEnv, superficialValidation) ->
+            superficialValidation.validateElement(processingEnv.findTypeElement("test.TestClass")));
   }
 
   @Test
   public void handlesRecursiveType() {
-    Source javaFileObject =
+    runSuccessfulTest(
         CompilerTests.javaSource(
             "test.TestClass",
             "package test;",
             "",
-            "@javax.inject.Singleton", // TODO(b/249322175): Used to trigger processing step
             "abstract class TestClass {",
             "  abstract TestClass foo(TestClass x);",
-            "}");
-    CompilerTests.daggerCompiler(javaFileObject)
-        .withProcessingSteps(
-            () -> new AssertingStep() {
-              @Override
-              void runAssertions(
-                  XProcessingEnv processingEnv, DaggerSuperficialValidation superficialValidation) {
-                XTypeElement testClassElement = processingEnv.findTypeElement("test.TestClass");
-                superficialValidation.validateElement(testClassElement);
-              }
-            })
-        .compile(subject -> subject.hasErrorCount(0));
+            "}"),
+        CompilerTests.kotlinSource(
+            "test.TestClass.kt",
+            "package test",
+            "",
+            "abstract class TestClass {",
+            "  abstract fun foo(x: TestClass): TestClass",
+            "}"),
+        (processingEnv, superficialValidation) ->
+            superficialValidation.validateElement(processingEnv.findTypeElement("test.TestClass")));
   }
 
   @Test
   public void missingWildcardBound() {
-    Source javaFileObject =
+    runTest(
         CompilerTests.javaSource(
             "test.TestClass",
             "package test;",
             "",
             "import java.util.Set;",
             "",
-            "@javax.inject.Singleton", // TODO(b/249322175): Used to trigger processing step
             "class TestClass {",
-            "  Set<? extends MissingType> extendsTest() {",
+            "  static final class Foo<T> {}",
+            "",
+            "  Foo<? extends MissingType> extendsTest() {",
             "    return null;",
             "  }",
             "",
-            "  Set<? super MissingType> superTest() {",
+            "  Foo<? super MissingType> superTest() {",
             "    return null;",
             "  }",
-            "}");
-    CompilerTests.daggerCompiler(javaFileObject)
-        .withProcessingSteps(
-            () -> new AssertingStep() {
-              @Override
-              void runAssertions(
-                  XProcessingEnv processingEnv, DaggerSuperficialValidation superficialValidation) {
-                XTypeElement testClassElement = processingEnv.findTypeElement("test.TestClass");
-                ValidationException exception =
-                    assertThrows(
-                        ValidationException.KnownErrorType.class,
-                        () -> superficialValidation.validateElement(testClassElement));
-                // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
-                boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
-                assertThat(exception)
-                    .hasMessageThat()
-                    .contains(
-                        String.format(
-                            NEW_LINES.join(
-                                "Validation trace:",
-                                "  => element (CLASS): test.TestClass",
-                                "  => element (METHOD): extendsTest()",
-                                "  => type (DECLARED return type): java.util.Set<? extends %1$s>",
-                                "  => type (WILDCARD type argument): ? extends %1$s",
-                                "  => type (ERROR extends bound type): %1$s"),
-                            isJavac ? "MissingType" : "error.NonExistentClass"));
-              }
-            })
-        .compile(subject -> subject.hasError());
+            "}"),
+        CompilerTests.kotlinSource(
+            "test.TestClass.kt",
+            "package test",
+            "",
+            "class TestClass {",
+            "  class Foo<T>",
+            "",
+            "  fun extendsTest(): Foo<out MissingType> = TODO()",
+            "",
+            "  fun superTest(): Foo<in MissingType> = TODO()",
+            "}"),
+        (processingEnv, superficialValidation) -> {
+          XTypeElement testClassElement = processingEnv.findTypeElement("test.TestClass");
+          ValidationException exception =
+              assertThrows(
+                  ValidationException.KnownErrorType.class,
+                  () -> superficialValidation.validateElement(testClassElement));
+          // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
+          boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
+          assertThat(exception)
+              .hasMessageThat()
+              .contains(
+                  String.format(
+                      NEW_LINES.join(
+                          "Validation trace:",
+                          "  => element (CLASS): test.TestClass",
+                          "  => element (METHOD): extendsTest()",
+                          "  => type (DECLARED return type): test.TestClass.Foo<? extends %1$s>",
+                          "  => type (WILDCARD type argument): ? extends %1$s",
+                          "  => type (ERROR extends bound type): %1$s"),
+                      isJavac ? "MissingType" : "error.NonExistentClass"));
+        });
   }
 
   @Test
   public void missingIntersection() {
-    Source javaFileObject =
+    runTest(
         CompilerTests.javaSource(
             "test.TestClass",
             "package test;",
             "",
-            "@javax.inject.Singleton", // TODO(b/249322175): Used to trigger processing step
-            "class TestClass<T extends Number & Missing> {}");
-    CompilerTests.daggerCompiler(javaFileObject)
-        .withProcessingSteps(
-            () -> new AssertingStep() {
-              @Override
-              void runAssertions(
-                  XProcessingEnv processingEnv, DaggerSuperficialValidation superficialValidation) {
-                XTypeElement testClassElement = processingEnv.findTypeElement("test.TestClass");
-                ValidationException exception =
-                    assertThrows(
-                        ValidationException.KnownErrorType.class,
-                        () -> superficialValidation.validateElement(testClassElement));
-                // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
-                boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
-                assertThat(exception)
-                    .hasMessageThat()
-                    .contains(
-                        String.format(
-                            NEW_LINES.join(
-                                "Validation trace:",
-                                "  => element (CLASS): test.TestClass",
-                                "  => element (TYPE_PARAMETER): T",
-                                "  => type (ERROR bound type): %s"),
-                            isJavac ? "Missing" : "error.NonExistentClass"));
-              }
-            })
-        .compile(subject -> subject.hasError());
+            "class TestClass<T extends Number & Missing> {}"),
+        CompilerTests.kotlinSource(
+            "test.TestClass.kt",
+            "package test",
+            "",
+            "class TestClass<T> where T: Number, T: Missing"),
+        (processingEnv, superficialValidation) -> {
+          if (isKAPT(processingEnv)) {
+            // TODO(b/268536260): Figure out why XProcessing Testing infra fails when using KAPT.
+            return;
+          }
+          XTypeElement testClassElement = processingEnv.findTypeElement("test.TestClass");
+          ValidationException exception =
+              assertThrows(
+                  ValidationException.KnownErrorType.class,
+                  () -> superficialValidation.validateElement(testClassElement));
+          // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
+          boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
+          assertThat(exception)
+              .hasMessageThat()
+              .contains(
+                  String.format(
+                      NEW_LINES.join(
+                          "Validation trace:",
+                          "  => element (CLASS): test.TestClass",
+                          "  => element (TYPE_PARAMETER): T",
+                          "  => type (ERROR bound type): %s"),
+                      isJavac ? "Missing" : "error.NonExistentClass"));
+        });
   }
 
   @Test
   public void invalidAnnotationValue() {
-    Source javaFileObject =
+    runTest(
         CompilerTests.javaSource(
             "test.Outer",
             "package test;",
             "",
-            "@javax.inject.Singleton", // TODO(b/249322175): Used to trigger processing step
             "final class Outer {",
             "  @interface TestAnnotation {",
             "    Class[] classes();",
@@ -429,192 +439,252 @@ public class DaggerSuperficialValidationTest {
             "",
             "  @TestAnnotation(classes = MissingType.class)",
             "  static class TestClass {}",
-            "}");
-    CompilerTests.daggerCompiler(javaFileObject)
-        .withProcessingSteps(
-            () -> new AssertingStep() {
-              @Override
-              void runAssertions(
-                  XProcessingEnv processingEnv, DaggerSuperficialValidation superficialValidation) {
-                XTypeElement testClassElement =
-                    processingEnv.findTypeElement("test.Outer.TestClass");
-                ValidationException exception =
-                    assertThrows(
-                        ValidationException.KnownErrorType.class,
-                        () -> superficialValidation.validateElement(testClassElement));
-                // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
-                boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
-                assertThat(exception)
-                    .hasMessageThat()
-                    .contains(
-                        String.format(
-                            NEW_LINES.join(
-                                "Validation trace:",
-                                "  => element (CLASS): test.Outer.TestClass",
-                                "  => annotation: @test.Outer.TestAnnotation(classes={<%1$s>})",
-                                "  => annotation value (TYPE_ARRAY): classes={<%1$s>}",
-                                "  => annotation value (TYPE): classes=<%1$s>"),
-                            isJavac ? "error" : "Error"));
-              }
-            })
-        .compile(subject -> subject.hasError());
+            "}"),
+        CompilerTests.kotlinSource(
+            "test.Outer.kt",
+            "package test",
+            "",
+            "class Outer {",
+            "  annotation class TestAnnotation(",
+            "    val classes: Array<kotlin.reflect.KClass<*>>",
+            "  )",
+            "",
+            "  @TestAnnotation(classes = [MissingType::class])",
+            "  class TestClass {}",
+            "}"),
+        (processingEnv, superficialValidation) -> {
+          XTypeElement testClassElement = processingEnv.findTypeElement("test.Outer.TestClass");
+          if (processingEnv.getBackend() == XProcessingEnv.Backend.KSP
+              && sourceKind == SourceKind.KOTLIN) {
+            // TODO(b/269364338): When using kotlin source with KSP the MissingType annotation value
+            // appears to be missing so validating this element does not cause the expected failure.
+            superficialValidation.validateElement(testClassElement);
+            return;
+          }
+          ValidationException exception =
+              assertThrows(
+                  ValidationException.KnownErrorType.class,
+                  () -> superficialValidation.validateElement(testClassElement));
+          // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
+          boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
+          assertThat(exception)
+              .hasMessageThat()
+              .contains(
+                  String.format(
+                      NEW_LINES.join(
+                          "Validation trace:",
+                          "  => element (CLASS): test.Outer.TestClass",
+                          "  => annotation type: test.Outer.TestAnnotation",
+                          "  => annotation: @test.Outer.TestAnnotation(classes={<%1$s>})",
+                          "  => annotation value (TYPE_ARRAY): classes={<%1$s>}",
+                          "  => annotation value (TYPE): classes=<%1$s>"),
+                      isJavac ? "error" : "Error"));
+        });
   }
 
   @Test
   public void invalidAnnotationValueOnParameter() {
-    Source javaFileObject =
+    runTest(
         CompilerTests.javaSource(
             "test.Outer",
             "package test;",
             "",
-            "@javax.inject.Singleton", // TODO(b/249322175): Used to trigger processing step
             "final class Outer {",
             "  @interface TestAnnotation {",
             "    Class[] classes();",
             "  }",
             "",
             "  static class TestClass {",
-            "    TestClass(@TestAnnotation(classes = Foo) String strParam) {}",
+            "    TestClass(@TestAnnotation(classes = MissingType.class) String strParam) {}",
             "  }",
-            "}");
-    CompilerTests.daggerCompiler(javaFileObject)
-        .withProcessingSteps(
-            () -> new AssertingStep() {
-              @Override
-              void runAssertions(
-                  XProcessingEnv processingEnv, DaggerSuperficialValidation superficialValidation) {
-                XTypeElement testClassElement =
-                    processingEnv.findTypeElement("test.Outer.TestClass");
-                XConstructorElement constructor = testClassElement.getConstructors().get(0);
-                XVariableElement parameter = constructor.getParameters().get(0);
-                ValidationException exception =
-                    assertThrows(
-                        ValidationException.KnownErrorType.class,
-                        () -> superficialValidation.validateElement(parameter));
-                assertThat(exception)
-                    .hasMessageThat()
-                    .contains(
-                        NEW_LINES.join(
-                            "Validation trace:",
-                            "  => element (CLASS): test.Outer.TestClass",
-                            "  => element (CONSTRUCTOR): TestClass(java.lang.String)",
-                            "  => element (PARAMETER): strParam",
-                            "  => annotation: @test.Outer.TestAnnotation(classes={<error>})",
-                            "  => annotation value (TYPE_ARRAY): classes={<error>}",
-                            "  => annotation value (TYPE): classes=<error>"));
-              }
-            })
-        .compile(subject -> subject.hasError());
+            "}"),
+        CompilerTests.kotlinSource(
+            "test.Outer.kt",
+            "package test",
+            "",
+            "class Outer {",
+            "  annotation class TestAnnotation(",
+            "    val classes: Array<kotlin.reflect.KClass<*>>",
+            "  )",
+            "",
+            "  class TestClass(",
+            "      @TestAnnotation(classes = [MissingType::class]) strParam: String",
+            "  )",
+            "}"),
+        (processingEnv, superficialValidation) -> {
+          if (sourceKind == SourceKind.KOTLIN) {
+            // TODO(b/268536260): Figure out why XProcessing Testing infra fails when using KAPT.
+            // TODO(b/269364338): When using kotlin source the MissingType annotation value appears
+            // to be missing so validating this element does not cause the expected failure.
+            return;
+          }
+          XTypeElement testClassElement = processingEnv.findTypeElement("test.Outer.TestClass");
+          XConstructorElement constructor = testClassElement.getConstructors().get(0);
+          XVariableElement parameter = constructor.getParameters().get(0);
+          ValidationException exception =
+              assertThrows(
+                  ValidationException.KnownErrorType.class,
+                  () -> superficialValidation.validateElement(parameter));
+          // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
+          boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
+          assertThat(exception)
+              .hasMessageThat()
+              .contains(
+                  String.format(
+                      NEW_LINES.join(
+                          "Validation trace:",
+                          "  => element (CLASS): test.Outer.TestClass",
+                          "  => element (CONSTRUCTOR): TestClass(java.lang.String)",
+                          "  => element (PARAMETER): strParam",
+                          "  => annotation type: test.Outer.TestAnnotation",
+                          "  => annotation: @test.Outer.TestAnnotation(classes={<%1$s>})",
+                          "  => annotation value (TYPE_ARRAY): classes={<%1$s>}",
+                          "  => annotation value (TYPE): classes=<%1$s>"),
+                      isJavac ? "error" : "Error"));
+        });
   }
 
   @Test
   public void invalidSuperclassInTypeHierarchy() {
-    Source javaFileObject =
+    runTest(
         CompilerTests.javaSource(
             "test.Outer",
             "package test;",
             "",
-            "@javax.inject.Singleton", // TODO(b/249322175): Used to trigger processing step
             "final class Outer {",
             "  Child<Long> getChild() { return null; }",
-            "",
             "  static class Child<T> extends Parent<T> {}",
-            "",
             "  static class Parent<T> extends MissingType<T> {}",
-            "}");
-
-    CompilerTests.daggerCompiler(javaFileObject)
-        .withProcessingSteps(
-            () -> new AssertingStep() {
-              @Override
-              void runAssertions(
-                  XProcessingEnv processingEnv, DaggerSuperficialValidation superficialValidation) {
-                XTypeElement outerElement = processingEnv.findTypeElement("test.Outer");
-                XMethodElement getChildMethod = outerElement.getDeclaredMethods().get(0);
-                ValidationException exception =
-                    assertThrows(
-                        ValidationException.KnownErrorType.class,
-                        () ->
-                            superficialValidation.validateTypeHierarchyOf(
-                                "return type", getChildMethod, getChildMethod.getReturnType()));
-                // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
-                boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
-                assertThat(exception)
-                    .hasMessageThat()
-                    .contains(
-                        String.format(
-                            NEW_LINES.join(
-                                "Validation trace:",
-                                "  => element (CLASS): test.Outer",
-                                "  => element (METHOD): getChild()",
-                                "  => type (DECLARED return type): "
-                                    + "test.Outer.Child<java.lang.Long>",
-                                "  => type (DECLARED supertype): test.Outer.Parent<java.lang.Long>",
-                                "  => type (ERROR supertype): %s"),
-                            isJavac ? "MissingType<T>" : "error.NonExistentClass"));
-              }
-            })
-        .compile(subject -> subject.hasError());
+            "}"),
+        CompilerTests.kotlinSource(
+            "test.Outer.kt",
+            "package test",
+            "",
+            "class Outer {",
+            "  fun getChild(): Child<Long> = TODO()",
+            "  class Child<T> : Parent<T>",
+            "  open class Parent<T> : MissingType<T>",
+            "}"),
+        (processingEnv, superficialValidation) -> {
+          XTypeElement outerElement = processingEnv.findTypeElement("test.Outer");
+          XMethodElement getChildMethod = outerElement.getDeclaredMethods().get(0);
+          ValidationException exception =
+              assertThrows(
+                  ValidationException.KnownErrorType.class,
+                  () ->
+                      superficialValidation.validateTypeHierarchyOf(
+                          "return type", getChildMethod, getChildMethod.getReturnType()));
+          // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
+          boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
+          assertThat(exception)
+              .hasMessageThat()
+              .contains(
+                  String.format(
+                      NEW_LINES.join(
+                          "Validation trace:",
+                          "  => element (CLASS): test.Outer",
+                          "  => element (METHOD): getChild()",
+                          "  => type (DECLARED return type): test.Outer.Child<java.lang.Long>",
+                          "  => type (DECLARED supertype): test.Outer.Parent<java.lang.Long>",
+                          "  => type (ERROR supertype): %s"),
+                      isJavac ? "MissingType<T>" : "error.NonExistentClass"));
+        });
   }
 
   @Test
   public void invalidSuperclassTypeParameterInTypeHierarchy() {
-    Source javaFileObject =
+    runTest(
         CompilerTests.javaSource(
             "test.Outer",
             "package test;",
             "",
-            "@javax.inject.Singleton", // TODO(b/249322175): Used to trigger processing step
             "final class Outer {",
             "  Child getChild() { return null; }",
-            "",
             "  static class Child extends Parent<MissingType> {}",
-            "",
             "  static class Parent<T> {}",
-            "}");
+            "}"),
+        CompilerTests.kotlinSource(
+            "test.Outer.kt",
+            "package test",
+            "",
+            "class Outer {",
+            "  fun getChild(): Child = TODO()",
+            "  class Child : Parent<MissingType>()",
+            "  open class Parent<T>",
+            "}"),
+        (processingEnv, superficialValidation) -> {
+          XTypeElement outerElement = processingEnv.findTypeElement("test.Outer");
+          XMethodElement getChildMethod = outerElement.getDeclaredMethods().get(0);
+          if (isKAPT(processingEnv)) {
+            // https://youtrack.jetbrains.com/issue/KT-34193/Kapt-CorrectErrorTypes-doesnt-work-for-generics
+            // There's no way to work around this bug in KAPT so validation doesn't catch this case.
+            superficialValidation.validateTypeHierarchyOf(
+                "return type", getChildMethod, getChildMethod.getReturnType());
+            return;
+          }
+          ValidationException exception =
+              assertThrows(
+                  ValidationException.KnownErrorType.class,
+                  () ->
+                      superficialValidation.validateTypeHierarchyOf(
+                          "return type", getChildMethod, getChildMethod.getReturnType()));
+          // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
+          boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
+          assertThat(exception)
+              .hasMessageThat()
+              .contains(
+                  String.format(
+                      NEW_LINES.join(
+                          "Validation trace:",
+                          "  => element (CLASS): test.Outer",
+                          "  => element (METHOD): getChild()",
+                          "  => type (DECLARED return type): test.Outer.Child",
+                          "  => type (DECLARED supertype): test.Outer.Parent<%1$s>",
+                          "  => type (ERROR type argument): %1$s"),
+                      isJavac ? "MissingType" : "error.NonExistentClass"));
+        });
+  }
 
-    CompilerTests.daggerCompiler(javaFileObject)
-        .withProcessingSteps(
-            () -> new AssertingStep() {
-              @Override
-              void runAssertions(
-                  XProcessingEnv processingEnv, DaggerSuperficialValidation superficialValidation) {
-                XTypeElement outerElement = processingEnv.findTypeElement("test.Outer");
-                XMethodElement getChildMethod = outerElement.getDeclaredMethods().get(0);
-                ValidationException exception =
-                    assertThrows(
-                        ValidationException.KnownErrorType.class,
-                        () ->
-                            superficialValidation.validateTypeHierarchyOf(
-                                "return type", getChildMethod, getChildMethod.getReturnType()));
-                // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
-                boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
-                assertThat(exception)
-                    .hasMessageThat()
-                    .contains(
-                        String.format(
-                            NEW_LINES.join(
-                                "Validation trace:",
-                                "  => element (CLASS): test.Outer",
-                                "  => element (METHOD): getChild()",
-                                "  => type (DECLARED return type): test.Outer.Child",
-                                "  => type (DECLARED supertype): test.Outer.Parent<%1$s>",
-                                "  => type (ERROR type argument): %1$s"),
-                            isJavac ? "MissingType" : "error.NonExistentClass"));
-              }
-            })
+  private void runTest(
+      Source.JavaSource javaSource,
+      Source.KotlinSource kotlinSource,
+      AssertionHandler assertionHandler) {
+    CompilerTests.daggerCompiler(sourceKind == SourceKind.JAVA ? javaSource : kotlinSource)
+        .withProcessingSteps(() -> new AssertingStep(assertionHandler))
+        // We're expecting compiler errors that we assert on in the assertionHandler.
         .compile(subject -> subject.hasError());
   }
 
-  private abstract static class AssertingStep implements XProcessingStep {
+  private void runSuccessfulTest(
+      Source.JavaSource javaSource,
+      Source.KotlinSource kotlinSource,
+      AssertionHandler assertionHandler) {
+    CompilerTests.daggerCompiler(sourceKind == SourceKind.JAVA ? javaSource : kotlinSource)
+        .withProcessingSteps(() -> new AssertingStep(assertionHandler))
+        .compile(subject -> subject.hasErrorCount(0));
+  }
+
+  private boolean isKAPT(XProcessingEnv processingEnv) {
+    return processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC
+        && sourceKind == SourceKind.KOTLIN;
+  }
+
+  private interface AssertionHandler {
+    void runAssertions(
+        XProcessingEnv processingEnv, DaggerSuperficialValidation superficialValidation);
+  }
+
+  private static final class AssertingStep implements XProcessingStep {
+    private final AssertionHandler assertionHandler;
     private boolean processed = false;
+
+    AssertingStep(AssertionHandler assertionHandler) {
+      this.assertionHandler = assertionHandler;
+    }
 
     @Override
     public final ImmutableSet<String> annotations() {
-      // TODO(b/249322175): Replace this with "*" after this bug is fixed.
-      // For now, we just trigger off of annotations in the other sources in the test, but ideally
-      // this should support "*" similar to javac's Processor.
-      return ImmutableSet.of("javax.inject.Singleton");
+      return ImmutableSet.of("*");
     }
 
     @Override
@@ -624,11 +694,7 @@ public class DaggerSuperficialValidationTest {
         processed = true; // only process once.
         TestComponent component =
             DaggerDaggerSuperficialValidationTest_TestComponent.factory().create(env);
-        try {
-          runAssertions(env, component.superficialValidation());
-        } catch (Exception e) {
-          throw new RuntimeException(e);
-        }
+        assertionHandler.runAssertions(env, component.superficialValidation());
       }
       return ImmutableSet.of();
     }
@@ -636,10 +702,6 @@ public class DaggerSuperficialValidationTest {
     @Override
     public void processOver(
         XProcessingEnv env, Map<String, ? extends Set<? extends XElement>> elementsByAnnotation) {}
-
-    abstract void runAssertions(
-        XProcessingEnv processingEnv, DaggerSuperficialValidation superficialValidation)
-        throws Exception;
   }
 
   @Singleton

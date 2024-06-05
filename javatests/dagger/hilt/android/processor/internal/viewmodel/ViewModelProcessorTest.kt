@@ -16,20 +16,23 @@
 
 package dagger.hilt.android.processor.internal.viewmodel
 
-import com.google.testing.compile.CompilationSubject.assertThat
-import com.google.testing.compile.Compiler
+import androidx.room.compiler.processing.ExperimentalProcessingApi
+import androidx.room.compiler.processing.util.Source
+import com.google.common.collect.ImmutableMap
+import dagger.hilt.android.testing.compile.HiltCompilerTests
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 
+@OptIn(ExperimentalProcessingApi::class)
 @RunWith(JUnit4::class)
 class ViewModelProcessorTest {
-
-  private fun compiler(): Compiler = Compiler.javac().withProcessors(ViewModelProcessor())
-
   @Test
   fun validViewModel() {
-    val myViewModel = """
+    val myViewModel =
+      Source.java(
+        "dagger.hilt.android.test.MyViewModel",
+        """
         package dagger.hilt.android.test;
 
         import androidx.lifecycle.ViewModel;
@@ -40,15 +43,21 @@ class ViewModelProcessorTest {
         class MyViewModel extends ViewModel {
             @Inject MyViewModel() { }
         }
-        """.toJFO("dagger.hilt.android.test.MyViewModel")
-
-    val compilation = compiler().compile(myViewModel)
-    assertThat(compilation).succeeded()
+        """
+          .trimIndent()
+      )
+    HiltCompilerTests.hiltCompiler(myViewModel)
+      .withAdditionalJavacProcessors(ViewModelProcessor())
+      .withAdditionalKspProcessors(KspViewModelProcessor.Provider())
+      .compile { subject -> subject.hasErrorCount(0) }
   }
 
   @Test
   fun verifyEnclosingElementExtendsViewModel() {
-    val myViewModel = """
+    val myViewModel =
+      Source.java(
+        "dagger.hilt.android.test.MyViewModel",
+        """
         package dagger.hilt.android.test;
 
         import dagger.hilt.android.lifecycle.HiltViewModel;
@@ -59,21 +68,64 @@ class ViewModelProcessorTest {
             @Inject
             MyViewModel() { }
         }
-        """.toJFO("dagger.hilt.android.test.MyViewModel")
-
-    val compilation = compiler().compile(myViewModel)
-    assertThat(compilation).apply {
-      failed()
-      hadErrorCount(1)
-      hadErrorContainingMatch(
-        "@HiltViewModel is only supported on types that subclass androidx.lifecycle.ViewModel."
+        """
+          .trimIndent()
       )
-    }
+
+    HiltCompilerTests.hiltCompiler(myViewModel)
+      .withAdditionalJavacProcessors(ViewModelProcessor())
+      .withAdditionalKspProcessors(KspViewModelProcessor.Provider())
+      .compile { subject ->
+        subject.compilationDidFail()
+        subject.hasErrorCount(1)
+        subject.hasErrorContainingMatch(
+          "@HiltViewModel is only supported on types that subclass androidx.lifecycle.ViewModel."
+        )
+      }
+  }
+
+  @Test
+  fun verifyNoAssistedInjectViewModels() {
+    val myViewModel =
+      Source.java(
+        "dagger.hilt.android.test.MyViewModel",
+        """
+        package dagger.hilt.android.test;
+
+        import dagger.assisted.AssistedInject;
+        import dagger.assisted.Assisted;
+        import androidx.lifecycle.ViewModel;
+        import dagger.hilt.android.lifecycle.HiltViewModel;
+        import javax.inject.Inject;
+
+        @HiltViewModel
+        class MyViewModel extends ViewModel {
+            @AssistedInject
+            MyViewModel(String s, @Assisted int i) { }
+        }
+        """
+          .trimIndent()
+      )
+
+    HiltCompilerTests.hiltCompiler(myViewModel)
+      .withAdditionalJavacProcessors(ViewModelProcessor())
+      .withAdditionalKspProcessors(KspViewModelProcessor.Provider())
+      .withProcessorOptions(ImmutableMap.of("dagger.hilt.enableAssistedInjectViewModels", "false"))
+      .compile { subject ->
+        subject.compilationDidFail()
+        subject.hasErrorCount(1)
+        subject.hasErrorContaining(
+          "ViewModel constructor should be annotated with @Inject instead of @AssistedInject."
+        )
+      }
   }
 
   @Test
   fun verifySingleAnnotatedConstructor() {
-    val myViewModel = """
+    val myViewModel =
+      Source.java(
+        "dagger.hilt.android.test.MyViewModel",
+        """
         package dagger.hilt.android.test;
 
         import androidx.lifecycle.ViewModel;
@@ -88,21 +140,43 @@ class ViewModelProcessorTest {
             @Inject
             MyViewModel(String s) { }
         }
-        """.toJFO("dagger.hilt.android.test.MyViewModel")
-
-    val compilation = compiler().compile(myViewModel)
-    assertThat(compilation).apply {
-      failed()
-      hadErrorCount(1)
-      hadErrorContainingMatch(
-        "@HiltViewModel annotated class should contain exactly one @Inject annotated constructor."
+        """
+          .trimIndent()
       )
+
+    listOf(false, true).forEach { enableAssistedInjectViewModels ->
+      HiltCompilerTests.hiltCompiler(myViewModel)
+        .withAdditionalJavacProcessors(ViewModelProcessor())
+        .withAdditionalKspProcessors(KspViewModelProcessor.Provider())
+        .withProcessorOptions(
+          ImmutableMap.of(
+            "dagger.hilt.enableAssistedInjectViewModels",
+            enableAssistedInjectViewModels.toString()
+          )
+        )
+        .compile { subject ->
+          subject.compilationDidFail()
+          subject.hasErrorCount(2)
+          subject.hasErrorContaining(
+            "Type dagger.hilt.android.test.MyViewModel may only contain one injected constructor. Found: [@Inject dagger.hilt.android.test.MyViewModel(), @Inject dagger.hilt.android.test.MyViewModel(String)]"
+          )
+          subject.hasErrorContaining(
+            if (enableAssistedInjectViewModels) {
+              "@HiltViewModel annotated class should contain exactly one @Inject or @AssistedInject annotated constructor."
+            } else {
+              "@HiltViewModel annotated class should contain exactly one @Inject annotated constructor."
+            }
+          )
+        }
     }
   }
 
   @Test
   fun verifyNonPrivateConstructor() {
-    val myViewModel = """
+    val myViewModel =
+      Source.java(
+        "dagger.hilt.android.test.MyViewModel",
+        """
         package dagger.hilt.android.test;
 
         import androidx.lifecycle.ViewModel;
@@ -114,22 +188,41 @@ class ViewModelProcessorTest {
             @Inject
             private MyViewModel() { }
         }
-        """.toJFO("dagger.hilt.android.test.MyViewModel")
-
-    val compilation = compiler().compile(myViewModel)
-    assertThat(compilation).apply {
-      failed()
-      hadErrorCount(1)
-      hadErrorContainingMatch(
-        "@Inject annotated constructors must not be " +
-          "private."
+        """
+          .trimIndent()
       )
+
+    listOf(false, true).forEach { enableAssistedInjectViewModels ->
+      HiltCompilerTests.hiltCompiler(myViewModel)
+        .withAdditionalJavacProcessors(ViewModelProcessor())
+        .withAdditionalKspProcessors(KspViewModelProcessor.Provider())
+        .withProcessorOptions(
+          ImmutableMap.of(
+            "dagger.hilt.enableAssistedInjectViewModels",
+            enableAssistedInjectViewModels.toString()
+          )
+        )
+        .compile { subject ->
+          subject.compilationDidFail()
+          subject.hasErrorCount(2)
+          subject.hasErrorContaining("Dagger does not support injection into private constructors")
+          subject.hasErrorContaining(
+            if (enableAssistedInjectViewModels) {
+              "@Inject or @AssistedInject annotated constructors must not be private."
+            } else {
+              "@Inject annotated constructors must not be private."
+            }
+          )
+        }
     }
   }
 
   @Test
   fun verifyInnerClassIsStatic() {
-    val myViewModel = """
+    val myViewModel =
+      Source.java(
+        "dagger.hilt.android.test.Outer",
+        """
         package dagger.hilt.android.test;
 
         import androidx.lifecycle.ViewModel;
@@ -143,21 +236,31 @@ class ViewModelProcessorTest {
                 MyViewModel() { }
             }
         }
-        """.toJFO("dagger.hilt.android.test.Outer")
-
-    val compilation = compiler().compile(myViewModel)
-    assertThat(compilation).apply {
-      failed()
-      hadErrorCount(1)
-      hadErrorContainingMatch(
-        "@HiltViewModel may only be used on inner classes if they are static."
+        """
+          .trimIndent()
       )
-    }
+
+    HiltCompilerTests.hiltCompiler(myViewModel)
+      .withAdditionalJavacProcessors(ViewModelProcessor())
+      .withAdditionalKspProcessors(KspViewModelProcessor.Provider())
+      .compile { subject ->
+        subject.compilationDidFail()
+        subject.hasErrorCount(2)
+        subject.hasErrorContaining(
+          "@Inject constructors are invalid on inner classes. Did you mean to make the class static?"
+        )
+        subject.hasErrorContaining(
+          "@HiltViewModel may only be used on inner classes if they are static."
+        )
+      }
   }
 
   @Test
   fun verifyNoScopeAnnotation() {
-    val myViewModel = """
+    val myViewModel =
+      Source.java(
+        "dagger.hilt.android.test.MyViewModel",
+        """
         package dagger.hilt.android.test;
 
         import androidx.lifecycle.ViewModel;
@@ -170,15 +273,355 @@ class ViewModelProcessorTest {
         class MyViewModel extends ViewModel {
             @Inject MyViewModel() { }
         }
-        """.toJFO("dagger.hilt.android.test.MyViewModel")
-
-    val compilation = compiler().compile(myViewModel)
-    assertThat(compilation).apply {
-      failed()
-      hadErrorCount(1)
-      hadErrorContainingMatch(
-        "@HiltViewModel classes should not be scoped. Found: @javax.inject.Singleton"
+        """
+          .trimIndent()
       )
-    }
+
+    HiltCompilerTests.hiltCompiler(myViewModel)
+      .withAdditionalJavacProcessors(ViewModelProcessor())
+      .withAdditionalKspProcessors(KspViewModelProcessor.Provider())
+      .compile { subject ->
+        subject.compilationDidFail()
+        subject.hasErrorCount(1)
+        subject.hasErrorContainingMatch(
+          "@HiltViewModel classes should not be scoped. Found: @javax.inject.Singleton"
+        )
+      }
+  }
+
+  @Test
+  fun verifyAssistedFlagIsEnabled() {
+    val myViewModel =
+      Source.java(
+        "dagger.hilt.android.test.MyViewModel",
+        """
+        package dagger.hilt.android.test;
+
+        import dagger.assisted.Assisted;
+        import dagger.assisted.AssistedInject;
+        import androidx.lifecycle.ViewModel;
+        import dagger.hilt.android.lifecycle.HiltViewModel;
+
+        @HiltViewModel(assistedFactory = MyFactory.class)
+        class MyViewModel extends ViewModel {
+            @AssistedInject
+            MyViewModel(String s, @Assisted int i) { }
+        }
+        """
+          .trimIndent()
+      )
+    val myFactory =
+      Source.java(
+        "dagger.hilt.android.test.MyFactory",
+        """
+        package dagger.hilt.android.test;
+        import dagger.assisted.AssistedFactory;
+        @AssistedFactory
+        interface MyFactory {
+            MyViewModel create(int i);
+        }
+        """
+      )
+
+    HiltCompilerTests.hiltCompiler(myViewModel, myFactory)
+      .withAdditionalJavacProcessors(ViewModelProcessor())
+      .withAdditionalKspProcessors(KspViewModelProcessor.Provider())
+      .withProcessorOptions(ImmutableMap.of("dagger.hilt.enableAssistedInjectViewModels", "false"))
+      .compile { subject ->
+        subject.compilationDidFail()
+        subject.hasErrorCount(1)
+        subject.hasErrorContaining(
+          "Specified assisted factory dagger.hilt.android.test.MyFactory for dagger.hilt.android.test.MyViewModel in @HiltViewModel but compiler option 'enableAssistedInjectViewModels' was not enabled."
+        )
+      }
+  }
+
+  @Test
+  fun verifyAssistedFactoryHasMethod() {
+    val myViewModel =
+      Source.java(
+        "dagger.hilt.android.test.MyViewModel",
+        """
+        package dagger.hilt.android.test;
+
+        import dagger.assisted.Assisted;
+        import dagger.assisted.AssistedInject;
+        import androidx.lifecycle.ViewModel;
+        import dagger.hilt.android.lifecycle.HiltViewModel;
+
+        @HiltViewModel(assistedFactory = MyFactory.class)
+        class MyViewModel extends ViewModel {
+            @AssistedInject
+            MyViewModel(String s, @Assisted int i) { }
+        }
+        """
+          .trimIndent()
+      )
+    val myFactory =
+      Source.java(
+        "dagger.hilt.android.test.MyFactory",
+        """
+        package dagger.hilt.android.test;
+        import dagger.assisted.AssistedFactory;
+        @AssistedFactory
+        interface MyFactory {}
+        """
+      )
+
+    HiltCompilerTests.hiltCompiler(myViewModel, myFactory)
+      .withAdditionalJavacProcessors(ViewModelProcessor())
+      .withAdditionalKspProcessors(KspViewModelProcessor.Provider())
+      .withProcessorOptions(ImmutableMap.of("dagger.hilt.enableAssistedInjectViewModels", "true"))
+      .compile { subject ->
+        subject.compilationDidFail()
+        subject.hasErrorCount(2)
+        subject.hasErrorContaining(
+          "The @AssistedFactory-annotated type is missing an abstract, non-default method whose return type matches the assisted injection type."
+        )
+        subject.hasErrorContaining(
+          "Cannot find assisted factory method in dagger.hilt.android.test.MyFactory."
+        )
+      }
+  }
+
+  @Test
+  fun verifyAssistedFactoryHasOnlyOneMethod() {
+    val myViewModel =
+      Source.java(
+        "dagger.hilt.android.test.MyViewModel",
+        """
+        package dagger.hilt.android.test;
+
+        import dagger.assisted.Assisted;
+        import dagger.assisted.AssistedInject;
+        import androidx.lifecycle.ViewModel;
+        import dagger.hilt.android.lifecycle.HiltViewModel;
+
+        @HiltViewModel(assistedFactory = MyFactory.class)
+        class MyViewModel extends ViewModel {
+            @AssistedInject
+            MyViewModel(String s, @Assisted int i) { }
+        }
+        """
+          .trimIndent()
+      )
+    val myFactory =
+      Source.java(
+        "dagger.hilt.android.test.MyFactory",
+        """
+        package dagger.hilt.android.test;
+        import dagger.assisted.AssistedFactory;
+        @AssistedFactory
+        interface MyFactory {
+            MyViewModel create(int i);
+            String createString(int i);
+            Integer createInteger(int i);
+        }
+        """
+      )
+
+    HiltCompilerTests.hiltCompiler(myViewModel, myFactory)
+      .withAdditionalJavacProcessors(ViewModelProcessor())
+      .withAdditionalKspProcessors(KspViewModelProcessor.Provider())
+      .withProcessorOptions(ImmutableMap.of("dagger.hilt.enableAssistedInjectViewModels", "true"))
+      .compile { subject ->
+        subject.compilationDidFail()
+        subject.hasErrorCount(4)
+        subject.hasErrorContaining(
+          "The @AssistedFactory-annotated type should contain a single abstract, non-default method but found multiple: [dagger.hilt.android.test.MyFactory.create(int), dagger.hilt.android.test.MyFactory.createString(int), dagger.hilt.android.test.MyFactory.createInteger(int)]"
+        )
+        subject.hasErrorContaining(
+          "Invalid return type: java.lang.String. An assisted factory's abstract method must return a type with an @AssistedInject-annotated constructor."
+        )
+        subject.hasErrorContaining(
+          "Invalid return type: java.lang.Integer. An assisted factory's abstract method must return a type with an @AssistedInject-annotated constructor."
+        )
+        subject.hasErrorContaining(
+          "Cannot find assisted factory method in dagger.hilt.android.test.MyFactory."
+        )
+      }
+  }
+
+  @Test
+  fun verifyAssistedFactoryIsAnnotatedWithAssistedFactory() {
+    val myViewModel =
+      Source.java(
+        "dagger.hilt.android.test.MyViewModel",
+        """
+        package dagger.hilt.android.test;
+
+        import dagger.assisted.Assisted;
+        import dagger.assisted.AssistedInject;
+        import androidx.lifecycle.ViewModel;
+        import dagger.hilt.android.lifecycle.HiltViewModel;
+
+        @HiltViewModel(assistedFactory = Integer.class)
+        class MyViewModel extends ViewModel {
+            @AssistedInject
+            MyViewModel(String s, @Assisted int i) { }
+        }
+        """
+          .trimIndent()
+      )
+
+    HiltCompilerTests.hiltCompiler(myViewModel)
+      .withAdditionalJavacProcessors(ViewModelProcessor())
+      .withAdditionalKspProcessors(KspViewModelProcessor.Provider())
+      .withProcessorOptions(ImmutableMap.of("dagger.hilt.enableAssistedInjectViewModels", "true"))
+      .compile { subject ->
+        subject.compilationDidFail()
+        subject.hasErrorCount(1)
+        subject.hasErrorContaining(
+          "Class java.lang.Integer is not annotated with @AssistedFactory."
+        )
+      }
+  }
+
+  @Test
+  fun verifyFactoryMethodHasCorrectReturnType() {
+    val myViewModel =
+      Source.java(
+        "dagger.hilt.android.test.MyViewModel",
+        """
+        package dagger.hilt.android.test;
+
+        import dagger.assisted.Assisted;
+        import dagger.assisted.AssistedInject;
+        import androidx.lifecycle.ViewModel;
+        import dagger.hilt.android.lifecycle.HiltViewModel;
+
+        @HiltViewModel(assistedFactory = MyFactory.class)
+        class MyViewModel extends ViewModel {
+            @AssistedInject
+            MyViewModel(String s, @Assisted int i) { }
+        }
+        """
+          .trimIndent()
+      )
+    val myFactory =
+      Source.java(
+        "dagger.hilt.android.test.MyFactory",
+        """
+        package dagger.hilt.android.test;
+        import dagger.assisted.AssistedFactory;
+        @AssistedFactory
+        interface MyFactory {
+            String create(int i);
+        }
+        """
+      )
+
+    HiltCompilerTests.hiltCompiler(myViewModel, myFactory)
+      .withAdditionalJavacProcessors(ViewModelProcessor())
+      .withAdditionalKspProcessors(KspViewModelProcessor.Provider())
+      .withProcessorOptions(ImmutableMap.of("dagger.hilt.enableAssistedInjectViewModels", "true"))
+      .compile { subject ->
+        subject.compilationDidFail()
+        subject.hasErrorCount(2)
+        subject.hasErrorContaining(
+          "Invalid return type: java.lang.String. An assisted factory's abstract method must return a type with an @AssistedInject-annotated constructor."
+        )
+        subject.hasErrorContaining(
+          "Class dagger.hilt.android.test.MyFactory must have a factory method that returns a dagger.hilt.android.test.MyViewModel. Found java.lang.String."
+        )
+      }
+  }
+
+  @Test
+  fun verifyAssistedFactoryIsSpecified() {
+    val myViewModel =
+      Source.java(
+        "dagger.hilt.android.test.MyViewModel",
+        """
+        package dagger.hilt.android.test;
+
+        import dagger.assisted.Assisted;
+        import dagger.assisted.AssistedInject;
+        import androidx.lifecycle.ViewModel;
+        import dagger.hilt.android.lifecycle.HiltViewModel;
+
+        @HiltViewModel
+        class MyViewModel extends ViewModel {
+            @AssistedInject
+            MyViewModel(String s, @Assisted int i) { }
+        }
+        """
+          .trimIndent()
+      )
+    val myFactory =
+      Source.java(
+        "dagger.hilt.android.test.MyFactory",
+        """
+        package dagger.hilt.android.test;
+        import dagger.assisted.AssistedFactory;
+        @AssistedFactory
+        interface MyFactory {
+            MyViewModel create(int i);
+        }
+        """
+      )
+
+    HiltCompilerTests.hiltCompiler(myViewModel, myFactory)
+      .withAdditionalJavacProcessors(ViewModelProcessor())
+      .withAdditionalKspProcessors(KspViewModelProcessor.Provider())
+      .withProcessorOptions(ImmutableMap.of("dagger.hilt.enableAssistedInjectViewModels", "true"))
+      .compile { subject ->
+        subject.compilationDidFail()
+        subject.hasErrorCount(1)
+        subject.hasErrorContaining(
+          "dagger.hilt.android.test.MyViewModel must have a valid assisted factory specified in @HiltViewModel when used with assisted injection. Found java.lang.Object."
+        )
+      }
+  }
+
+  @Test
+  fun verifyConstructorHasRightInjectAnnotation() {
+    val myViewModel =
+      Source.java(
+        "dagger.hilt.android.test.MyViewModel",
+        """
+        package dagger.hilt.android.test;
+
+        import dagger.assisted.Assisted;
+        import dagger.assisted.AssistedInject;
+        import androidx.lifecycle.ViewModel;
+        import dagger.hilt.android.lifecycle.HiltViewModel;
+        import javax.inject.Inject;
+
+        @HiltViewModel(assistedFactory = MyFactory.class)
+        class MyViewModel extends ViewModel {
+            @Inject
+            MyViewModel(String s, int i) { }
+        }
+        """
+          .trimIndent()
+      )
+    val myFactory =
+      Source.java(
+        "dagger.hilt.android.test.MyFactory",
+        """
+        package dagger.hilt.android.test;
+        import dagger.assisted.AssistedFactory;
+        @AssistedFactory
+        interface MyFactory {
+            MyViewModel create(int i);
+        }
+        """
+      )
+
+    HiltCompilerTests.hiltCompiler(myViewModel, myFactory)
+      .withAdditionalJavacProcessors(ViewModelProcessor())
+      .withAdditionalKspProcessors(KspViewModelProcessor.Provider())
+      .withProcessorOptions(ImmutableMap.of("dagger.hilt.enableAssistedInjectViewModels", "true"))
+      .compile { subject ->
+        subject.compilationDidFail()
+        subject.hasErrorCount(2)
+        subject.hasErrorContaining(
+          "Invalid return type: dagger.hilt.android.test.MyViewModel. An assisted factory's abstract method must return a type with an @AssistedInject-annotated constructor."
+        )
+        subject.hasErrorContaining(
+          "Found assisted factory dagger.hilt.android.test.MyFactory in @HiltViewModel but the constructor was annotated with @Inject instead of @AssistedInject."
+        )
+      }
   }
 }

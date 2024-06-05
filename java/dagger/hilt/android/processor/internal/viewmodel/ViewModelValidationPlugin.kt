@@ -14,29 +14,44 @@
  * limitations under the License.
  */
 
+@file:OptIn(ExperimentalProcessingApi::class)
+
 package dagger.hilt.android.processor.internal.viewmodel
 
-import com.google.auto.common.MoreTypes.asElement
+import androidx.room.compiler.processing.ExperimentalProcessingApi
+import androidx.room.compiler.processing.XMethodElement
+import androidx.room.compiler.processing.XProcessingEnv
+import androidx.room.compiler.processing.XProcessingEnv.Companion.create
+import androidx.room.compiler.processing.XType
+import androidx.room.compiler.processing.XTypeElement
+import androidx.room.compiler.processing.compat.XConverters.toXProcessing
 import com.google.auto.service.AutoService
 import com.google.common.graph.EndpointPair
 import com.google.common.graph.ImmutableNetwork
-import com.squareup.javapoet.ClassName
 import dagger.hilt.android.processor.internal.AndroidClassNames
-import dagger.hilt.processor.internal.Processors.hasAnnotation
-import dagger.model.Binding
-import dagger.model.BindingGraph
-import dagger.model.BindingGraph.Edge
-import dagger.model.BindingGraph.Node
-import dagger.model.BindingKind
-import dagger.spi.BindingGraphPlugin
-import dagger.spi.DiagnosticReporter
+import dagger.hilt.processor.internal.getQualifiedName
+import dagger.hilt.processor.internal.hasAnnotation
+import dagger.internal.codegen.xprocessing.XTypeElements
+import dagger.spi.model.Binding
+import dagger.spi.model.BindingGraph
+import dagger.spi.model.BindingGraph.Edge
+import dagger.spi.model.BindingGraph.Node
+import dagger.spi.model.BindingGraphPlugin
+import dagger.spi.model.BindingKind
+import dagger.spi.model.DaggerProcessingEnv
+import dagger.spi.model.DaggerType
+import dagger.spi.model.DiagnosticReporter
 import javax.tools.Diagnostic.Kind
 
-/**
- * Plugin to validate users do not inject @HiltViewModel classes.
- */
+/** Plugin to validate users do not inject @HiltViewModel classes. */
 @AutoService(BindingGraphPlugin::class)
 class ViewModelValidationPlugin : BindingGraphPlugin {
+
+  private lateinit var env: XProcessingEnv
+
+  override fun init(processingEnv: DaggerProcessingEnv, options: MutableMap<String, String>) {
+    env = processingEnv.toXProcessingEnv()
+  }
 
   override fun visitGraph(bindingGraph: BindingGraph, diagnosticReporter: DiagnosticReporter) {
     if (bindingGraph.rootComponentNode().isSubcomponent()) {
@@ -50,10 +65,10 @@ class ViewModelValidationPlugin : BindingGraphPlugin {
       val pair: EndpointPair<Node> = network.incidentNodes(edge)
       val target: Node = pair.target()
       val source: Node = pair.source()
-      if (target is Binding &&
-        isHiltViewModelBinding(target) &&
-        !isInternalHiltViewModelUsage(source)
-      ) {
+      if (target !is Binding) {
+        return@forEach
+      }
+      if (isHiltViewModelBinding(target) && !isInternalHiltViewModelUsage(source)) {
         diagnosticReporter.reportDependency(
           Kind.ERROR,
           edge,
@@ -61,6 +76,17 @@ class ViewModelValidationPlugin : BindingGraphPlugin {
             "ViewModel instance correctly.\nAccess the ViewModel via the Android APIs " +
             "(e.g. ViewModelProvider) instead." +
             "\nInjected ViewModel: ${target.key().type()}\n"
+        )
+      } else if (
+        isViewModelAssistedFactory(target) && !isInternalViewModelAssistedFactoryUsage(source)
+      ) {
+        diagnosticReporter.reportDependency(
+          Kind.ERROR,
+          edge,
+          "\nInjection of an assisted factory for Hilt ViewModel is prohibited since it " +
+            "can not be used to create a ViewModel instance correctly.\nAccess the ViewModel via " +
+            "the Android APIs (e.g. ViewModelProvider) instead." +
+            "\nInjected factory: ${target.key().type()}\n"
         )
       }
     }
@@ -70,7 +96,7 @@ class ViewModelValidationPlugin : BindingGraphPlugin {
     // Make sure this is from an @Inject constructor rather than an overridden binding like an
     // @Provides and that the class is annotated with @HiltViewModel.
     return target.kind() == BindingKind.INJECTION &&
-      hasAnnotation(asElement(target.key().type()), AndroidClassNames.HILT_VIEW_MODEL)
+      target.key().type().hasAnnotation(AndroidClassNames.HILT_VIEW_MODEL)
   }
 
   private fun isInternalHiltViewModelUsage(source: Node): Boolean {
@@ -85,8 +111,62 @@ class ViewModelValidationPlugin : BindingGraphPlugin {
     // TODO(erichang): Should we check for even more things?
     return source is Binding &&
       source.key().qualifier().isPresent() &&
-      ClassName.get(source.key().qualifier().get().getAnnotationType()) ==
-      AndroidClassNames.HILT_VIEW_MODEL_MAP_QUALIFIER &&
+      source.key().qualifier().get().getQualifiedName() ==
+        AndroidClassNames.HILT_VIEW_MODEL_MAP_QUALIFIER.canonicalName() &&
       source.key().multibindingContributionIdentifier().isPresent()
+  }
+
+  private fun isViewModelAssistedFactory(target: Binding): Boolean {
+    if (target.kind() != BindingKind.ASSISTED_FACTORY) return false
+    val factoryType = target.key().type()
+    return getAssistedInjectTypeElement(factoryType.toXType(env))
+      .hasAnnotation(AndroidClassNames.HILT_VIEW_MODEL)
+  }
+
+  private fun getAssistedInjectTypeElement(factoryType: XType): XTypeElement =
+    // The factory method and the type element for its return type cannot be
+    // null as the BindingGraph won't be created if the
+    // @AssistedFactory-annotated class is invalid.
+    getAssistedFactoryMethods(factoryType.typeElement)
+      .single()
+      .asMemberOf(factoryType)
+      .returnType
+      .typeElement!!
+
+  private fun getAssistedFactoryMethods(factory: XTypeElement?): List<XMethodElement> {
+    return XTypeElements.getAllNonPrivateInstanceMethods(factory)
+      .filter { it.isAbstract() }
+      .filter { !it.isJavaDefault() }
+  }
+
+  private fun isInternalViewModelAssistedFactoryUsage(source: Node): Boolean {
+    // We expect the only usage of the assisted factory for a Hilt ViewModel is in the
+    // code we generate:
+    // @Binds
+    // @IntoMap
+    // @StringKey(...)
+    // @HiltViewModelAssistedMap
+    // public abstract Object bind(FooFactory factory);
+    return source is Binding &&
+      source.key().qualifier().isPresent() &&
+      source.key().qualifier().get().getQualifiedName() ==
+        AndroidClassNames.HILT_VIEW_MODEL_ASSISTED_FACTORY_MAP_QUALIFIER.canonicalName() &&
+      source.key().multibindingContributionIdentifier().isPresent()
+  }
+}
+
+private fun DaggerType.toXType(processingEnv: XProcessingEnv): XType {
+  return when (backend()) {
+    DaggerProcessingEnv.Backend.JAVAC -> javac().toXProcessing(processingEnv)
+    DaggerProcessingEnv.Backend.KSP -> ksp().toXProcessing(processingEnv)
+    else -> error("Backend ${ backend() } not supported yet.")
+  }
+}
+
+private fun DaggerProcessingEnv.toXProcessingEnv(): XProcessingEnv {
+  return when (backend()) {
+    DaggerProcessingEnv.Backend.JAVAC -> create(javac())
+    DaggerProcessingEnv.Backend.KSP -> create(ksp(), resolver())
+    else -> error("Backend ${ backend() } not supported yet.")
   }
 }

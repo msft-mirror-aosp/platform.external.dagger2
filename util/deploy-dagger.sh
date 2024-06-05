@@ -37,10 +37,10 @@ _deploy() {
 
 _deploy \
   "" \
-  java/dagger/libcore.jar \
+  java/dagger/artifact.jar \
   java/dagger/pom.xml \
-  java/dagger/libcore-src.jar \
-  java/dagger/core-javadoc.jar \
+  java/dagger/artifact-src.jar \
+  java/dagger/artifact-javadoc.jar \
   "dagger"
 
 _deploy \
@@ -51,10 +51,8 @@ _deploy \
   gwt/libgwt.jar \
   ""
 
-# This artifact uses the shaded classes from dagger-spi, so we use the same
-# shading rules so that our references to those classes are shaded the same way.
 _deploy \
-  "com.google.auto.common,dagger.spi.shaded.auto.common;androidx.room.compiler,dagger.spi.shaded.androidx.room.compiler" \
+  "com.google.auto.common,dagger.spi.internal.shaded.auto.common;androidx.room.compiler,dagger.spi.internal.shaded.androidx.room.compiler;kotlinx.metadata,dagger.spi.internal.shaded.kotlinx.metadata;androidx.room,dagger.spi.internal.shaded.androidx.room" \
   java/dagger/internal/codegen/artifact.jar \
   java/dagger/internal/codegen/pom.xml \
   java/dagger/internal/codegen/artifact-src.jar \
@@ -70,7 +68,7 @@ _deploy \
   ""
 
 _deploy \
-  "com.google.auto.common,dagger.spi.shaded.auto.common;androidx.room.compiler,dagger.spi.shaded.androidx.room.compiler" \
+  "com.google.auto.common,dagger.spi.internal.shaded.auto.common;androidx.room.compiler,dagger.spi.internal.shaded.androidx.room.compiler;kotlinx.metadata,dagger.spi.internal.shaded.kotlinx.metadata;androidx.room,dagger.spi.internal.shaded.androidx.room" \
   java/dagger/spi/artifact.jar \
   java/dagger/spi/pom.xml \
   java/dagger/spi/artifact-src.jar \
@@ -79,10 +77,10 @@ _deploy \
 
 _deploy \
   "" \
-  java/dagger/android/android.aar \
+  java/dagger/android/artifact.aar \
   java/dagger/android/pom.xml \
-  java/dagger/android/libandroid-src.jar \
-  java/dagger/android/android-javadoc.jar \
+  java/dagger/android/artifact-src.jar \
+  java/dagger/android/artifact-javadoc.jar \
   ""
 
 _deploy \
@@ -95,10 +93,10 @@ _deploy \
 
 _deploy \
   "" \
-  java/dagger/android/support/support.aar \
+  java/dagger/android/support/artifact.aar \
   java/dagger/android/support/pom.xml \
-  java/dagger/android/support/libsupport-src.jar \
-  java/dagger/android/support/support-javadoc.jar \
+  java/dagger/android/support/artifact-src.jar \
+  java/dagger/android/support/artifact-javadoc.jar \
   ""
 
 _deploy \
@@ -110,11 +108,11 @@ _deploy \
   ""
 
 _deploy \
-  "" \
-  shaded_android_processor.jar \
+  "com.google.auto.common,dagger.spi.internal.shaded.auto.common;androidx.room.compiler,dagger.spi.internal.shaded.androidx.room.compiler;kotlinx.metadata,dagger.spi.internal.shaded.kotlinx.metadata;androidx.room,dagger.spi.internal.shaded.androidx.room" \
+  java/dagger/android/processor/artifact.jar \
   java/dagger/android/processor/pom.xml \
-  java/dagger/android/processor/libprocessor-src.jar \
-  java/dagger/android/processor/processor-javadoc.jar \
+  java/dagger/android/processor/artifact-src.jar \
+  java/dagger/android/processor/artifact-javadoc.jar \
   ""
 
 _deploy \

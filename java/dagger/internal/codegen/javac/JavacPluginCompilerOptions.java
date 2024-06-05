@@ -37,11 +37,6 @@ final class JavacPluginCompilerOptions extends CompilerOptions {
   }
 
   @Override
-  public boolean experimentalMergedMode(XTypeElement element) {
-    return false;
-  }
-
-  @Override
   public boolean fastInit(XTypeElement element) {
     return false;
   }
@@ -138,6 +133,11 @@ final class JavacPluginCompilerOptions extends CompilerOptions {
 
   @Override
   public boolean generatedClassExtendsComponent() {
+    return false;
+  }
+
+  @Override
+  public boolean ignoreProvisionKeyWildcards() {
     return false;
   }
 }

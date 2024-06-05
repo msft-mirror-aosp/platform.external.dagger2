@@ -69,10 +69,10 @@ import dagger.internal.codegen.binding.ErrorMessages;
 import dagger.internal.codegen.binding.MethodSignatureFormatter;
 import dagger.internal.codegen.javapoet.TypeNames;
 import dagger.internal.codegen.kotlin.KotlinMetadataUtil;
+import dagger.internal.codegen.model.DependencyRequest;
+import dagger.internal.codegen.model.Key;
 import dagger.internal.codegen.xprocessing.XTypeElements;
 import dagger.internal.codegen.xprocessing.XTypes;
-import dagger.spi.model.DependencyRequest;
-import dagger.spi.model.Key;
 import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.HashMap;
@@ -168,6 +168,7 @@ public final class ComponentValidator implements ClearableCache {
         // the remaining checks will likely just output unhelpful noise in such cases.
         return report.addError(invalidTypeError(), component).build();
       }
+      validateFields();
       validateUseOfCancellationPolicy();
       validateIsAbstractType();
       validateCreators();
@@ -206,6 +207,18 @@ public final class ComponentValidator implements ClearableCache {
       return String.format(
           "@%s may only be applied to an interface or abstract class",
           componentKind().annotation().simpleName());
+    }
+
+    private void validateFields() {
+      component.getDeclaredMethods().stream()
+          .filter(method -> method.isKotlinPropertySetter() && method.isAbstract())
+          .forEach(
+              method ->
+                  report.addError(
+                      String.format(
+                          "Cannot use 'abstract var' property in a component declaration to get a"
+                              + " binding. Use 'val' or 'fun' instead: %s",
+                          method.getPropertyName())));
     }
 
     private void validateCreators() {

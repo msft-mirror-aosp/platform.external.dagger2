@@ -46,8 +46,8 @@ import dagger.MapKey;
 import dagger.internal.codegen.base.DaggerSuperficialValidation;
 import dagger.internal.codegen.base.MapKeyAccessibility;
 import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.model.DaggerAnnotation;
 import dagger.internal.codegen.xprocessing.XElements;
-import dagger.spi.model.DaggerAnnotation;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
@@ -197,6 +197,27 @@ public final class MapKeys {
                     .returns(mapKeyType(mapKey).getTypeName())
                     .addStatement("return $L", directMapKeyExpression(mapKey, processingEnv))
                     .build());
+  }
+
+  /**
+   * Returns if this binding is a map binding and uses @LazyClassKey for contributing class keys.
+   *
+   * <p>@LazyClassKey won't co-exist with @ClassKey in the graph, since the same binding type cannot
+   * use more than one @MapKey annotation type and Dagger validation will fail.
+   */
+  public static boolean useLazyClassKey(Binding binding, BindingGraph graph) {
+    if (!binding.dependencies().isEmpty()) {
+      ContributionBinding contributionBinding =
+          graph.contributionBinding(binding.dependencies().iterator().next().key());
+      return contributionBinding.mapKey().isPresent()
+          && contributionBinding
+              .mapKey()
+              .get()
+              .xprocessing()
+              .getClassName()
+              .equals(TypeNames.LAZY_CLASS_KEY);
+    }
+    return false;
   }
 
   private MapKeys() {}

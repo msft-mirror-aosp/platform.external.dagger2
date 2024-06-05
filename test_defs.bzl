@@ -50,6 +50,7 @@ def GenKtLibrary(
         deps = deps,
         gen_library_deps = gen_library_deps,
         test_only_deps = None,
+        shard_count = None,
         plugins = plugins,
         javacopts = javacopts,
         functional = functional,
@@ -64,6 +65,7 @@ def GenKtTests(
         test_only_deps = None,
         plugins = None,
         javacopts = None,
+        shard_count = None,
         functional = True,
         require_jdk7_syntax = True):
     _GenTestsWithVariants(
@@ -76,6 +78,7 @@ def GenKtTests(
         test_only_deps = test_only_deps,
         plugins = plugins,
         javacopts = javacopts,
+        shard_count = shard_count,
         functional = functional,
         require_jdk7_syntax = require_jdk7_syntax,
     )
@@ -101,6 +104,7 @@ def GenJavaLibrary(
         test_only_deps = None,
         plugins = plugins,
         javacopts = javacopts,
+        shard_count = None,
         functional = functional,
         require_jdk7_syntax = require_jdk7_syntax,
     )
@@ -113,6 +117,7 @@ def GenJavaTests(
         test_only_deps = None,
         plugins = None,
         javacopts = None,
+        shard_count = None,
         functional = True,
         require_jdk7_syntax = True):
     if any([src for src in srcs if src.endswith(".kt")]):
@@ -127,6 +132,7 @@ def GenJavaTests(
         test_only_deps = test_only_deps,
         plugins = plugins,
         javacopts = javacopts,
+        shard_count = shard_count,
         functional = functional,
         require_jdk7_syntax = require_jdk7_syntax,
     )
@@ -138,6 +144,7 @@ def GenRobolectricTests(
         test_only_deps = None,
         plugins = None,
         javacopts = None,
+        shard_count = None,
         functional = True,
         require_jdk7_syntax = True,
         manifest_values = None):
@@ -152,6 +159,7 @@ def GenRobolectricTests(
         test_only_deps = test_only_deps,
         plugins = plugins,
         javacopts = javacopts,
+        shard_count = shard_count,
         functional = functional,
         require_jdk7_syntax = require_jdk7_syntax,
         test_kwargs = {"manifest_values": manifest_values},
@@ -167,6 +175,7 @@ def _GenTestsWithVariants(
         test_only_deps,
         plugins,
         javacopts,
+        shard_count,
         functional,
         require_jdk7_syntax,
         test_kwargs = None):
@@ -242,6 +251,7 @@ def _GenTestsWithVariants(
                     deps = test_deps + variant_deps,
                     plugins = plugins,
                     javacopts = javacopts + variant_javacopts,
+                    shard_count = shard_count,
                     jvm_flags = jvm_flags,
                     functional = functional,
                     test_kwargs = test_kwargs,
@@ -291,6 +301,7 @@ def _GenTestWithVariant(
         deps,
         plugins,
         javacopts,
+        shard_count,
         jvm_flags,
         functional,
         test_kwargs):
@@ -319,6 +330,7 @@ def _GenTestWithVariant(
         jvm_flags = jvm_flags,
         plugins = plugins,
         tags = tags,
+        shard_count = shard_count,
         test_class = test_class,
         deps = deps,
         **test_kwargs_with_javacopts

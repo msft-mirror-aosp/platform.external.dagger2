@@ -34,8 +34,8 @@ import dagger.internal.codegen.binding.ContributionBinding;
 import dagger.internal.codegen.binding.FrameworkField;
 import dagger.internal.codegen.javapoet.AnnotationSpecs;
 import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.model.BindingKind;
 import dagger.internal.codegen.writing.ComponentImplementation.ShardImplementation;
-import dagger.spi.model.BindingKind;
 import java.util.Optional;
 
 /**
@@ -142,8 +142,9 @@ class FrameworkFieldInitializer implements FrameworkInstanceSupplier {
         FrameworkField.forBinding(
             binding, frameworkInstanceCreationExpression.alternativeFrameworkClass());
 
-    TypeName fieldType =
-        useRawType ? contributionBindingField.type().rawType : contributionBindingField.type();
+    TypeName fieldType = useRawType
+        ? TypeNames.rawTypeName(contributionBindingField.type())
+        : contributionBindingField.type();
 
     if (binding.kind() == BindingKind.ASSISTED_INJECTION) {
       // An assisted injection factory doesn't extend Provider, so we reference the generated

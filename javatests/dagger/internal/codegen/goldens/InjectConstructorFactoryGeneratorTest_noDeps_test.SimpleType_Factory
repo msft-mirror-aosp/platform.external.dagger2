@@ -17,7 +17,8 @@ import javax.annotation.processing.Generated;
     "unchecked",
     "rawtypes",
     "KotlinInternal",
-    "KotlinInternalInJava"
+    "KotlinInternalInJava",
+    "cast"
 })
 public final class SimpleType_Factory implements Factory<SimpleType> {
   @Override
@@ -37,3 +38,4 @@ public final class SimpleType_Factory implements Factory<SimpleType> {
     private static final SimpleType_Factory INSTANCE = new SimpleType_Factory();
   }
 }
+

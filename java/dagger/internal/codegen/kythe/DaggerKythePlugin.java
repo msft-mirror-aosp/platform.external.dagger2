@@ -40,16 +40,16 @@ import dagger.internal.codegen.binding.Binding;
 import dagger.internal.codegen.binding.BindingDeclaration;
 import dagger.internal.codegen.binding.BindingGraphFactory;
 import dagger.internal.codegen.binding.BindingNode;
-import dagger.internal.codegen.binding.ComponentDescriptorFactory;
+import dagger.internal.codegen.binding.ComponentDescriptor;
 import dagger.internal.codegen.binding.ModuleDescriptor;
 import dagger.internal.codegen.javac.JavacPluginModule;
 import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.model.BindingGraph;
+import dagger.internal.codegen.model.BindingGraph.DependencyEdge;
+import dagger.internal.codegen.model.BindingGraph.Edge;
+import dagger.internal.codegen.model.BindingGraph.Node;
+import dagger.internal.codegen.model.DependencyRequest;
 import dagger.internal.codegen.validation.InjectBindingRegistryModule;
-import dagger.spi.model.BindingGraph;
-import dagger.spi.model.BindingGraph.DependencyEdge;
-import dagger.spi.model.BindingGraph.Edge;
-import dagger.spi.model.BindingGraph.Node;
-import dagger.spi.model.DependencyRequest;
 import java.util.Optional;
 import java.util.logging.Logger;
 import javax.inject.Inject;
@@ -64,7 +64,7 @@ public class DaggerKythePlugin extends Plugin.Scanner<Void, Void> {
   // TODO(ronshapiro): use flogger
   private static final Logger logger = Logger.getLogger(DaggerKythePlugin.class.getCanonicalName());
   private FactEmitter emitter;
-  @Inject ComponentDescriptorFactory componentDescriptorFactory;
+  @Inject ComponentDescriptor.Factory componentDescriptorFactory;
   @Inject BindingGraphFactory bindingGraphFactory;
   @Inject XProcessingEnv xProcessingEnv;
 

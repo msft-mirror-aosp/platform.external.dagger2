@@ -20,13 +20,14 @@ import com.android.build.api.instrumentation.AsmClassVisitorFactory
 import com.android.build.api.instrumentation.FramesComputationMode
 import com.android.build.api.instrumentation.InstrumentationParameters
 import com.android.build.api.instrumentation.InstrumentationScope
+import java.io.File
+import org.gradle.api.Project
 
 /**
  * Compatibility version of [com.android.build.api.variant.Component]
  * - In AGP 4.2 its package is 'com.android.build.api.component'
  * - In AGP 7.0 its packages is 'com.android.build.api.variant'
  */
-@Suppress("UnstableApiUsage") // ASM Pipeline APIs
 abstract class ComponentCompat {
 
   /** Redeclaration of [com.android.build.api.variant.ComponentIdentity.name] */

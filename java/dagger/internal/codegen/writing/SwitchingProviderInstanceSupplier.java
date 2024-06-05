@@ -26,9 +26,9 @@ import dagger.assisted.AssistedInject;
 import dagger.internal.codegen.binding.Binding;
 import dagger.internal.codegen.binding.BindingGraph;
 import dagger.internal.codegen.binding.ProvisionBinding;
+import dagger.internal.codegen.model.BindingKind;
 import dagger.internal.codegen.writing.ComponentImplementation.ShardImplementation;
 import dagger.internal.codegen.writing.FrameworkFieldInitializer.FrameworkInstanceCreationExpression;
-import dagger.spi.model.BindingKind;
 
 /**
  * An object that initializes a framework-type component field for a binding using instances created
@@ -46,11 +46,9 @@ final class SwitchingProviderInstanceSupplier implements FrameworkInstanceSuppli
           unscopedDirectInstanceRequestRepresentationFactory) {
     ShardImplementation shardImplementation = componentImplementation.shardImplementation(binding);
     FrameworkInstanceCreationExpression frameworkInstanceCreationExpression =
-        componentImplementation.compilerMode().isExperimentalMergedMode()
-            ? shardImplementation.getExperimentalSwitchingProviders()
-                .newFrameworkInstanceCreationExpression(
-                    binding, unscopedDirectInstanceRequestRepresentationFactory.create(binding))
-            : shardImplementation.getSwitchingProviders().newFrameworkInstanceCreationExpression(
+        shardImplementation
+            .getSwitchingProviders()
+            .newFrameworkInstanceCreationExpression(
                 binding, unscopedDirectInstanceRequestRepresentationFactory.create(binding));
     this.frameworkInstanceSupplier =
         new FrameworkFieldInitializer(

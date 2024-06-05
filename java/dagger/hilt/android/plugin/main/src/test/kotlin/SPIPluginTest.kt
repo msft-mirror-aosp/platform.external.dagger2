@@ -21,8 +21,11 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 
-class SPIPluginTest {
+@RunWith(Parameterized::class)
+class SPIPluginTest(val backend: Backend) {
   @get:Rule
   val testProjectDir = TemporaryFolder()
 
@@ -40,12 +43,30 @@ class SPIPluginTest {
         """.trimIndent()
       )
     }
+    val processorConfig = when (backend) {
+      Backend.JAVAC -> "annotationProcessor"
+      Backend.KAPT -> "kapt"
+      Backend.KSP -> "ksp"
+    }
+    if (backend == Backend.KAPT || backend == Backend.KSP) {
+      gradleRunner.addPluginId("kotlin-android")
+      if (backend == Backend.KAPT) {
+        gradleRunner.addPluginId("kotlin-kapt")
+      } else {
+        gradleRunner.addPluginId("com.google.devtools.ksp")
+      }
+      gradleRunner.addAdditionalClosure("""
+      |kotlin {
+      |  jvmToolchain(11)
+      |}
+      """.trimMargin())
+    }
     gradleRunner.addHiltOption("enableAggregatingTask = true")
     gradleRunner.addDependencies(
       "implementation 'androidx.appcompat:appcompat:1.1.0'",
       "implementation 'com.google.dagger:hilt-android:LOCAL-SNAPSHOT'",
-      "annotationProcessor 'com.google.dagger:hilt-compiler:LOCAL-SNAPSHOT'",
-      "annotationProcessor project(':spi-plugin')",
+      "$processorConfig 'com.google.dagger:hilt-compiler:LOCAL-SNAPSHOT'",
+      "$processorConfig project(':spi-plugin')",
     )
     gradleRunner.addSrc(
       srcPath = "minimal/MyApp.java",
@@ -73,5 +94,15 @@ class SPIPluginTest {
     assertThat(result.getOutput()).contains(
       "[spi.TestPlugin] Found component: minimal.MyApp_HiltComponents.SingletonC"
     )
+  }
+
+  companion object {
+    @JvmStatic
+    @Parameterized.Parameters(name = "backend = {0}")
+    fun params() = listOf(Backend.JAVAC, Backend.KAPT, Backend.KSP)
+
+    enum class Backend {
+      JAVAC, KAPT, KSP
+    }
   }
 }

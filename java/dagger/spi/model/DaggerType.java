@@ -16,39 +16,27 @@
 
 package dagger.spi.model;
 
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
-
-import androidx.room.compiler.processing.XType;
-import com.google.auto.value.AutoValue;
-import com.google.common.base.Equivalence;
-import com.google.common.base.Preconditions;
-import dagger.internal.codegen.xprocessing.XTypes;
+import com.google.devtools.ksp.symbol.KSType;
+import com.google.errorprone.annotations.DoNotMock;
 import javax.lang.model.type.TypeMirror;
 
 /** Wrapper type for a type. */
-@AutoValue
+@DoNotMock("Only use real implementations created by Dagger")
 public abstract class DaggerType {
-  public static DaggerType from(XType type) {
-    Preconditions.checkNotNull(type);
-    return new AutoValue_DaggerType(XTypes.equivalence().wrap(type));
-  }
+  /**
+   * Returns the Javac representation for the type.
+   *
+   * @throws IllegalStateException if the current backend isn't Javac.
+   */
+  public abstract TypeMirror javac();
 
-  abstract Equivalence.Wrapper<XType> equivalenceWrapper();
+  /**
+   * Returns the KSP representation for the type.
+   *
+   * @throws IllegalStateException if the current backend isn't KSP.
+   */
+  public abstract KSType ksp();
 
-  public XType xprocessing() {
-    return equivalenceWrapper().get();
-  }
-
-  public TypeMirror java() {
-    return toJavac(xprocessing());
-  }
-
-  @Override
-  public final String toString() {
-    // We define our own stable string rather than use XType#toString() here because
-    // XType#toString() is currently not stable across backends. In particular, in javac it returns
-    // the qualified type but in ksp it returns the simple name.
-    // TODO(bcorso): Consider changing XProcessing so that #toString() is stable across backends.
-    return XTypes.toStableString(xprocessing());
-  }
+  /** Returns the backend used in this compilation. */
+  public abstract DaggerProcessingEnv.Backend backend();
 }

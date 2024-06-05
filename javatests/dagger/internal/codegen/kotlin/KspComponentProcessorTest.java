@@ -57,7 +57,8 @@ public final class KspComponentProcessorTest {
                         "    \"unchecked\",",
                         "    \"rawtypes\",",
                         "    \"KotlinInternal\",",
-                        "    \"KotlinInternalInJava\"",
+                        "    \"KotlinInternalInJava\",",
+                        "    \"cast\"",
                         "})",
                         "public final class DaggerMyComponent {",
                         "  private DaggerMyComponent() {",
@@ -90,6 +91,34 @@ public final class KspComponentProcessorTest {
                         "  }",
                         "}"));
               });
+  }
+
+  @Test
+  public void
+      testComponentReferencingGeneratedTypeInCompanionObject_successfullyGeneratedComponent()
+          throws Exception {
+    Source componentSrc =
+        CompilerTests.kotlinSource(
+            "MyComponent.kt",
+            "package test",
+            "",
+            "import dagger.BindsInstance",
+            "import dagger.Component",
+            "",
+            "@Component",
+            "interface MyComponent {",
+            " @Component.Builder",
+            " interface Builder {",
+            "   @BindsInstance fun text(text: String): Builder",
+            "   fun build(): MyComponent",
+            " }",
+            "",
+            " companion object {",
+            "   fun getComponent(text: String) = DaggerMyComponent.builder().text(text).build()",
+            " }",
+            "}");
+
+    CompilerTests.daggerCompiler(componentSrc).compile(subject -> subject.hasErrorCount(0));
   }
 
   @Test
@@ -132,7 +161,8 @@ public final class KspComponentProcessorTest {
                         "    \"unchecked\",",
                         "    \"rawtypes\",",
                         "    \"KotlinInternal\",",
-                        "    \"KotlinInternalInJava\"",
+                        "    \"KotlinInternalInJava\",",
+                        "    \"cast\"",
                         "})",
                         "public final class DaggerMyComponent {",
                         "  private DaggerMyComponent() {",
@@ -202,8 +232,8 @@ public final class KspComponentProcessorTest {
                         "package test;",
                         "",
                         "import dagger.internal.DaggerGenerated;",
+                        "import dagger.internal.Provider;",
                         "import javax.annotation.processing.Generated;",
-                        "import javax.inject.Provider;",
                         "",
                         "@DaggerGenerated",
                         "@Generated(",
@@ -214,7 +244,8 @@ public final class KspComponentProcessorTest {
                         "    \"unchecked\",",
                         "    \"rawtypes\",",
                         "    \"KotlinInternal\",",
-                        "    \"KotlinInternalInJava\"",
+                        "    \"KotlinInternalInJava\",",
+                        "    \"cast\"",
                         "})",
                         "public final class DaggerMyComponent {",
                         "  private DaggerMyComponent() {",
@@ -255,7 +286,7 @@ public final class KspComponentProcessorTest {
                         "    }",
                         "",
                         "    @Override",
-                        "    public Provider<Foo> foo() {",
+                        "    public javax.inject.Provider<Foo> foo() {",
                         "      return fooProvider;",
                         "    }",
                         "  }",
@@ -314,7 +345,8 @@ public final class KspComponentProcessorTest {
                         "    \"unchecked\",",
                         "    \"rawtypes\",",
                         "    \"KotlinInternal\",",
-                        "    \"KotlinInternalInJava\"",
+                        "    \"KotlinInternalInJava\",",
+                        "    \"cast\"",
                         "})",
                         "public final class DaggerMyComponent {",
                         "  private DaggerMyComponent() {",
@@ -420,7 +452,8 @@ public final class KspComponentProcessorTest {
                         "    \"unchecked\",",
                         "    \"rawtypes\",",
                         "    \"KotlinInternal\",",
-                        "    \"KotlinInternalInJava\"",
+                        "    \"KotlinInternalInJava\",",
+                        "    \"cast\"",
                         "})",
                         "public final class DaggerMyComponent {",
                         "  private DaggerMyComponent() {",
@@ -532,7 +565,8 @@ public final class KspComponentProcessorTest {
                         "    \"unchecked\",",
                         "    \"rawtypes\",",
                         "    \"KotlinInternal\",",
-                        "    \"KotlinInternalInJava\"",
+                        "    \"KotlinInternalInJava\",",
+                        "    \"cast\"",
                         "})",
                         "public final class DaggerMyComponent {",
                         "  private DaggerMyComponent() {",

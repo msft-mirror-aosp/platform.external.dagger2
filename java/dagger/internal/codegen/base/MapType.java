@@ -26,8 +26,8 @@ import com.google.auto.value.AutoValue;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.TypeName;
 import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.model.Key;
 import dagger.internal.codegen.xprocessing.XTypes;
-import dagger.spi.model.Key;
 
 /** Information about a {@link java.util.Map} type. */
 @AutoValue
@@ -113,6 +113,13 @@ public abstract class MapType {
   /** {@code true} if {@code key.type()} is a {@link java.util.Map} type. */
   public static boolean isMap(Key key) {
     return isMap(key.type().xprocessing());
+  }
+
+  public static boolean isMapOfProvider(XType keyType) {
+    if (MapType.isMap(keyType)) {
+      return MapType.from(keyType).valuesAreTypeOf(TypeNames.PROVIDER);
+    }
+    return false;
   }
 
   /**

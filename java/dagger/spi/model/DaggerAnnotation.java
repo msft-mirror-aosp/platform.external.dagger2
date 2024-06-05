@@ -16,45 +16,29 @@
 
 package dagger.spi.model;
 
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
-
-import androidx.room.compiler.processing.XAnnotation;
-import com.google.auto.value.AutoValue;
-import com.google.common.base.Equivalence;
-import com.google.common.base.Preconditions;
-import com.squareup.javapoet.ClassName;
-import dagger.internal.codegen.xprocessing.XAnnotations;
+import com.google.devtools.ksp.symbol.KSAnnotation;
+import com.google.errorprone.annotations.DoNotMock;
 import javax.lang.model.element.AnnotationMirror;
 
 /** Wrapper type for an annotation. */
-@AutoValue
+@DoNotMock("Only use real implementations created by Dagger")
 public abstract class DaggerAnnotation {
+  public abstract DaggerTypeElement annotationTypeElement();
 
-  public static DaggerAnnotation from(XAnnotation annotation) {
-    Preconditions.checkNotNull(annotation);
-    return new AutoValue_DaggerAnnotation(XAnnotations.equivalence().wrap(annotation));
-  }
+  /**
+   * Returns the Javac representation for the annotation.
+   *
+   * @throws IllegalStateException if the current backend isn't Javac.
+   */
+  public abstract AnnotationMirror javac();
 
-  abstract Equivalence.Wrapper<XAnnotation> equivalenceWrapper();
+  /**
+   * Returns the KSP representation for the annotation.
+   *
+   * @throws IllegalStateException if the current backend isn't KSP.
+   */
+  public abstract KSAnnotation ksp();
 
-  public DaggerTypeElement annotationTypeElement() {
-    return DaggerTypeElement.from(xprocessing().getType().getTypeElement());
-  }
-
-  public ClassName className() {
-    return annotationTypeElement().className();
-  }
-
-  public XAnnotation xprocessing() {
-    return equivalenceWrapper().get();
-  }
-
-  public AnnotationMirror java() {
-    return toJavac(xprocessing());
-  }
-
-  @Override
-  public final String toString() {
-    return XAnnotations.toString(xprocessing());
-  }
+  /** Returns the backend used in this compilation. */
+  public abstract DaggerProcessingEnv.Backend backend();
 }

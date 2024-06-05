@@ -16,28 +16,27 @@
 
 package dagger.spi.model;
 
-import static androidx.room.compiler.processing.compat.XConverters.toJavac;
-import static com.google.common.base.Preconditions.checkNotNull;
-
-import androidx.room.compiler.processing.XExecutableElement;
-import com.google.auto.value.AutoValue;
+import com.google.devtools.ksp.symbol.KSFunctionDeclaration;
+import com.google.errorprone.annotations.DoNotMock;
 import javax.lang.model.element.ExecutableElement;
 
 /** Wrapper type for an executable element. */
-@AutoValue
+@DoNotMock("Only use real implementations created by Dagger")
 public abstract class DaggerExecutableElement {
-  public static DaggerExecutableElement from(XExecutableElement executableElement) {
-    return new AutoValue_DaggerExecutableElement(checkNotNull(executableElement));
-  }
+  /**
+   * Returns the Javac representation for the executable element.
+   *
+   * @throws IllegalStateException if the current backend isn't Javac.
+   */
+  public abstract ExecutableElement javac();
 
-  public abstract XExecutableElement xprocessing();
+  /**
+   * Returns the KSP representation for the executable element.
+   *
+   * @throws IllegalStateException if the current backend isn't KSP.
+   */
+  public abstract KSFunctionDeclaration ksp();
 
-  public ExecutableElement java() {
-    return toJavac(xprocessing());
-  }
-
-  @Override
-  public final String toString() {
-    return xprocessing().toString();
-  }
+  /** Returns the backend used in this compilation. */
+  public abstract DaggerProcessingEnv.Backend backend();
 }

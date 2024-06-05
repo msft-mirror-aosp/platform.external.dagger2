@@ -23,7 +23,6 @@ import static java.util.stream.Collectors.joining;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.collect.ImmutableList;
-import com.squareup.javapoet.ClassName;
 
 /** A path containing a component and all of its ancestor components. */
 @AutoValue
@@ -40,8 +39,7 @@ public abstract class ComponentPath {
   public abstract ImmutableList<DaggerTypeElement> components();
 
   /**
-   * Returns the root {@link dagger.Component}- or {@link
-   * dagger.producers.ProductionComponent}-annotated type
+   * Returns the root {@code Component}- or {@code ProductionComponent}-annotated type
    */
   public final DaggerTypeElement rootComponent() {
     return components().get(0);
@@ -90,10 +88,7 @@ public abstract class ComponentPath {
 
   @Override
   public final String toString() {
-    return components().stream()
-        .map(DaggerTypeElement::className)
-        .map(ClassName::canonicalName)
-        .collect(joining(" → "));
+    return components().stream().map(Key::qualifiedName).collect(joining(" → "));
   }
 
   @Memoized

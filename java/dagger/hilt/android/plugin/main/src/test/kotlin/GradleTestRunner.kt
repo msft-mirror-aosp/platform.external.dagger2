@@ -22,10 +22,13 @@ import org.junit.rules.TemporaryFolder
 
 /** Testing utility class that sets up a simple Android project that applies the Hilt plugin. */
 class GradleTestRunner(val tempFolder: TemporaryFolder) {
+  private val pluginClasspaths = mutableListOf<String>()
+  private val pluginIds = mutableListOf<String>()
   private val dependencies = mutableListOf<String>()
   private val activities = mutableListOf<String>()
   private val additionalAndroidOptions = mutableListOf<String>()
   private val hiltOptions = mutableListOf<String>()
+  private val additionalClosures = mutableListOf<String>()
   private var appClassName: String? = null
   private var buildFile: File? = null
   private var gradlePropertiesFile: File? = null
@@ -37,6 +40,17 @@ class GradleTestRunner(val tempFolder: TemporaryFolder) {
     tempFolder.newFolder("src", "main", "java", "minimal")
     tempFolder.newFolder("src", "test", "java", "minimal")
     tempFolder.newFolder("src", "main", "res")
+  }
+
+  // Adds a Gradle plugin classpath to the test project,
+  // e.g. "org.jetbrains.kotlin:kotlin-gradle-plugin:1.8.0"
+  fun addPluginClasspath(pluginClasspath: String) {
+    pluginClasspaths.add(pluginClasspath)
+  }
+
+  // Adds a Gradle plugin id to the test project, e.g. "kotlin-android"
+  fun addPluginId(pluginId: String) {
+    pluginIds.add(pluginId)
   }
 
   // Adds project dependencies, e.g. "implementation <group>:<id>:<version>"
@@ -59,6 +73,10 @@ class GradleTestRunner(val tempFolder: TemporaryFolder) {
   // = true"
   fun addHiltOption(vararg options: String) {
     hiltOptions.addAll(options)
+  }
+
+  fun addAdditionalClosure(closure: String) {
+    additionalClosures.add(closure)
   }
 
   // Adds a source package to the project. The package path is relative to 'src/main/java'.
@@ -127,22 +145,24 @@ class GradleTestRunner(val tempFolder: TemporaryFolder) {
           }
           dependencies {
             classpath 'com.android.tools.build:gradle:7.1.2'
+            ${pluginClasspaths.joinToString(separator = "\n") { "classpath '$it'" }}
           }
         }
 
         plugins {
           id '${ if (isAppProject) "com.android.application" else "com.android.library" }'
           id 'com.google.dagger.hilt.android'
+          ${pluginIds.joinToString(separator = "\n") { "id '$it'" }}
         }
 
         android {
-          compileSdkVersion 32
-          buildToolsVersion "32.0.0"
+          compileSdkVersion 33
+          buildToolsVersion "33.0.0"
 
           defaultConfig {
             ${ if (isAppProject) "applicationId \"plugin.test\"" else "" }
             minSdkVersion 21
-            targetSdkVersion 32
+            targetSdkVersion 33
           }
 
           compileOptions {
@@ -168,7 +188,9 @@ class GradleTestRunner(val tempFolder: TemporaryFolder) {
         hilt {
           ${hiltOptions.joinToString(separator = "\n")}
         }
-        """.trimIndent()
+        ${additionalClosures.joinToString(separator = "\n")}
+        """
+            .trimIndent()
         )
       }
   }
@@ -177,9 +199,14 @@ class GradleTestRunner(val tempFolder: TemporaryFolder) {
     gradlePropertiesFile?.delete()
     gradlePropertiesFile =
       tempFolder.newFile("gradle.properties").apply {
-        writeText("""
+        writeText(
+          """
         android.useAndroidX=true
-        """.trimIndent())
+        // TODO(b/296583777): See if there's a better way to fix the OOM error.
+        org.gradle.jvmargs=-XX:MaxMetaspaceSize=1g
+        """
+            .trimIndent()
+        )
       }
   }
 
@@ -197,7 +224,8 @@ class GradleTestRunner(val tempFolder: TemporaryFolder) {
                 ${activities.joinToString(separator = "\n")}
             </application>
         </manifest>
-        """.trimIndent()
+        """
+            .trimIndent()
         )
       }
   }
