@@ -20,6 +20,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Path;
 
 /** Used to create files for a Gradle module in a particular directory. */
 public final class GradleModule {
@@ -37,6 +38,10 @@ public final class GradleModule {
   private GradleModule(File moduleDir) {
     this.moduleDir = moduleDir;
     this.moduleSrcDir = new File(moduleDir, "src/main/java/");
+  }
+
+  public Path getDir() {
+    return moduleDir.toPath();
   }
 
   public GradleModule addBuildFile(String... content) throws IOException {
