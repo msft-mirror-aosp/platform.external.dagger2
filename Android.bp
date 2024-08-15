@@ -179,9 +179,7 @@ java_library_host {
         "kotlin-stdlib-jdk8",
         "kotlinpoet",
         "kotlinx_metadata_jvm",
-        "kotlin_symbol_processing_api",
     ],
-
 
     libs: [
         "auto_factory_annotations",
@@ -290,6 +288,7 @@ android_library {
         "java/dagger/hilt/android/internal/migration/*.java",
         "java/dagger/hilt/android/internal/modules/*.java",
         "java/dagger/hilt/android/lifecycle/*.java",
+        "java/dagger/hilt/android/lifecycle/*.kt",
         "java/dagger/hilt/internal/aggregatedroot/*.java",
         "java/dagger/hilt/internal/componenttreedeps/*.java",
         "java/dagger/hilt/internal/processedrootsentinel/*.java",
