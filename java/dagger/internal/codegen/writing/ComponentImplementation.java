@@ -16,6 +16,8 @@
 
 package dagger.internal.codegen.writing;
 
+import static androidx.room.compiler.codegen.XTypeNameKt.toJavaPoet;
+import static androidx.room.compiler.codegen.compat.XConverters.toXPoet;
 import static com.google.common.base.CaseFormat.LOWER_CAMEL;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.google.common.base.CaseFormat.UPPER_UNDERSCORE;
@@ -42,6 +44,7 @@ import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
 import static javax.tools.Diagnostic.Kind.ERROR;
 
+import androidx.room.compiler.processing.JavaPoetExtKt;
 import androidx.room.compiler.processing.XExecutableParameterElement;
 import androidx.room.compiler.processing.XMessager;
 import androidx.room.compiler.processing.XMethodElement;
@@ -58,7 +61,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.MultimapBuilder;
-import com.google.common.collect.Sets;
+import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.FieldSpec;
@@ -80,6 +83,7 @@ import dagger.internal.codegen.binding.ComponentDescriptor.ComponentMethodDescri
 import dagger.internal.codegen.binding.ComponentRequirement;
 import dagger.internal.codegen.binding.KeyVariableNamer;
 import dagger.internal.codegen.binding.MethodSignature;
+import dagger.internal.codegen.binding.ModuleDescriptor;
 import dagger.internal.codegen.compileroption.CompilerOptions;
 import dagger.internal.codegen.javapoet.CodeBlocks;
 import dagger.internal.codegen.javapoet.TypeNames;
@@ -91,6 +95,7 @@ import dagger.internal.codegen.model.RequestKind;
 import dagger.internal.codegen.xprocessing.XTypeElements;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -244,8 +249,12 @@ public final class ComponentImplementation {
   /**
    * How many statements per {@code initialize()} or {@code onProducerFutureCancelled()} method
    * before they get partitioned.
+   *
+   * <p>This value has been set based on empirical performance analysis. If this number is too
+   * large, some Android runtimes will not ahead-of-time compile the generated code. See
+   * b/316617683.
    */
-  private static final int STATEMENTS_PER_METHOD = 100;
+  private static final int STATEMENTS_PER_METHOD = 25;
 
   private final ShardImplementation componentShard;
   private final Supplier<ImmutableMap<Binding, ShardImplementation>> shardsByBinding;
@@ -291,7 +300,8 @@ public final class ComponentImplementation {
     this.processingEnv = processingEnv;
 
     // The first group of keys belong to the component itself. We call this the componentShard.
-    this.componentShard = new ShardImplementation(componentNames.get(graph.componentPath()));
+    this.componentShard =
+        new ShardImplementation(toJavaPoet(componentNames.get(graph.componentPath())));
 
     // Claim the method names for all local and inherited methods on the component type.
     XTypeElements.getAllNonPrivateInstanceMethods(graph.componentTypeElement()).stream()
@@ -376,8 +386,8 @@ public final class ComponentImplementation {
                   ClassName fieldType = componentImpl.name();
                   String fieldName =
                       componentImpl.isNested()
-                          ? simpleVariableName(componentImpl.name())
-                          : simpleVariableName(component);
+                          ? simpleVariableName(toXPoet(componentImpl.name()))
+                          : simpleVariableName(toXPoet(component));
                   FieldSpec.Builder field =
                       FieldSpec.builder(
                           fieldType,
@@ -426,7 +436,7 @@ public final class ComponentImplementation {
    * generated class unless this is a top-level component, in which case it will be nested.
    */
   public ClassName getCreatorName() {
-    return componentNames.getCreatorName(graph.componentPath());
+    return toJavaPoet(componentNames.getCreatorName(graph.componentPath()));
   }
 
   /** Generates the component and returns the resulting {@link TypeSpec}. */
@@ -437,7 +447,7 @@ public final class ComponentImplementation {
   /**
    * The implementation of a shard.
    *
-   * <p>The purpose of a shard is to allow a component implemenation to be split into multiple
+   * <p>The purpose of a shard is to allow a component implementation to be split into multiple
    * classes, where each class owns the creation logic for a set of keys. Sharding is useful for
    * large component implementations, where a single component implementation class can reach size
    * limitations, such as the constant pool size.
@@ -456,7 +466,6 @@ public final class ComponentImplementation {
     private final UniqueNameSet assistedParamNames = new UniqueNameSet();
     private final List<CodeBlock> initializations = new ArrayList<>();
     private final SwitchingProviders switchingProviders;
-    private final LazyClassKeyProviders lazyClassKeyProviders;
     private final Map<Key, CodeBlock> cancellations = new LinkedHashMap<>();
     private final Map<XVariableElement, String> uniqueAssistedName = new LinkedHashMap<>();
     private final List<CodeBlock> componentRequirementInitializations = new ArrayList<>();
@@ -473,7 +482,6 @@ public final class ComponentImplementation {
     private ShardImplementation(ClassName name) {
       this.name = name;
       this.switchingProviders = new SwitchingProviders(this, processingEnv);
-      this.lazyClassKeyProviders = new LazyClassKeyProviders(this);
       if (graph.componentDescriptor().isProduction()) {
         claimMethodName(CANCELLATION_LISTENER_METHOD_NAME);
       }
@@ -487,8 +495,26 @@ public final class ComponentImplementation {
                       requirement -> requirement,
                       requirement ->
                           ParameterSpec.builder(
-                                  requirement.type().getTypeName(),
+                                  requirement
+                                      .type()
+                                      .getTypeName()
+                                      .annotated(
+                                          requirement
+                                              .getNullability()
+                                              .typeUseNullableAnnotations()
+                                              .stream()
+                                              .map(AnnotationSpec::builder)
+                                              .map(AnnotationSpec.Builder::build)
+                                              .collect(toImmutableList())),
                                   getUniqueFieldName(requirement.variableName() + "Param"))
+                              .addAnnotations(
+                                  requirement
+                                      .getNullability()
+                                      .nonTypeUseNullableAnnotations()
+                                      .stream()
+                                      .map(AnnotationSpec::builder)
+                                      .map(AnnotationSpec.Builder::build)
+                                      .collect(toImmutableList()))
                               .build()));
     }
 
@@ -505,10 +531,6 @@ public final class ComponentImplementation {
     /** Returns the {@link SwitchingProviders} class for this shard. */
     public SwitchingProviders getSwitchingProviders() {
       return switchingProviders;
-    }
-
-    public LazyClassKeyProviders getLazyClassKeyProviders() {
-      return lazyClassKeyProviders;
     }
 
     /** Returns the {@link ComponentImplementation} that owns this shard. */
@@ -569,7 +591,8 @@ public final class ComponentImplementation {
      * {@link Key}.
      */
     ClassName getSubcomponentCreatorSimpleName(Key creatorKey) {
-      return componentNames.getSubcomponentCreatorName(graph.componentPath(), creatorKey);
+      return toJavaPoet(
+          componentNames.getSubcomponentCreatorName(graph.componentPath(), creatorKey));
     }
 
     /**
@@ -612,7 +635,8 @@ public final class ComponentImplementation {
     }
 
     /** Adds a {@link Supplier} for the SwitchingProvider for the component. */
-    void addTypeSupplier(Supplier<TypeSpec> typeSpecSupplier) {
+    @Override
+    public void addTypeSupplier(Supplier<TypeSpec> typeSpecSupplier) {
       typeSuppliers.add(typeSpecSupplier);
     }
 
@@ -705,6 +729,15 @@ public final class ComponentImplementation {
     @Override
     public TypeSpec generate() {
       TypeSpec.Builder builder = classBuilder(name);
+
+      // Ksp requires explicitly associating input classes that are generated with the output class,
+      // otherwise, the cached generated classes won't be discoverable in an incremental build.
+      if (processingEnv.getBackend() == XProcessingEnv.Backend.KSP) {
+        graph.componentDescriptor().modules().stream()
+            .filter(ModuleDescriptor::isImplicitlyIncluded)
+            .forEach(
+                module -> JavaPoetExtKt.addOriginatingElement(builder, module.moduleElement()));
+      }
 
       if (isComponentShard()) {
         TypeSpecs.addSupertype(builder, graph.componentTypeElement());
@@ -871,10 +904,11 @@ public final class ComponentImplementation {
       // Each component method may have been declared by several supertypes. We want to implement
       // only one method for each distinct signature.
       XType componentType = graph.componentTypeElement().getType();
-      Set<MethodSignature> signatures = Sets.newHashSet();
-      for (ComponentMethodDescriptor method : graph.componentDescriptor().entryPointMethods()) {
-        if (signatures.add(
-            MethodSignature.forComponentMethod(method, componentType, processingEnv))) {
+      Set<MethodSignature> methodDescriptors = new HashSet<>();
+      for (ComponentMethodDescriptor method : graph.entryPointMethods()) {
+        MethodSignature signature =
+            MethodSignature.forComponentMethod(method, componentType, processingEnv);
+        if (methodDescriptors.add(signature)) {
           addMethod(
               COMPONENT_METHOD,
               componentRequestRepresentationsProvider.get().getComponentMethod(method));

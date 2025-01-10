@@ -16,10 +16,11 @@
 
 package dagger.internal.codegen.writing;
 
+import static androidx.room.compiler.codegen.XTypeNameKt.toJavaPoet;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static dagger.internal.codegen.binding.MapKeys.getLazyClassMapKeyExpression;
 import static dagger.internal.codegen.binding.MapKeys.getMapKeyExpression;
 import static dagger.internal.codegen.binding.SourceFiles.mapFactoryClassName;
-import static dagger.internal.codegen.extension.DaggerCollectors.toOptional;
 
 import androidx.room.compiler.processing.XProcessingEnv;
 import com.squareup.javapoet.ClassName;
@@ -32,9 +33,9 @@ import dagger.internal.codegen.base.MapType;
 import dagger.internal.codegen.binding.BindingGraph;
 import dagger.internal.codegen.binding.ContributionBinding;
 import dagger.internal.codegen.binding.MapKeys;
+import dagger.internal.codegen.binding.MultiboundMapBinding;
 import dagger.internal.codegen.javapoet.TypeNames;
 import dagger.internal.codegen.model.DependencyRequest;
-import java.util.stream.Stream;
 
 /** A factory creation expression for a multibound map. */
 final class MapFactoryCreationExpression extends MultibindingFactoryCreationExpression {
@@ -42,13 +43,12 @@ final class MapFactoryCreationExpression extends MultibindingFactoryCreationExpr
   private final XProcessingEnv processingEnv;
   private final ComponentImplementation componentImplementation;
   private final BindingGraph graph;
-  private final ContributionBinding binding;
+  private final MultiboundMapBinding binding;
   private final boolean useLazyClassKey;
-  private final LazyClassKeyProviders lazyClassKeyProviders;
 
   @AssistedInject
   MapFactoryCreationExpression(
-      @Assisted ContributionBinding binding,
+      @Assisted MultiboundMapBinding binding,
       XProcessingEnv processingEnv,
       ComponentImplementation componentImplementation,
       ComponentRequestRepresentations componentRequestRepresentations,
@@ -59,26 +59,16 @@ final class MapFactoryCreationExpression extends MultibindingFactoryCreationExpr
     this.componentImplementation = componentImplementation;
     this.graph = graph;
     this.useLazyClassKey = MapKeys.useLazyClassKey(binding, graph);
-    this.lazyClassKeyProviders =
-        componentImplementation.shardImplementation(binding).getLazyClassKeyProviders();
   }
 
   @Override
   public CodeBlock creationExpression() {
-    ClassName mapFactoryClassName = mapFactoryClassName(binding);
+    ClassName mapFactoryClassName = toJavaPoet(mapFactoryClassName(binding));
     CodeBlock.Builder builder = CodeBlock.builder().add("$T.", mapFactoryClassName);
     TypeName valueTypeName = TypeName.OBJECT;
     if (!useRawType()) {
       MapType mapType = MapType.from(binding.key());
-      // TODO(ronshapiro): either inline this into mapFactoryClassName, or add a
-      // mapType.unwrappedValueType() method that doesn't require a framework type
-      valueTypeName =
-          Stream.of(TypeNames.PROVIDER, TypeNames.PRODUCER, TypeNames.PRODUCED)
-              .filter(mapType::valuesAreTypeOf)
-              .map(mapType::unwrappedValueType)
-              .collect(toOptional())
-              .orElseGet(mapType::valueType)
-              .getTypeName();
+      valueTypeName = mapType.unwrappedFrameworkValueType().getTypeName();
       builder.add(
           "<$T, $T>",
           useLazyClassKey ? TypeNames.STRING : mapType.keyType().getTypeName(),
@@ -92,7 +82,7 @@ final class MapFactoryCreationExpression extends MultibindingFactoryCreationExpr
       builder.add(
           ".put($L, $L)",
           useLazyClassKey
-              ? lazyClassKeyProviders.getMapKeyExpression(dependency.key())
+              ? getLazyClassMapKeyExpression(graph.contributionBinding(dependency.key()))
               : getMapKeyExpression(
                   contributionBinding, componentImplementation.name(), processingEnv),
           multibindingDependencyExpression(dependency));
@@ -101,14 +91,32 @@ final class MapFactoryCreationExpression extends MultibindingFactoryCreationExpr
     return useLazyClassKey
         ? CodeBlock.of(
             "$T.<$T>of($L)",
-            TypeNames.LAZY_CLASS_KEY_MAP_FACTORY,
+            lazyMapFactoryClassName(binding),
             valueTypeName,
             builder.add(".build()").build())
         : builder.add(".build()").build();
   }
 
+  private static ClassName lazyMapFactoryClassName(MultiboundMapBinding binding) {
+    MapType mapType = MapType.from(binding.key());
+    switch (binding.bindingType()) {
+      case PROVISION:
+        return mapType.valuesAreTypeOf(TypeNames.PROVIDER)
+            ? TypeNames.LAZY_CLASS_KEY_MAP_PROVIDER_FACTORY
+            : TypeNames.LAZY_CLASS_KEY_MAP_FACTORY;
+      case PRODUCTION:
+        return mapType.valuesAreFrameworkType()
+            ? mapType.valuesAreTypeOf(TypeNames.PRODUCER)
+                ? TypeNames.LAZY_MAP_OF_PRODUCER_PRODUCER
+                : TypeNames.LAZY_MAP_OF_PRODUCED_PRODUCER
+            : TypeNames.LAZY_MAP_PRODUCER;
+      default:
+        throw new IllegalArgumentException(binding.bindingType().toString());
+    }
+  }
+
   @AssistedFactory
   static interface Factory {
-    MapFactoryCreationExpression create(ContributionBinding binding);
+    MapFactoryCreationExpression create(MultiboundMapBinding binding);
   }
 }

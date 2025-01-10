@@ -20,16 +20,17 @@ import static dagger.internal.Preconditions.checkNotNull;
 import static dagger.internal.Providers.asDaggerProvider;
 
 import dagger.Lazy;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A {@link Lazy} and {@link Provider} implementation that memoizes the value returned from a
  * delegate using the double-check idiom described in Item 71 of <i>Effective Java 2</i>.
  */
-public final class DoubleCheck<T> implements Provider<T>, Lazy<T> {
+public final class DoubleCheck<T extends @Nullable Object> implements Provider<T>, Lazy<T> {
   private static final Object UNINITIALIZED = new Object();
 
-  private volatile Provider<T> provider;
-  private volatile Object instance = UNINITIALIZED;
+  private volatile @Nullable Provider<T> provider;
+  private volatile @Nullable Object instance = UNINITIALIZED;
 
   private DoubleCheck(Provider<T> provider) {
     assert provider != null;
@@ -39,20 +40,24 @@ public final class DoubleCheck<T> implements Provider<T>, Lazy<T> {
   @SuppressWarnings("unchecked") // cast only happens when result comes from the provider
   @Override
   public T get() {
-    Object result = instance;
+    @Nullable Object result = instance;
     if (result == UNINITIALIZED) {
-      synchronized (this) {
-        result = instance;
-        if (result == UNINITIALIZED) {
-          result = provider.get();
-          instance = reentrantCheck(instance, result);
-          /* Null out the reference to the provider. We are never going to need it again, so we
-           * can make it eligible for GC. */
-          provider = null;
-        }
-      }
+      result = getSynchronized();
     }
     return (T) result;
+  }
+
+  @SuppressWarnings("nullness:dereference.of.nullable") // provider is non-null
+  private synchronized @Nullable Object getSynchronized() {
+    @Nullable Object result = instance;
+    if (result == UNINITIALIZED) {
+      result = provider.get();
+      instance = reentrantCheck(instance, result);
+      /* Null out the reference to the provider. We are never going to need it again, so we
+       * can make it eligible for GC. */
+      provider = null;
+    }
+    return result;
   }
 
   /**
@@ -60,7 +65,8 @@ public final class DoubleCheck<T> implements Provider<T>, Lazy<T> {
    * new instance is the same as the current instance, return the instance. However, if the new
    * instance differs from the current instance, an {@link IllegalStateException} is thrown.
    */
-  private static Object reentrantCheck(Object currentInstance, Object newInstance) {
+  private static @Nullable Object reentrantCheck(
+      @Nullable Object currentInstance, @Nullable Object newInstance) {
     boolean isReentrant = currentInstance != UNINITIALIZED;
     if (isReentrant && currentInstance != newInstance) {
       throw new IllegalStateException("Scoped provider was invoked recursively returning "
@@ -71,10 +77,7 @@ public final class DoubleCheck<T> implements Provider<T>, Lazy<T> {
   }
 
   /** Returns a {@link Provider} that caches the value from the given delegate provider. */
-  // This method is declared this way instead of "<T> Provider<T> provider(Provider<T> delegate)"
-  // to work around an Eclipse type inference bug: https://github.com/google/dagger/issues/949.
-  public static <P extends dagger.internal.Provider<T>, T> dagger.internal.Provider<T> provider(
-      P delegate) {
+  public static <T> dagger.internal.Provider<T> provider(dagger.internal.Provider<T> delegate) {
     checkNotNull(delegate);
     if (delegate instanceof DoubleCheck) {
       /* This should be a rare case, but if we have a scoped @Binds that delegates to a scoped
@@ -95,9 +98,7 @@ public final class DoubleCheck<T> implements Provider<T>, Lazy<T> {
   }
 
   /** Returns a {@link Lazy} that caches the value from the given provider. */
-  // This method is declared this way instead of "<T> Lazy<T> lazy(Provider<T> delegate)"
-  // to work around an Eclipse type inference bug: https://github.com/google/dagger/issues/949.
-  public static <P extends Provider<T>, T> Lazy<T> lazy(P provider) {
+  public static <T> Lazy<T> lazy(Provider<T> provider) {
     if (provider instanceof Lazy) {
       @SuppressWarnings("unchecked")
       final Lazy<T> lazy = (Lazy<T>) provider;
