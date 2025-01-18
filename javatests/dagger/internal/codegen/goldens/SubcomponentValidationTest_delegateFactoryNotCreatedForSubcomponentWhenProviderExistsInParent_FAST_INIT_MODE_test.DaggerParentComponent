@@ -16,7 +16,9 @@ import javax.annotation.processing.Generated;
     "rawtypes",
     "KotlinInternal",
     "KotlinInternalInJava",
-    "cast"
+    "cast",
+    "deprecation",
+    "nullness:initialization.field.uninitialized"
 })
 final class DaggerParentComponent {
   private DaggerParentComponent() {
@@ -113,9 +115,9 @@ final class DaggerParentComponent {
     }
 
     @CanIgnoreReturnValue
-    private Dep2 injectDep2(Dep2 instance) {
-      Dep2_MembersInjector.injectDep2Method(instance);
-      return instance;
+    private Dep2 injectDep2(Dep2 instance2) {
+      Dep2_MembersInjector.injectDep2Method(instance2);
+      return instance2;
     }
 
     private static final class SwitchingProvider<T> implements Provider<T> {

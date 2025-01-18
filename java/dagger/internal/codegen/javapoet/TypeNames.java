@@ -61,7 +61,15 @@ public final class TypeNames {
   public static final ClassName LAZY_CLASS_KEY_MAP =
       ClassName.get("dagger.internal", "LazyClassKeyMap");
   public static final ClassName LAZY_CLASS_KEY_MAP_FACTORY =
-      ClassName.get("dagger.internal", "LazyClassKeyMap", "Factory");
+      ClassName.get("dagger.internal", "LazyClassKeyMap", "MapFactory");
+  public static final ClassName LAZY_CLASS_KEY_MAP_PROVIDER_FACTORY =
+      ClassName.get("dagger.internal", "LazyClassKeyMap", "MapProviderFactory");
+  public static final ClassName LAZY_MAP_OF_PRODUCED_PRODUCER =
+      ClassName.get("dagger.producers.internal", "LazyMapOfProducedProducer");
+  public static final ClassName LAZY_MAP_OF_PRODUCER_PRODUCER =
+      ClassName.get("dagger.producers.internal", "LazyMapOfProducerProducer");
+  public static final ClassName LAZY_MAP_PRODUCER =
+      ClassName.get("dagger.producers.internal", "LazyMapProducer");
 
   public static final ClassName DELEGATE_FACTORY =
       ClassName.get("dagger.internal", "DelegateFactory");
@@ -80,6 +88,7 @@ public final class TypeNames {
   public static final ClassName MEMBERS_INJECTORS =
       ClassName.get("dagger.internal", "MembersInjectors");
   public static final ClassName PROVIDER = ClassName.get("javax.inject", "Provider");
+  public static final ClassName JAKARTA_PROVIDER = ClassName.get("jakarta.inject", "Provider");
   public static final ClassName DAGGER_PROVIDER = ClassName.get("dagger.internal", "Provider");
   public static final ClassName DAGGER_PROVIDERS = ClassName.get("dagger.internal", "Providers");
   public static final ClassName PROVIDER_OF_LAZY =

@@ -16,6 +16,7 @@
 
 package dagger.internal.codegen.writing;
 
+import static androidx.room.compiler.codegen.XTypeNameKt.toJavaPoet;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static dagger.internal.codegen.binding.BindingRequest.bindingRequest;
@@ -24,7 +25,7 @@ import com.squareup.javapoet.CodeBlock;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
 import dagger.assisted.AssistedInject;
-import dagger.internal.codegen.binding.ContributionBinding;
+import dagger.internal.codegen.binding.DelegateBinding;
 import dagger.internal.codegen.compileroption.CompilerOptions;
 import dagger.internal.codegen.javapoet.CodeBlocks;
 import dagger.internal.codegen.model.DependencyRequest;
@@ -34,13 +35,13 @@ import dagger.internal.codegen.writing.FrameworkFieldInitializer.FrameworkInstan
 final class DelegatingFrameworkInstanceCreationExpression
     implements FrameworkInstanceCreationExpression {
 
-  private final ContributionBinding binding;
+  private final DelegateBinding binding;
   private final ComponentImplementation componentImplementation;
   private final ComponentRequestRepresentations componentRequestRepresentations;
 
   @AssistedInject
   DelegatingFrameworkInstanceCreationExpression(
-      @Assisted ContributionBinding binding,
+      @Assisted DelegateBinding binding,
       ComponentImplementation componentImplementation,
       ComponentRequestRepresentations componentRequestRepresentations,
       CompilerOptions compilerOptions) {
@@ -58,11 +59,11 @@ final class DelegatingFrameworkInstanceCreationExpression
                 bindingRequest(dependency.key(), binding.frameworkType()),
                 componentImplementation.shardImplementation(binding).name())
             .codeBlock(),
-        binding.frameworkType().frameworkClassName());
+        toJavaPoet(binding.frameworkType().frameworkClassName()));
   }
 
   @AssistedFactory
   static interface Factory {
-    DelegatingFrameworkInstanceCreationExpression create(ContributionBinding binding);
+    DelegatingFrameworkInstanceCreationExpression create(DelegateBinding binding);
   }
 }

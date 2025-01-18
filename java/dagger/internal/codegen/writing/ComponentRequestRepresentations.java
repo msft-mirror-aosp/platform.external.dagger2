@@ -19,17 +19,14 @@ package dagger.internal.codegen.writing;
 import static androidx.room.compiler.processing.XTypeKt.isVoid;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.collect.Iterables.getOnlyElement;
 import static dagger.internal.codegen.base.Util.reentrantComputeIfAbsent;
 import static dagger.internal.codegen.binding.BindingRequest.bindingRequest;
 import static dagger.internal.codegen.javapoet.CodeBlocks.makeParametersCodeBlock;
 import static dagger.internal.codegen.langmodel.Accessibility.isRawTypeAccessible;
 import static dagger.internal.codegen.langmodel.Accessibility.isTypeAccessibleFrom;
 import static dagger.internal.codegen.xprocessing.MethodSpecs.overriding;
-import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
 import static dagger.internal.codegen.xprocessing.XProcessingEnvs.isPreJava8SourceVersion;
 
-import androidx.room.compiler.processing.XMethodElement;
 import androidx.room.compiler.processing.XProcessingEnv;
 import androidx.room.compiler.processing.XType;
 import com.google.common.collect.ImmutableList;
@@ -47,8 +44,6 @@ import dagger.internal.codegen.binding.ContributionBinding;
 import dagger.internal.codegen.binding.FrameworkType;
 import dagger.internal.codegen.binding.FrameworkTypeMapper;
 import dagger.internal.codegen.binding.MembersInjectionBinding;
-import dagger.internal.codegen.binding.ProductionBinding;
-import dagger.internal.codegen.binding.ProvisionBinding;
 import dagger.internal.codegen.javapoet.Expression;
 import dagger.internal.codegen.model.DependencyRequest;
 import dagger.internal.codegen.model.RequestKind;
@@ -187,47 +182,26 @@ public final class ComponentRequestRepresentations {
 
   /** Returns the implementation of a component method. */
   public MethodSpec getComponentMethod(ComponentMethodDescriptor componentMethod) {
-    checkArgument(componentMethod.dependencyRequest().isPresent());
-    BindingRequest request = bindingRequest(componentMethod.dependencyRequest().get());
     return overriding(componentMethod.methodElement(), graph.componentTypeElement().getType())
-        .addCode(
-            request.isRequestKind(RequestKind.MEMBERS_INJECTION)
-                ? getMembersInjectionComponentMethodImplementation(request, componentMethod)
-                : getContributionComponentMethodImplementation(request, componentMethod))
+        .addCode(getComponentMethodCodeBlock(componentMethod))
         .build();
   }
 
-  private CodeBlock getMembersInjectionComponentMethodImplementation(
-      BindingRequest request, ComponentMethodDescriptor componentMethod) {
-    checkArgument(request.isRequestKind(RequestKind.MEMBERS_INJECTION));
-    XMethodElement methodElement = componentMethod.methodElement();
-    RequestRepresentation requestRepresentation = getRequestRepresentation(request);
-    MembersInjectionBinding binding =
-        ((MembersInjectionRequestRepresentation) requestRepresentation).binding();
-    if (binding.injectionSites().isEmpty()) {
-      // If there are no injection sites either do nothing (if the return type is void) or return
-      // the input instance as-is.
-      return isVoid(methodElement.getReturnType())
-          ? CodeBlock.of("")
-          : CodeBlock.of(
-              "return $L;", getSimpleName(getOnlyElement(methodElement.getParameters())));
+  private CodeBlock getComponentMethodCodeBlock(ComponentMethodDescriptor componentMethod) {
+    Expression expression = getComponentMethodExpression(componentMethod);
+    if (isVoid(componentMethod.methodElement().getReturnType())) {
+      return expression.codeBlock().isEmpty()
+          ? expression.codeBlock()
+          : CodeBlock.of("$L;", expression.codeBlock());
     }
-    Expression expression = getComponentMethodExpression(requestRepresentation, componentMethod);
-    return isVoid(methodElement.getReturnType())
-        ? CodeBlock.of("$L;", expression.codeBlock())
-        : CodeBlock.of("return $L;", expression.codeBlock());
-  }
-
-  private CodeBlock getContributionComponentMethodImplementation(
-      BindingRequest request, ComponentMethodDescriptor componentMethod) {
-    checkArgument(!request.isRequestKind(RequestKind.MEMBERS_INJECTION));
-    Expression expression =
-        getComponentMethodExpression(getRequestRepresentation(request), componentMethod);
     return CodeBlock.of("return $L;", expression.codeBlock());
   }
 
-  private Expression getComponentMethodExpression(
-      RequestRepresentation requestRepresentation, ComponentMethodDescriptor componentMethod) {
+  private Expression getComponentMethodExpression(ComponentMethodDescriptor componentMethod) {
+    checkArgument(componentMethod.dependencyRequest().isPresent());
+    BindingRequest request = bindingRequest(componentMethod.dependencyRequest().get());
+    RequestRepresentation requestRepresentation = getRequestRepresentation(request);
+
     Expression expression =
         requestRepresentation.getDependencyExpressionForComponentMethod(
             componentMethod, componentImplementation);
@@ -279,9 +253,9 @@ public final class ComponentRequestRepresentations {
         return membersInjectionBindingRepresentationFactory.create(
             (MembersInjectionBinding) binding);
       case PROVISION:
-        return provisionBindingRepresentationFactory.create((ProvisionBinding) binding);
+        return provisionBindingRepresentationFactory.create((ContributionBinding) binding);
       case PRODUCTION:
-        return productionBindingRepresentationFactory.create((ProductionBinding) binding);
+        return productionBindingRepresentationFactory.create((ContributionBinding) binding);
     }
     throw new AssertionError();
   }

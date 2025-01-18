@@ -16,6 +16,7 @@
 
 package dagger.internal.codegen.writing;
 
+import static androidx.room.compiler.codegen.XTypeNameKt.toJavaPoet;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static dagger.internal.codegen.binding.SourceFiles.generatedClassNameForBinding;
 
@@ -23,7 +24,7 @@ import com.squareup.javapoet.CodeBlock;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
 import dagger.assisted.AssistedInject;
-import dagger.internal.codegen.binding.ContributionBinding;
+import dagger.internal.codegen.binding.ProductionBinding;
 import dagger.internal.codegen.writing.ComponentImplementation.ShardImplementation;
 import dagger.internal.codegen.writing.FrameworkFieldInitializer.FrameworkInstanceCreationExpression;
 
@@ -36,11 +37,11 @@ final class ProducerCreationExpression implements FrameworkInstanceCreationExpre
 
   private final ShardImplementation shardImplementation;
   private final ComponentRequestRepresentations componentRequestRepresentations;
-  private final ContributionBinding binding;
+  private final ProductionBinding binding;
 
   @AssistedInject
   ProducerCreationExpression(
-      @Assisted ContributionBinding binding,
+      @Assisted ProductionBinding binding,
       ComponentImplementation componentImplementation,
       ComponentRequestRepresentations componentRequestRepresentations) {
     this.binding = checkNotNull(binding);
@@ -52,13 +53,13 @@ final class ProducerCreationExpression implements FrameworkInstanceCreationExpre
   public CodeBlock creationExpression() {
     return CodeBlock.of(
         "$T.create($L)",
-        generatedClassNameForBinding(binding),
+        toJavaPoet(generatedClassNameForBinding(binding)),
         componentRequestRepresentations.getCreateMethodArgumentsCodeBlock(
             binding, shardImplementation.name()));
   }
 
   @AssistedFactory
   static interface Factory {
-    ProducerCreationExpression create(ContributionBinding binding);
+    ProducerCreationExpression create(ProductionBinding binding);
   }
 }

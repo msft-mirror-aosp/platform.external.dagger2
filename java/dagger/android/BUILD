@@ -17,13 +17,15 @@
 
 load(
     "//:build_defs.bzl",
+    "DOCLINT_HTML_AND_SYNTAX",
+    "JAVA_RELEASE_MIN",
     "POM_VERSION",
 )
 load("//tools:dejetify.bzl", "dejetified_library")
 load(
-    "//tools:maven.bzl",
+    "//tools/maven:maven.bzl",
+    "dagger_pom_file",
     "gen_maven_artifact",
-    "pom_file",
 )
 
 package(default_visibility = ["//:src"])
@@ -43,6 +45,7 @@ filegroup(
 android_library(
     name = "android",
     srcs = SRCS,
+    javacopts = JAVA_RELEASE_MIN + DOCLINT_HTML_AND_SYNTAX,
     plugins = [
         "//java/dagger/android/internal/proguard:plugin",
     ],
@@ -68,7 +71,7 @@ gen_maven_artifact(
         "com.google.dagger:dagger",
         "com.google.dagger:dagger-lint-aar",
     ],
-    javadoc_android_api_level = 32,
+    javadoc_android_api_level = 34,
     javadoc_root_packages = [
         "dagger.android",
     ],
@@ -94,7 +97,7 @@ android_library(
     ],
 )
 
-pom_file(
+dagger_pom_file(
     name = "legacy-pom",
     artifact_id = "dagger-android-legacy",
     artifact_name = "Dagger Android Legacy",
