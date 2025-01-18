@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("@rules_java//java:defs.bzl", "java_library")
+
 # Description:
 #   A library based on Hilt that provides standard components and automated injection for Android.
 load("//:build_defs.bzl", "POM_VERSION")
 load("//tools:bazel_compat.bzl", "compat_kt_android_library")
-load("//tools:maven.bzl", "gen_maven_artifact")
+load("//tools/maven:maven.bzl", "gen_maven_artifact")
 
 package(default_visibility = ["//:src"])
 
@@ -68,9 +70,9 @@ android_library(
         "//java/dagger/hilt/processor/internal/root:root_plugin",
     ],
     exports = [
-        ":activity_retained_lifecycle",
         "//:dagger_with_compiler",
         "//java/dagger/hilt:install_in",
+        "//java/dagger/hilt/android:activity_retained_lifecycle",
         "//java/dagger/hilt/android/components",
         "//java/dagger/hilt/android/internal/builders",
         "//java/dagger/hilt/android/internal/legacy:aggregated_element_proxy",
@@ -247,7 +249,7 @@ gen_maven_artifact(
         "com.google.guava:guava",
         "javax.annotation:javax.annotation-api",
     ],
-    javadoc_android_api_level = 32,
+    javadoc_android_api_level = 34,
     javadoc_exclude_packages = [
         "dagger.hilt.android.internal",
     ],

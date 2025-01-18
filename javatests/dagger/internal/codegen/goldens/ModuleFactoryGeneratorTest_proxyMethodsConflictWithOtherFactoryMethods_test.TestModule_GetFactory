@@ -18,7 +18,9 @@ import javax.annotation.processing.Generated;
     "rawtypes",
     "KotlinInternal",
     "KotlinInternalInJava",
-    "cast"
+    "cast",
+    "deprecation",
+    "nullness:initialization.field.uninitialized"
 })
 public final class TestModule_GetFactory implements Factory<Integer> {
   @Override
@@ -35,7 +37,7 @@ public final class TestModule_GetFactory implements Factory<Integer> {
   }
 
   private static final class InstanceHolder {
-    private static final TestModule_GetFactory INSTANCE = new TestModule_GetFactory();
+    static final TestModule_GetFactory INSTANCE = new TestModule_GetFactory();
   }
 }
 

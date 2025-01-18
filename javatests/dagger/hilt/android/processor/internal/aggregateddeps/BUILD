@@ -14,6 +14,7 @@
 # Description:
 #   Tests for internal code for implementing Hilt processors.
 
+load("@rules_java//java:defs.bzl", "java_library")
 load("//java/dagger/testing/compile:macros.bzl", "compiler_test")
 
 package(default_visibility = ["//:src"])
@@ -30,7 +31,7 @@ compiler_test(
         "//java/dagger/hilt/android/internal/modules",
         "//java/dagger/hilt/testing:test_install_in",
         "//java/dagger/hilt/android/testing:hilt_android_test",
-        "@androidsdk//:platforms/android-32/android.jar",
+        "@androidsdk//:platforms/android-34/android.jar",
     ],
     deps = [
         "//java/dagger/hilt/android/testing/compile",
@@ -49,7 +50,7 @@ compiler_test(
         "//java/dagger/hilt/android:early_entry_point",
         "//java/dagger/hilt/android/components",
         "//java/dagger/hilt/android/testing:hilt_android_test",
-        "@androidsdk//:platforms/android-32/android.jar",
+        "@androidsdk//:platforms/android-34/android.jar",
     ],
     deps = [
         "//java/dagger/hilt/android/testing/compile",

@@ -15,8 +15,9 @@
 # Description:
 #   Hilt android processors.
 
+load("@rules_java//java:defs.bzl", "java_library")
 load("//:build_defs.bzl", "POM_VERSION")
-load("//tools:maven.bzl", "gen_maven_artifact")
+load("//tools/maven:maven.bzl", "gen_maven_artifact")
 
 package(default_visibility = ["//:src"])
 
@@ -114,7 +115,7 @@ gen_maven_artifact(
         "net.ltgt.gradle.incap:incap",
         "org.jetbrains.kotlin:kotlin-stdlib",
     ],
-    javadoc_android_api_level = 32,
+    javadoc_android_api_level = 34,
     javadoc_root_packages = [
         # Java 11 javadocs requires non-empty root package so use ".internal" as the root package.
         "dagger.hilt.processor.internal",

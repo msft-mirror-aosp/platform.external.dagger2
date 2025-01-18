@@ -77,7 +77,11 @@ java_library {
 
     libs: [
         "guava",
+        "jspecify",
         "jsr330",
+    ],
+    static_libs: [
+        "jakarta.inject",
     ],
     apex_available: [
         "//apex_available:platform",
@@ -152,6 +156,7 @@ java_library_host {
 
     srcs: [
         "java/dagger/internal/codegen/**/*.java",
+        "java/dagger/internal/codegen/**/*.kt",
         "java/dagger/internal/codegen/**/*.proto",
 
         "java/dagger/model/*.java",
@@ -172,13 +177,14 @@ java_library_host {
         "dagger2-room-compiler-processing",
         "google_java_format",
         "guava",
+        "jakarta.inject",
         "javapoet",
         "jsr330",
+        "kotlin_metadata_jvm",
         "kotlin_symbol_processing_api",
         "kotlin-stdlib",
         "kotlin-stdlib-jdk8",
         "kotlinpoet",
-        "kotlinx_metadata_jvm",
     ],
 
     libs: [
@@ -507,8 +513,8 @@ java_library_host {
         "dagger2",
         "javapoet",
         "jsr330",
+        "kotlin_metadata_jvm",
         "kotlin-stdlib",
-        "kotlinx_metadata_jvm",
         "dagger2-android-annotation-stubs",
     ],
     // shade guava to avoid conflicts with guava embedded in Error Prone.

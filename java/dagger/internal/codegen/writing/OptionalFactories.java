@@ -16,6 +16,7 @@
 
 package dagger.internal.codegen.writing;
 
+import static androidx.room.compiler.codegen.XTypeNameKt.toJavaPoet;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.google.common.base.CaseFormat.UPPER_UNDERSCORE;
 import static com.google.common.base.Verify.verify;
@@ -57,8 +58,8 @@ import dagger.internal.Preconditions;
 import dagger.internal.codegen.base.OptionalType;
 import dagger.internal.codegen.base.OptionalType.OptionalKind;
 import dagger.internal.codegen.binding.BindingType;
-import dagger.internal.codegen.binding.ContributionBinding;
 import dagger.internal.codegen.binding.FrameworkType;
+import dagger.internal.codegen.binding.OptionalBinding;
 import dagger.internal.codegen.javapoet.AnnotationSpecs;
 import dagger.internal.codegen.javapoet.TypeNames;
 import dagger.internal.codegen.model.RequestKind;
@@ -119,7 +120,7 @@ final class OptionalFactories {
    * Returns an expression that calls a static method that returns a {@code Provider<Optional<T>>}
    * for absent optional bindings.
    */
-  CodeBlock absentOptionalProvider(ContributionBinding binding) {
+  CodeBlock absentOptionalProvider(OptionalBinding binding) {
     verify(
         binding.bindingType().equals(BindingType.PROVISION),
         "Absent optional bindings should be provisions: %s",
@@ -267,11 +268,11 @@ final class OptionalFactories {
       return new StringBuilder("Present")
           .append(UPPER_UNDERSCORE.to(UPPER_CAMEL, optionalKind().name()))
           .append(UPPER_UNDERSCORE.to(UPPER_CAMEL, valueKind().toString()))
-          .append(frameworkType().frameworkClassName().simpleName())
+          .append(toJavaPoet(frameworkType().frameworkClassName()).simpleName())
           .toString();
     }
 
-    private static PresentFactorySpec of(ContributionBinding binding) {
+    private static PresentFactorySpec of(OptionalBinding binding) {
       return new AutoValue_OptionalFactories_PresentFactorySpec(
           FrameworkType.forBindingType(binding.bindingType()),
           OptionalType.from(binding.key()).kind(),
@@ -302,7 +303,7 @@ final class OptionalFactories {
    * @param delegateFactory an expression for a {@code Provider} or {@code Producer} of the
    *     underlying type
    */
-  CodeBlock presentOptionalFactory(ContributionBinding binding, CodeBlock delegateFactory) {
+  CodeBlock presentOptionalFactory(OptionalBinding binding, CodeBlock delegateFactory) {
     return CodeBlock.of(
         "$N.of($L)",
         perGeneratedFileCache.presentFactoryClasses.computeIfAbsent(
