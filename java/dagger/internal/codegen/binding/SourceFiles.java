@@ -16,36 +16,30 @@
 
 package dagger.internal.codegen.binding;
 
+import static androidx.room.compiler.codegen.XTypeNameKt.toJavaPoet;
 import static androidx.room.compiler.processing.XElementKt.isConstructor;
 import static com.google.common.base.CaseFormat.LOWER_CAMEL;
 import static com.google.common.base.CaseFormat.UPPER_CAMEL;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static dagger.internal.codegen.javapoet.TypeNames.DOUBLE_CHECK;
-import static dagger.internal.codegen.javapoet.TypeNames.MAP_FACTORY;
-import static dagger.internal.codegen.javapoet.TypeNames.MAP_OF_PRODUCED_PRODUCER;
-import static dagger.internal.codegen.javapoet.TypeNames.MAP_OF_PRODUCER_PRODUCER;
-import static dagger.internal.codegen.javapoet.TypeNames.MAP_PRODUCER;
-import static dagger.internal.codegen.javapoet.TypeNames.MAP_PROVIDER_FACTORY;
 import static dagger.internal.codegen.javapoet.TypeNames.PRODUCER;
 import static dagger.internal.codegen.javapoet.TypeNames.PROVIDER;
 import static dagger.internal.codegen.javapoet.TypeNames.PROVIDER_OF_LAZY;
-import static dagger.internal.codegen.javapoet.TypeNames.SET_FACTORY;
-import static dagger.internal.codegen.javapoet.TypeNames.SET_OF_PRODUCED_PRODUCER;
-import static dagger.internal.codegen.javapoet.TypeNames.SET_PRODUCER;
 import static dagger.internal.codegen.model.BindingKind.ASSISTED_INJECTION;
 import static dagger.internal.codegen.model.BindingKind.INJECTION;
-import static dagger.internal.codegen.model.BindingKind.MULTIBOUND_MAP;
-import static dagger.internal.codegen.model.BindingKind.MULTIBOUND_SET;
 import static dagger.internal.codegen.xprocessing.XElements.asExecutable;
+import static dagger.internal.codegen.xprocessing.XElements.asMethod;
 import static dagger.internal.codegen.xprocessing.XElements.asTypeElement;
 import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
 import static dagger.internal.codegen.xprocessing.XTypeElements.typeVariableNames;
+import static dagger.internal.codegen.xprocessing.XTypeNames.simpleName;
 import static javax.lang.model.SourceVersion.isName;
 
+import androidx.room.compiler.codegen.XClassName;
 import androidx.room.compiler.processing.XExecutableElement;
 import androidx.room.compiler.processing.XFieldElement;
+import androidx.room.compiler.processing.XMethodElement;
 import androidx.room.compiler.processing.XTypeElement;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
@@ -61,9 +55,11 @@ import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeVariableName;
 import dagger.internal.codegen.base.MapType;
 import dagger.internal.codegen.base.SetType;
+import dagger.internal.codegen.binding.MembersInjectionBinding.InjectionSite;
 import dagger.internal.codegen.javapoet.TypeNames;
 import dagger.internal.codegen.model.DependencyRequest;
 import dagger.internal.codegen.model.RequestKind;
+import dagger.internal.codegen.xprocessing.XTypeNames;
 import javax.inject.Inject;
 import javax.lang.model.SourceVersion;
 
@@ -96,21 +92,12 @@ public final class SourceFiles {
     return Maps.toMap(
         binding.dependencies(),
         dependency -> {
-          ClassName frameworkClassName =
+          XClassName frameworkClassName =
               frameworkTypeMapper.getFrameworkType(dependency.kind()).frameworkClassName();
-          // Remap factory fields back to javax.inject.Provider to maintain backwards compatibility
-          // for now. In a future release, we should change this to Dagger Provider. This will still
-          // be a breaking change, but keeping compatibility for a while should reduce the
-          // likelihood of breakages as it would require components built at much older versions
-          // using factories built at newer versions to break.
-          if (frameworkClassName.equals(TypeNames.DAGGER_PROVIDER)) {
-            frameworkClassName = TypeNames.PROVIDER;
-          }
           return FrameworkField.create(
-              ParameterizedTypeName.get(
-                  frameworkClassName,
-                  dependency.key().type().xprocessing().getTypeName()),
-              DependencyVariableNamer.name(dependency));
+              DependencyVariableNamer.name(dependency),
+              frameworkClassName,
+              dependency.key().type().xprocessing());
         });
   }
 
@@ -147,31 +134,39 @@ public final class SourceFiles {
         dep -> frameworkTypeUsageStatement(CodeBlock.of("$N", fields.get(dep)), dep.kind()));
   }
 
+  public static String generatedProxyMethodName(ContributionBinding binding) {
+    switch (binding.kind()) {
+      case INJECTION:
+      case ASSISTED_INJECTION:
+        return "newInstance";
+      case PROVISION:
+        XMethodElement method = asMethod(binding.bindingElement().get());
+        String simpleName = getSimpleName(method);
+        // If the simple name is already defined in the factory, prepend "proxy" to the name.
+        return simpleName.contentEquals("get") || simpleName.contentEquals("create")
+            ? "proxy" + LOWER_CAMEL.to(UPPER_CAMEL, simpleName)
+            : simpleName;
+      default:
+        throw new AssertionError("Unexpected binding kind: " + binding);
+    }
+  }
+
   /** Returns the generated factory or members injector name for a binding. */
-  public static ClassName generatedClassNameForBinding(Binding binding) {
-    switch (binding.bindingType()) {
+  public static XClassName generatedClassNameForBinding(Binding binding) {
+    switch (binding.kind()) {
+      case ASSISTED_INJECTION:
+      case INJECTION:
       case PROVISION:
       case PRODUCTION:
-        ContributionBinding contribution = (ContributionBinding) binding;
-        switch (contribution.kind()) {
-          case ASSISTED_INJECTION:
-          case INJECTION:
-          case PROVISION:
-          case PRODUCTION:
-            return factoryNameForElement(asExecutable(binding.bindingElement().get()));
-
-          case ASSISTED_FACTORY:
-            return siblingClassName(asTypeElement(binding.bindingElement().get()), "_Impl");
-
-          default:
-            throw new AssertionError();
-        }
-
+        return factoryNameForElement(asExecutable(binding.bindingElement().get()));
+      case ASSISTED_FACTORY:
+        return siblingClassName(asTypeElement(binding.bindingElement().get()), "_Impl");
       case MEMBERS_INJECTION:
         return membersInjectorNameForType(
             ((MembersInjectionBinding) binding).membersInjectedType());
+      default:
+        throw new AssertionError();
     }
-    throw new AssertionError();
   }
 
   /**
@@ -182,35 +177,35 @@ public final class SourceFiles {
    * #generatedClassNameForBinding(Binding)} instead since this method does not validate that the
    * given element is actually a binding element or not.
    */
-  public static ClassName factoryNameForElement(XExecutableElement element) {
+  public static XClassName factoryNameForElement(XExecutableElement element) {
     return elementBasedClassName(element, "Factory");
   }
 
   /**
-   * Calculates an appropriate {@link ClassName} for a generated class that is based on {@code
+   * Calculates an appropriate {@link XClassName} for a generated class that is based on {@code
    * element}, appending {@code suffix} at the end.
    *
-   * <p>This will always return a {@linkplain ClassName#topLevelClassName() top level class name},
-   * even if {@code element}'s enclosing class is a nested type.
+   * <p>This will always return a top level class name, even if {@code element}'s enclosing class is
+   * a nested type.
    */
-  public static ClassName elementBasedClassName(XExecutableElement element, String suffix) {
-    ClassName enclosingClassName = element.getEnclosingElement().getClassName();
+  public static XClassName elementBasedClassName(XExecutableElement element, String suffix) {
+    XClassName enclosingClassName = element.getEnclosingElement().asClassName();
     String methodName =
         isConstructor(element) ? "" : LOWER_CAMEL.to(UPPER_CAMEL, getSimpleName(element));
-    return ClassName.get(
-        enclosingClassName.packageName(),
+    return XClassName.Companion.get(
+        enclosingClassName.getPackageName(),
         classFileName(enclosingClassName) + "_" + methodName + suffix);
   }
 
   public static TypeName parameterizedGeneratedTypeNameForBinding(Binding binding) {
-    ClassName className = generatedClassNameForBinding(binding);
+    ClassName className = toJavaPoet(generatedClassNameForBinding(binding));
     ImmutableList<TypeVariableName> typeParameters = bindingTypeElementTypeVariableNames(binding);
     return typeParameters.isEmpty()
         ? className
         : ParameterizedTypeName.get(className, Iterables.toArray(typeParameters, TypeName.class));
   }
 
-  public static ClassName membersInjectorNameForType(XTypeElement typeElement) {
+  public static XClassName membersInjectorNameForType(XTypeElement typeElement) {
     return siblingClassName(typeElement, "_MembersInjector");
   }
 
@@ -218,19 +213,42 @@ public final class SourceFiles {
     return field.getEnclosingElement().getClassName().canonicalName() + "." + getSimpleName(field);
   }
 
-  public static String classFileName(ClassName className) {
-    return CLASS_FILE_NAME_JOINER.join(className.simpleNames());
+  /*
+   * TODO(ronshapiro): this isn't perfect, as collisions could still exist. Some examples:
+   *
+   *  - @Inject void members() {} will generate a method that conflicts with the instance
+   *    method `injectMembers(T)`
+   *  - Adding the index could conflict with another member:
+   *      @Inject void a(Object o) {}
+   *      @Inject void a(String s) {}
+   *      @Inject void a1(String s) {}
+   *
+   *    Here, Method a(String) will add the suffix "1", which will conflict with the method
+   *    generated for a1(String)
+   *  - Members named "members" or "methods" could also conflict with the {@code static} injection
+   *    method.
+   */
+  public static String membersInjectorMethodName(InjectionSite injectionSite) {
+    int index = injectionSite.indexAmongAtInjectMembersWithSameSimpleName();
+    String indexString = index == 0 ? "" : String.valueOf(index + 1);
+    return "inject"
+        + LOWER_CAMEL.to(UPPER_CAMEL, getSimpleName(injectionSite.element()))
+        + indexString;
   }
 
-  public static ClassName generatedMonitoringModuleName(XTypeElement componentElement) {
+  public static String classFileName(XClassName className) {
+    return CLASS_FILE_NAME_JOINER.join(className.getSimpleNames());
+  }
+
+  public static XClassName generatedMonitoringModuleName(XTypeElement componentElement) {
     return siblingClassName(componentElement, "_MonitoringModule");
   }
 
   // TODO(ronshapiro): when JavaPoet migration is complete, replace the duplicated code
   // which could use this.
-  private static ClassName siblingClassName(XTypeElement typeElement, String suffix) {
-    ClassName className = typeElement.getClassName();
-    return className.topLevelClassName().peerClass(classFileName(className) + suffix);
+  private static XClassName siblingClassName(XTypeElement typeElement, String suffix) {
+    XClassName className = typeElement.asClassName();
+    return XClassName.Companion.get(className.getPackageName(), classFileName(className) + suffix);
   }
 
   /**
@@ -243,31 +261,33 @@ public final class SourceFiles {
    *       {@code Set<Produced<T>>}.
    * </ul>
    */
-  public static ClassName setFactoryClassName(ContributionBinding binding) {
-    checkArgument(binding.kind().equals(MULTIBOUND_SET));
-    if (binding.bindingType().equals(BindingType.PROVISION)) {
-      return SET_FACTORY;
-    } else {
-      SetType setType = SetType.from(binding.key());
-      return setType.elementsAreTypeOf(TypeNames.PRODUCED)
-          ? SET_OF_PRODUCED_PRODUCER
-          : SET_PRODUCER;
+  public static XClassName setFactoryClassName(MultiboundSetBinding binding) {
+    switch (binding.bindingType()) {
+      case PROVISION:
+        return XTypeNames.SET_FACTORY;
+      case PRODUCTION:
+        SetType setType = SetType.from(binding.key());
+        return setType.elementsAreTypeOf(TypeNames.PRODUCED)
+            ? XTypeNames.SET_OF_PRODUCED_PRODUCER
+            : XTypeNames.SET_PRODUCER;
+      default:
+        throw new IllegalArgumentException(binding.bindingType().toString());
     }
   }
 
   /** The {@link java.util.Map} factory class name appropriate for map bindings. */
-  public static ClassName mapFactoryClassName(ContributionBinding binding) {
-    checkState(binding.kind().equals(MULTIBOUND_MAP), binding.kind());
+  public static XClassName mapFactoryClassName(MultiboundMapBinding binding) {
     MapType mapType = MapType.from(binding.key());
     switch (binding.bindingType()) {
       case PROVISION:
-        return mapType.valuesAreTypeOf(PROVIDER) ? MAP_PROVIDER_FACTORY : MAP_FACTORY;
+        return mapType.valuesAreTypeOf(PROVIDER)
+            ? XTypeNames.MAP_PROVIDER_FACTORY : XTypeNames.MAP_FACTORY;
       case PRODUCTION:
         return mapType.valuesAreFrameworkType()
             ? mapType.valuesAreTypeOf(PRODUCER)
-                ? MAP_OF_PRODUCER_PRODUCER
-                : MAP_OF_PRODUCED_PRODUCER
-            : MAP_PRODUCER;
+                ? XTypeNames.MAP_OF_PRODUCER_PRODUCER
+                : XTypeNames.MAP_OF_PRODUCED_PRODUCER
+            : XTypeNames.MAP_PRODUCER;
       default:
         throw new IllegalArgumentException(binding.bindingType().toString());
     }
@@ -293,16 +313,15 @@ public final class SourceFiles {
    */
   // TODO(gak): maybe this should be a function of TypeMirrors instead of Elements?
   public static String simpleVariableName(XTypeElement typeElement) {
-    return simpleVariableName(typeElement.getClassName());
+    return simpleVariableName(typeElement.asClassName());
   }
 
   /**
-   * Returns a name to be used for variables of the given {@linkplain ClassName}. Prefer
-   * semantically meaningful variable names, but if none can be derived, this will produce something
-   * readable.
+   * Returns a name to be used for variables of the given {@link XClassName}. Prefer semantically
+   * meaningful variable names, but if none can be derived, this will produce something readable.
    */
-  public static String simpleVariableName(ClassName className) {
-    String candidateName = UPPER_CAMEL.to(LOWER_CAMEL, className.simpleName());
+  public static String simpleVariableName(XClassName className) {
+    String candidateName = UPPER_CAMEL.to(LOWER_CAMEL, simpleName(className));
     String variableName = protectAgainstKeywords(candidateName);
     verify(isName(variableName), "'%s' was expected to be a valid variable name", variableName);
     return variableName;

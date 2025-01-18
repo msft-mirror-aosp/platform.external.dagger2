@@ -16,15 +16,17 @@
 
 package dagger.internal.codegen.xprocessing;
 
+import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
+import static dagger.internal.codegen.xprocessing.JavaPoetExt.toParameterSpec;
 import static javax.lang.model.element.Modifier.PROTECTED;
 import static javax.lang.model.element.Modifier.PUBLIC;
 
+import androidx.room.compiler.processing.XExecutableParameterElement;
 import androidx.room.compiler.processing.XMethodElement;
 import androidx.room.compiler.processing.XMethodType;
 import androidx.room.compiler.processing.XType;
+import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.MethodSpec;
-import com.squareup.javapoet.ParameterSpec;
-import com.squareup.javapoet.TypeName;
 
 // TODO(bcorso): Consider moving these methods into XProcessing library.
 /** A utility class for {@link MethodSpec} helper methods. */
@@ -33,22 +35,36 @@ public final class MethodSpecs {
   /** Returns a {@link MethodSpec} that overrides the given method. */
   public static MethodSpec.Builder overriding(XMethodElement method, XType owner) {
     XMethodType methodType = method.asMemberOf(owner);
+    Nullability nullability = Nullability.of(method);
     MethodSpec.Builder builder =
         // We're overriding the method so we have to use the jvm name here.
         MethodSpec.methodBuilder(method.getJvmName())
             .addAnnotation(Override.class)
+            .addAnnotations(
+                nullability.nonTypeUseNullableAnnotations().stream()
+                    .map(AnnotationSpec::builder)
+                    .map(AnnotationSpec.Builder::build)
+                    .collect(toImmutableList()))
             .addTypeVariables(methodType.getTypeVariableNames())
             .varargs(method.isVarArgs())
-            .returns(methodType.getReturnType().getTypeName());
+            .returns(
+                methodType
+                    .getReturnType()
+                    .getTypeName()
+                    .annotated(
+                        nullability.typeUseNullableAnnotations().stream()
+                            .map(AnnotationSpec::builder)
+                            .map(AnnotationSpec.Builder::build)
+                            .collect(toImmutableList())));
     if (method.isPublic()) {
       builder.addModifiers(PUBLIC);
     } else if (method.isProtected()) {
       builder.addModifiers(PROTECTED);
     }
     for (int i = 0; i < methodType.getParameterTypes().size(); i++) {
-      String parameterName = method.getParameters().get(i).getJvmName();
-      TypeName parameterType = methodType.getParameterTypes().get(i).getTypeName();
-      builder.addParameter(ParameterSpec.builder(parameterType, parameterName).build());
+      XExecutableParameterElement parameter = method.getParameters().get(i);
+      XType parameterType = methodType.getParameterTypes().get(i);
+      builder.addParameter(toParameterSpec(parameter, parameterType));
     }
     method.getThrownTypes().stream().map(XType::getTypeName).forEach(builder::addException);
     return builder;

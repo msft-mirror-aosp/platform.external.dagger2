@@ -24,7 +24,8 @@ import dagger.assisted.AssistedFactory;
 import dagger.assisted.AssistedInject;
 import dagger.internal.codegen.binding.BindingGraph;
 import dagger.internal.codegen.binding.BindingRequest;
-import dagger.internal.codegen.binding.ProvisionBinding;
+import dagger.internal.codegen.binding.ContributionBinding;
+import dagger.internal.codegen.binding.DelegateBinding;
 import dagger.internal.codegen.model.RequestKind;
 import dagger.internal.codegen.writing.ComponentImplementation.CompilerMode;
 
@@ -35,13 +36,13 @@ import dagger.internal.codegen.writing.ComponentImplementation.CompilerMode;
 final class ProvisionBindingRepresentation implements BindingRepresentation {
   private final BindingGraph graph;
   private final CompilerMode compilerMode;
-  private final ProvisionBinding binding;
+  private final ContributionBinding binding;
   private final DirectInstanceBindingRepresentation directInstanceBindingRepresentation;
   private final FrameworkInstanceBindingRepresentation frameworkInstanceBindingRepresentation;
 
   @AssistedInject
   ProvisionBindingRepresentation(
-      @Assisted ProvisionBinding binding,
+      @Assisted ContributionBinding binding,
       DirectInstanceBindingRepresentation.Factory directInstanceBindingRepresentationFactory,
       FrameworkInstanceBindingRepresentation.Factory frameworkInstanceBindingRepresentationFactory,
       BindingGraph graph,
@@ -72,7 +73,7 @@ final class ProvisionBindingRepresentation implements BindingRepresentation {
     // be handled with simple pre-check in the graph. For example, a provider for a subcomponent
     // builder is backed with its direct instance, returning framework instance for both cases will
     // form a loop. There are also difficulties introduced by manually created framework requests.
-    // TODO(wanyingd): refactor framework instance so that we don't need to generate both direct
+    // TODO(bcorso): refactor framework instance so that we don't need to generate both direct
     // instance and framework instance representation for the same binding.
     if (compilerMode.isFastInit() && graph.topLevelBindingGraph().hasFrameworkRequest(binding)) {
       return false;
@@ -105,18 +106,18 @@ final class ProvisionBindingRepresentation implements BindingRepresentation {
    * <p>The component needs to cache the value for scoped bindings except for {@code @Binds}
    * bindings whose scope is no stronger than their delegate's.
    */
-  static boolean needsCaching(ProvisionBinding binding, BindingGraph graph) {
+  static boolean needsCaching(ContributionBinding binding, BindingGraph graph) {
     if (!binding.scope().isPresent()) {
       return false;
     }
     if (binding.kind().equals(DELEGATE)) {
-      return isBindsScopeStrongerThanDependencyScope(binding, graph);
+      return isBindsScopeStrongerThanDependencyScope((DelegateBinding) binding, graph);
     }
     return true;
   }
 
   @AssistedFactory
   static interface Factory {
-    ProvisionBindingRepresentation create(ProvisionBinding binding);
+    ProvisionBindingRepresentation create(ContributionBinding binding);
   }
 }
