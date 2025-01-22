@@ -17,7 +17,7 @@
 load("@rules_java//java:defs.bzl", "java_library", "java_test")
 load("//:build_defs.bzl", "JAVA_RELEASE_MIN")
 load(
-    "@io_bazel_rules_kotlin//kotlin:kotlin.bzl",
+    "@io_bazel_rules_kotlin//kotlin:jvm.bzl",
     "kt_jvm_library",
     "kt_jvm_test",
 )
@@ -27,7 +27,6 @@ load(
 _NON_FUNCTIONAL_BUILD_VARIANTS = {None: []}
 _FUNCTIONAL_BUILD_VARIANTS = {
     None: [],  # The default build variant (no javacopts).
-    "ExtendsComponent": ["-Adagger.generatedClassExtendsComponent=enabled"],
     "Shards": ["-Adagger.keysPerComponentShard=2"],
     "FastInit": ["-Adagger.fastInit=enabled"],
     "FastInit_Shards": ["-Adagger.fastInit=enabled", "-Adagger.keysPerComponentShard=2"],
@@ -208,7 +207,9 @@ def _GenTestsWithVariants(
 
     build_variants = _FUNCTIONAL_BUILD_VARIANTS if functional else _NON_FUNCTIONAL_BUILD_VARIANTS
     for (variant_name, variant_javacopts) in build_variants.items():
+        merged_javacopts = javacopts + variant_javacopts
         for is_ksp in (True, False):
+            merged_plugins = plugins
             if variant_name:
                 suffix = "_" + variant_name
                 tags = [variant_name]
@@ -233,8 +234,8 @@ def _GenTestsWithVariants(
                     srcs = supporting_files,
                     tags = tags,
                     deps = deps + variant_deps,
-                    plugins = plugins,
-                    javacopts = javacopts + variant_javacopts,
+                    plugins = merged_plugins,
+                    javacopts = merged_javacopts,
                     functional = functional,
                     require_jdk7_syntax = require_jdk7_syntax,
                 )
@@ -242,6 +243,7 @@ def _GenTestsWithVariants(
 
             for test_file in test_files:
                 test_name = test_file.rsplit(".", 1)[0]
+
                 _GenTestWithVariant(
                     library_rule_type = library_rule_type,
                     test_rule_type = test_rule_type,
@@ -249,8 +251,8 @@ def _GenTestsWithVariants(
                     srcs = [test_file],
                     tags = tags,
                     deps = test_deps + variant_deps,
-                    plugins = plugins,
-                    javacopts = javacopts + variant_javacopts,
+                    plugins = merged_plugins,
+                    javacopts = merged_javacopts,
                     shard_count = shard_count,
                     jvm_flags = jvm_flags,
                     functional = functional,

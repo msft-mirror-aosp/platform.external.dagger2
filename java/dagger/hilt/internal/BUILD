@@ -15,6 +15,8 @@
 # Description:
 #   Internal Hilt libraries
 
+load("@rules_java//java:defs.bzl", "java_library")
+
 package(default_visibility = ["//:src"])
 
 java_library(
@@ -41,8 +43,8 @@ java_library(
         "GeneratedComponentManagerHolder.java",
     ],
     exports = [
-        ":preconditions",
-        ":unsafe_casts",
+        "//java/dagger/hilt/internal:preconditions",
+        "//java/dagger/hilt/internal:unsafe_casts",
     ],
 )
 

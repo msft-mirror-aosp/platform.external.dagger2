@@ -79,10 +79,13 @@ public abstract class ModuleDescriptor {
   /** The kind of the module. */
   public abstract ModuleKind kind();
 
+  /** Whether the module is implicitly included rather than directly referenced in annotation. */
+  public abstract boolean isImplicitlyIncluded();
+
   /** Returns all of the bindings declared in this module. */
   @Memoized
-  public ImmutableSet<BindingDeclaration> allBindingDeclarations() {
-    return ImmutableSet.<BindingDeclaration>builder()
+  public ImmutableSet<Declaration> allBindingDeclarations() {
+    return ImmutableSet.<Declaration>builder()
         .addAll(bindings())
         .addAll(delegateDeclarations())
         .addAll(multibindingDeclarations())
@@ -93,7 +96,7 @@ public abstract class ModuleDescriptor {
 
   /** Returns the keys of all bindings declared by this module. */
   ImmutableSet<Key> allBindingKeys() {
-    return allBindingDeclarations().stream().map(BindingDeclaration::key).collect(toImmutableSet());
+    return allBindingDeclarations().stream().map(Declaration::key).collect(toImmutableSet());
   }
 
   /** A {@link ModuleDescriptor} factory. */
@@ -107,6 +110,7 @@ public abstract class ModuleDescriptor {
     private final OptionalBindingDeclaration.Factory optionalBindingDeclarationFactory;
     private final DaggerSuperficialValidation superficialValidation;
     private final Map<XTypeElement, ModuleDescriptor> cache = new HashMap<>();
+    private final Set<XTypeElement> implicitlyIncludedModules = new LinkedHashSet<>();
 
     @Inject
     Factory(
@@ -174,7 +178,8 @@ public abstract class ModuleDescriptor {
           subcomponentDeclarationFactory.forModule(moduleElement),
           delegates.build(),
           optionalDeclarations.build(),
-          ModuleKind.forAnnotatedElement(moduleElement).get());
+          ModuleKind.forAnnotatedElement(moduleElement).get(),
+          implicitlyIncludedModules.contains(moduleElement));
     }
 
     private void collectCompanionModuleBindings(
@@ -231,7 +236,10 @@ public abstract class ModuleDescriptor {
           .ifPresent(
               moduleAnnotation -> {
                 includedModules.addAll(moduleAnnotation.includes());
-                includedModules.addAll(implicitlyIncludedModules(moduleElement));
+                ImmutableSet<XTypeElement> daggerAndroidModules =
+                    implicitlyIncludedModules(moduleElement);
+                includedModules.addAll(daggerAndroidModules);
+                implicitlyIncludedModules.addAll(daggerAndroidModules);
               });
       return includedModules;
     }
@@ -259,7 +267,7 @@ public abstract class ModuleDescriptor {
           module.getPackageName(),
           String.format(
               "%s_%s",
-              classFileName(module.getClassName()),
+              classFileName(module.asClassName()),
               LOWER_CAMEL.to(UPPER_CAMEL, getSimpleName(method))));
     }
 

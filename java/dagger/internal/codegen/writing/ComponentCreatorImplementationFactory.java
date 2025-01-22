@@ -320,7 +320,7 @@ final class ComponentCreatorImplementationFactory {
               "$T.checkBuilderRequirement($N, $T.class)",
               Preconditions.class,
               field,
-              TypeNames.rawTypeName(field.type));
+              TypeNames.rawTypeName(field.type.withoutAnnotations()));
           break;
         case ALLOW:
           break;
@@ -498,7 +498,7 @@ final class ComponentCreatorImplementationFactory {
 
     @Override
     protected MethodSpec.Builder setterMethodBuilder(ComponentRequirement requirement) {
-      String name = simpleVariableName(requirement.typeElement().getClassName());
+      String name = simpleVariableName(requirement.typeElement().asClassName());
       return methodBuilder(name)
           .addModifiers(PUBLIC)
           .addParameter(requirement.type().getTypeName(), name)

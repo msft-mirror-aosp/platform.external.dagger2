@@ -16,6 +16,7 @@
 
 package dagger.internal.codegen.writing;
 
+import static androidx.room.compiler.codegen.XTypeNameKt.toJavaPoet;
 import static androidx.room.compiler.processing.XTypeKt.isArray;
 import static androidx.room.compiler.processing.compat.XConverters.getProcessingEnv;
 import static com.squareup.javapoet.MethodSpec.constructorBuilder;
@@ -95,7 +96,7 @@ public class AnnotationCreatorGenerator extends SourceFileGenerator<XTypeElement
 
   @Override
   public ImmutableList<TypeSpec.Builder> topLevelTypes(XTypeElement annotationType) {
-    ClassName generatedTypeName = getAnnotationCreatorClassName(annotationType);
+    ClassName generatedTypeName = toJavaPoet(getAnnotationCreatorClassName(annotationType));
     TypeSpec.Builder annotationCreatorBuilder =
         classBuilder(generatedTypeName)
             .addModifiers(PUBLIC, FINAL)
@@ -146,11 +147,15 @@ public class AnnotationCreatorGenerator extends SourceFileGenerator<XTypeElement
       XTypeElement annotationElement, Set<XTypeElement> annotationElements) {
     if (annotationElements.add(annotationElement)) {
       for (XMethodElement method : annotationElement.getDeclaredMethods()) {
-        XTypeElement returnType = method.getReturnType().getTypeElement();
+        XType returnType = method.getReturnType();
+        XTypeElement maybeAnnotationType =
+            isArray(returnType)
+                ? asArray(returnType).getComponentType().getTypeElement()
+                : returnType.getTypeElement();
         // Return type may be null if it doesn't return a type or type is not known
-        if (returnType != null && returnType.isAnnotationClass()) {
+        if (maybeAnnotationType != null && maybeAnnotationType.isAnnotationClass()) {
           // Ignore the return value since this method is just an accumulator method.
-          nestedAnnotationElements(returnType, annotationElements);
+          nestedAnnotationElements(maybeAnnotationType, annotationElements);
         }
       }
     }

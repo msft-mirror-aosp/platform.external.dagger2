@@ -16,18 +16,19 @@
 
 package dagger.internal.codegen.writing;
 
+import static androidx.room.compiler.codegen.XTypeNameKt.toJavaPoet;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static dagger.internal.codegen.binding.SourceFiles.generatedClassNameForBinding;
 import static dagger.internal.codegen.javapoet.AnnotationSpecs.Suppression.RAWTYPES;
 import static dagger.internal.codegen.writing.ComponentImplementation.FieldSpecKind.FRAMEWORK_FIELD;
 import static javax.lang.model.element.Modifier.PRIVATE;
 
+import androidx.room.compiler.codegen.XClassName;
+import androidx.room.compiler.codegen.XTypeName;
 import androidx.room.compiler.processing.XType;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.FieldSpec;
-import com.squareup.javapoet.ParameterizedTypeName;
-import com.squareup.javapoet.TypeName;
 import dagger.internal.DelegateFactory;
 import dagger.internal.codegen.binding.BindingType;
 import dagger.internal.codegen.binding.ContributionBinding;
@@ -36,6 +37,7 @@ import dagger.internal.codegen.javapoet.AnnotationSpecs;
 import dagger.internal.codegen.javapoet.TypeNames;
 import dagger.internal.codegen.model.BindingKind;
 import dagger.internal.codegen.writing.ComponentImplementation.ShardImplementation;
+import dagger.internal.codegen.xprocessing.XTypeNames;
 import java.util.Optional;
 
 /**
@@ -56,7 +58,7 @@ class FrameworkFieldInitializer implements FrameworkInstanceSupplier {
      * Returns the framework class to use for the field, if different from the one implied by the
      * binding. This implementation returns {@link Optional#empty()}.
      */
-    default Optional<ClassName> alternativeFrameworkClass() {
+    default Optional<XClassName> alternativeFrameworkClass() {
       return Optional.empty();
     }
   }
@@ -142,26 +144,27 @@ class FrameworkFieldInitializer implements FrameworkInstanceSupplier {
         FrameworkField.forBinding(
             binding, frameworkInstanceCreationExpression.alternativeFrameworkClass());
 
-    TypeName fieldType = useRawType
-        ? TypeNames.rawTypeName(contributionBindingField.type())
+    XTypeName fieldType = useRawType
+        ? contributionBindingField.type().getRawTypeName()
         : contributionBindingField.type();
 
     if (binding.kind() == BindingKind.ASSISTED_INJECTION) {
       // An assisted injection factory doesn't extend Provider, so we reference the generated
       // factory type directly (i.e. Foo_Factory<T> instead of Provider<Foo<T>>).
-      TypeName[] typeParameters =
+      XTypeName[] typeParameters =
           binding.key().type().xprocessing().getTypeArguments().stream()
-              .map(XType::getTypeName)
-              .toArray(TypeName[]::new);
+              .map(XType::asTypeName)
+              .toArray(XTypeName[]::new);
       fieldType =
           typeParameters.length == 0
               ? generatedClassNameForBinding(binding)
-              : ParameterizedTypeName.get(generatedClassNameForBinding(binding), typeParameters);
+              : generatedClassNameForBinding(binding).parametrizedBy(typeParameters);
     }
 
     FieldSpec.Builder contributionField =
         FieldSpec.builder(
-            fieldType, shardImplementation.getUniqueFieldName(contributionBindingField.name()));
+            toJavaPoet(fieldType),
+            shardImplementation.getUniqueFieldName(contributionBindingField.name()));
     contributionField.addModifiers(PRIVATE);
     if (useRawType) {
       contributionField.addAnnotation(AnnotationSpecs.suppressWarnings(RAWTYPES));
@@ -181,7 +184,7 @@ class FrameworkFieldInitializer implements FrameworkInstanceSupplier {
     return binding.bindingType().equals(BindingType.PROVISION)
         && frameworkInstanceCreationExpression
             .alternativeFrameworkClass()
-            .map(TypeNames.PROVIDER::equals)
+            .map(XTypeNames.PROVIDER::equals)
             .orElse(true);
   }
 

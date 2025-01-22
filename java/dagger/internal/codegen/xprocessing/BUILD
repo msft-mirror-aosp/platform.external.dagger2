@@ -15,7 +15,7 @@
 # Description:
 #   Import for including XProcessing in Dagger.
 
-load("@rules_java//java:defs.bzl", "java_import")
+load("@rules_java//java:defs.bzl", "java_import", "java_library")
 
 package(default_visibility = ["//:src"])
 
@@ -32,6 +32,7 @@ java_library(
         "//java/dagger/internal/codegen/extension",
         "//java/dagger/spi",
         "//third_party/java/auto:common",
+        "//third_party/java/auto:value",
         "//third_party/java/guava/base",
         "//third_party/java/guava/collect",
         "//third_party/java/javapoet",
@@ -63,6 +64,8 @@ java_library(
     exports = [
         ":xprocessing-testing-lib",
         "@maven//:com_google_devtools_ksp_symbol_processing",
+        "@maven//:com_google_devtools_ksp_symbol_processing_aa_embeddable",
+        "@maven//:com_google_devtools_ksp_symbol_processing_common_deps",
         "@maven//:org_jetbrains_kotlin_kotlin_annotation_processing_embeddable",
         "@maven//:org_jetbrains_kotlin_kotlin_compiler_embeddable",
         "@maven//:org_jetbrains_kotlin_kotlin_daemon_embeddable",

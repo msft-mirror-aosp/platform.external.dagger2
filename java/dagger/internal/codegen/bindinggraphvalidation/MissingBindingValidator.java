@@ -18,13 +18,12 @@ package dagger.internal.codegen.bindinggraphvalidation;
 
 import static androidx.room.compiler.processing.compat.XConverters.getProcessingEnv;
 import static com.google.common.base.Verify.verify;
-import static com.google.common.collect.Iterables.getLast;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static dagger.internal.codegen.base.ElementFormatter.elementToString;
 import static dagger.internal.codegen.base.Formatter.INDENT;
 import static dagger.internal.codegen.base.Keys.isValidImplicitProvisionKey;
 import static dagger.internal.codegen.base.Keys.isValidMembersInjectionKey;
-import static dagger.internal.codegen.base.RequestKinds.canBeSatisfiedByProductionBinding;
+import static dagger.internal.codegen.base.RequestKinds.dependencyCanBeProduction;
 import static dagger.internal.codegen.binding.DependencyRequestFormatter.DOUBLE_INDENT;
 import static dagger.internal.codegen.extension.DaggerStreams.instancesOf;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
@@ -40,16 +39,12 @@ import com.google.common.collect.Lists;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.WildcardTypeName;
 import dagger.internal.codegen.binding.ComponentNodeImpl;
-import dagger.internal.codegen.binding.DependencyRequestFormatter;
 import dagger.internal.codegen.binding.InjectBindingRegistry;
 import dagger.internal.codegen.model.Binding;
 import dagger.internal.codegen.model.BindingGraph;
-import dagger.internal.codegen.model.BindingGraph.ComponentNode;
 import dagger.internal.codegen.model.BindingGraph.DependencyEdge;
-import dagger.internal.codegen.model.BindingGraph.Edge;
 import dagger.internal.codegen.model.BindingGraph.MissingBinding;
-import dagger.internal.codegen.model.BindingGraph.Node;
-import dagger.internal.codegen.model.DaggerAnnotation;
+import dagger.internal.codegen.model.DaggerType;
 import dagger.internal.codegen.model.DiagnosticReporter;
 import dagger.internal.codegen.model.Key;
 import dagger.internal.codegen.validation.DiagnosticMessageGenerator;
@@ -58,24 +53,19 @@ import dagger.internal.codegen.xprocessing.XTypes;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;
-import java.util.List;
-import java.util.Optional;
 import javax.inject.Inject;
 
 /** Reports errors for missing bindings. */
 final class MissingBindingValidator extends ValidationBindingGraphPlugin {
 
   private final InjectBindingRegistry injectBindingRegistry;
-  private final DependencyRequestFormatter dependencyRequestFormatter;
   private final DiagnosticMessageGenerator.Factory diagnosticMessageGeneratorFactory;
 
   @Inject
   MissingBindingValidator(
       InjectBindingRegistry injectBindingRegistry,
-      DependencyRequestFormatter dependencyRequestFormatter,
       DiagnosticMessageGenerator.Factory diagnosticMessageGeneratorFactory) {
     this.injectBindingRegistry = injectBindingRegistry;
-    this.dependencyRequestFormatter = dependencyRequestFormatter;
     this.diagnosticMessageGeneratorFactory = diagnosticMessageGeneratorFactory;
   }
 
@@ -115,24 +105,28 @@ final class MissingBindingValidator extends ValidationBindingGraphPlugin {
         ERROR,
         graph.componentNode(missingBinding.componentPath()).get(),
         missingBindingErrorMessage(missingBinding, graph)
-            + missingBindingDependencyTraceMessage(missingBinding, graph)
+            + diagnosticMessageGeneratorFactory.create(graph).getMessage(missingBinding)
             + alternativeBindingsMessage(missingBinding, graph)
             + similarBindingsMessage(missingBinding, graph));
   }
 
   private static ImmutableSet<Binding> getSimilarTypeBindings(
       BindingGraph graph, Key missingBindingKey) {
-    XType missingBindingType = missingBindingKey.type().xprocessing();
-    Optional<DaggerAnnotation> missingBindingQualifier = missingBindingKey.qualifier();
-    ImmutableList<TypeName> flatMissingBindingType = flattenBindingType(missingBindingType);
+    ImmutableList<TypeName> flatMissingBindingType = flattenBindingType(missingBindingKey.type());
     if (flatMissingBindingType.size() <= 1) {
       return ImmutableSet.of();
     }
     return graph.bindings().stream()
-        .filter(
-            binding ->
-                binding.key().qualifier().equals(missingBindingQualifier)
-                    && isSimilarType(binding.key().type().xprocessing(), flatMissingBindingType))
+        // Filter out multibinding contributions (users can't request these directly).
+        .filter(binding -> binding.key().multibindingContributionIdentifier().isEmpty())
+        // Filter out keys with the exact same type (those are reported elsewhere).
+        .filter(binding -> !binding.key().type().equals(missingBindingKey.type()))
+        // Filter out keys with different qualifiers.
+        // TODO(bcorso): We should consider allowing keys with different qualifiers here, as that
+        // could actually be helpful when users forget a qualifier annotation on the request.
+        .filter(binding -> binding.key().qualifier().equals(missingBindingKey.qualifier()))
+        // Filter out keys that don't have a similar type (i.e. same type if ignoring wildcards).
+        .filter(binding -> isSimilarType(binding.key().type(), flatMissingBindingType))
         .collect(toImmutableSet());
   }
 
@@ -140,11 +134,11 @@ final class MissingBindingValidator extends ValidationBindingGraphPlugin {
    * Unwraps a parameterized type to a list of TypeNames. e.g. {@code Map<Foo, List<Bar>>} to {@code
    * [Map, Foo, List, Bar]}.
    */
-  private static ImmutableList<TypeName> flattenBindingType(XType type) {
+  private static ImmutableList<TypeName> flattenBindingType(DaggerType type) {
     return ImmutableList.copyOf(new TypeDfsIterator(type));
   }
 
-  private static boolean isSimilarType(XType type, List<TypeName> flatTypeNames) {
+  private static boolean isSimilarType(DaggerType type, ImmutableList<TypeName> flatTypeNames) {
     return Iterators.elementsEqual(flatTypeNames.iterator(), new TypeDfsIterator(type));
   }
 
@@ -178,36 +172,7 @@ final class MissingBindingValidator extends ValidationBindingGraphPlugin {
       errorMessage.append(
           " This type supports members injection but cannot be implicitly provided.");
     }
-    return errorMessage.toString();
-  }
-
-  private String missingBindingDependencyTraceMessage(
-      MissingBinding missingBinding, BindingGraph graph) {
-    ImmutableSet<DependencyEdge> entryPoints =
-        graph.entryPointEdgesDependingOnBinding(missingBinding);
-    DiagnosticMessageGenerator generator = diagnosticMessageGeneratorFactory.create(graph);
-    ImmutableList<DependencyEdge> dependencyTrace =
-        generator.dependencyTrace(missingBinding, entryPoints);
-    StringBuilder message =
-        new StringBuilder(dependencyTrace.size() * 100 /* a guess heuristic */).append("\n");
-    for (DependencyEdge edge : dependencyTrace) {
-      String line = dependencyRequestFormatter.format(edge.dependencyRequest());
-      if (line.isEmpty()) {
-        continue;
-      }
-      // We don't have to check for cases where component names collide since
-      //  1. We always show the full classname of the component, and
-      //  2. We always show the full component path at the end of the dependency trace (below).
-      String componentName = String.format("[%s] ", getComponentFromDependencyEdge(edge, graph));
-      message.append("\n").append(line.replace(DOUBLE_INDENT, DOUBLE_INDENT + componentName));
-    }
-    if (!dependencyTrace.isEmpty()) {
-      generator.appendComponentPathUnlessAtRoot(message, source(getLast(dependencyTrace), graph));
-    }
-    message.append(
-        generator.getRequestsNotInTrace(
-            dependencyTrace, generator.requests(missingBinding), entryPoints));
-    return message.toString();
+    return errorMessage.append("\n").toString();
   }
 
   private String alternativeBindingsMessage(
@@ -282,33 +247,11 @@ final class MissingBindingValidator extends ValidationBindingGraphPlugin {
         .allMatch(edge -> dependencyCanBeProduction(edge, graph));
   }
 
-  // TODO(ronshapiro): merge with
-  // ProvisionDependencyOnProduerBindingValidator.dependencyCanUseProduction
-  private boolean dependencyCanBeProduction(DependencyEdge edge, BindingGraph graph) {
-    Node source = graph.network().incidentNodes(edge).source();
-    if (source instanceof ComponentNode) {
-      return canBeSatisfiedByProductionBinding(edge.dependencyRequest().kind());
-    }
-    if (source instanceof Binding) {
-      return ((Binding) source).isProduction();
-    }
-    throw new IllegalArgumentException(
-        "expected a dagger.internal.codegen.model.Binding or ComponentNode: " + source);
-  }
-
   private boolean typeHasInjectionSites(Key key) {
     return injectBindingRegistry
         .getOrFindMembersInjectionBinding(key)
         .map(binding -> !binding.injectionSites().isEmpty())
         .orElse(false);
-  }
-
-  private static String getComponentFromDependencyEdge(DependencyEdge edge, BindingGraph graph) {
-    return source(edge, graph).componentPath().currentComponent().className().canonicalName();
-  }
-
-  private static Node source(Edge edge, BindingGraph graph) {
-    return graph.network().incidentNodes(edge).source();
   }
 
   /**
@@ -320,8 +263,8 @@ final class MissingBindingValidator extends ValidationBindingGraphPlugin {
   private static class TypeDfsIterator implements Iterator<TypeName> {
     final Deque<XType> stack = new ArrayDeque<>();
 
-    TypeDfsIterator(XType root) {
-      stack.push(root);
+    TypeDfsIterator(DaggerType root) {
+      stack.push(root.xprocessing());
     }
 
     @Override

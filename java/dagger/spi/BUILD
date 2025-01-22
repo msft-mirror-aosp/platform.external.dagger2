@@ -22,7 +22,7 @@ load(
     "DOCLINT_REFERENCES",
     "POM_VERSION",
 )
-load("//tools:maven.bzl", "gen_maven_artifact")
+load("//tools/maven:maven.bzl", "gen_maven_artifact")
 
 package(default_visibility = ["//:src"])
 
@@ -80,7 +80,7 @@ gen_maven_artifact(
     # util/deploy-dagger.sh
     shaded_deps = [
         "//third_party/java/auto:common",
-        "@maven//:org_jetbrains_kotlinx_kotlinx_metadata_jvm",
+        "//third_party/kotlin/kotlin_metadata_jvm",
         "//java/dagger/internal/codegen/xprocessing:xprocessing-jar",
     ],
 )

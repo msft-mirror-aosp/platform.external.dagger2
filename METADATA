@@ -1,20 +1,20 @@
 # This project was upgraded with external_updater.
 # Usage: tools/external_updater/updater.sh update external/dagger2
-# For more info, check https://cs.android.com/android/platform/superproject/+/main:tools/external_updater/README.md
+# For more info, check https://cs.android.com/android/platform/superproject/main/+/main:tools/external_updater/README.md
 
 name: "dagger2"
 description: "A fast dependency injector for Android and Java."
 third_party {
   license_type: NOTICE
   last_upgrade_date {
-    year: 2024
-    month: 3
-    day: 5
+    year: 2025
+    month: 1
+    day: 10
   }
   homepage: "https://dagger.dev"
   identifier {
     type: "Git"
     value: "https://github.com/google/dagger"
-    version: "dagger-2.51"
+    version: "347cfe1352469381f4391091e8bfa242214c68cc"
   }
 }
