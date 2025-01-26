@@ -39,6 +39,11 @@ import com.google.common.collect.ImmutableMap;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.TypeName;
 import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.model.Binding;
+import dagger.internal.codegen.model.BindingGraph;
+import dagger.internal.codegen.model.BindingGraph.ComponentNode;
+import dagger.internal.codegen.model.BindingGraph.DependencyEdge;
+import dagger.internal.codegen.model.BindingGraph.Node;
 import dagger.internal.codegen.model.RequestKind;
 
 /** Utility methods for {@link RequestKind}s. */
@@ -92,6 +97,8 @@ public final class RequestKinds {
 
   private static final ImmutableMap<RequestKind, ClassName> FRAMEWORK_CLASSES =
       ImmutableMap.of(
+          // Default to the javax Provider since that is what is used for the binding graph
+          // representation.
           PROVIDER, TypeNames.PROVIDER,
           LAZY, TypeNames.LAZY,
           PRODUCER, TypeNames.PRODUCER,
@@ -106,8 +113,13 @@ public final class RequestKinds {
       return RequestKind.INSTANCE;
     }
 
-    if (isTypeOf(type, TypeNames.PROVIDER) && isTypeOf(unwrapType(type), TypeNames.LAZY)) {
+    if ((isTypeOf(type, TypeNames.PROVIDER) || isTypeOf(type, TypeNames.JAKARTA_PROVIDER))
+        && isTypeOf(unwrapType(type), TypeNames.LAZY)) {
       return RequestKind.PROVIDER_OF_LAZY;
+    }
+
+    if (isTypeOf(type, TypeNames.JAKARTA_PROVIDER)) {
+      return RequestKind.PROVIDER;
     }
 
     return FRAMEWORK_CLASSES.keySet().stream()
@@ -162,20 +174,37 @@ public final class RequestKinds {
    * Returns {@code true} if requests for {@code requestKind} can be satisfied by a production
    * binding.
    */
-  public static boolean canBeSatisfiedByProductionBinding(RequestKind requestKind) {
+  public static boolean canBeSatisfiedByProductionBinding(
+      RequestKind requestKind, boolean isEntryPoint) {
     switch (requestKind) {
-      case INSTANCE:
       case PROVIDER:
       case LAZY:
       case PROVIDER_OF_LAZY:
       case MEMBERS_INJECTION:
         return false;
+      case PRODUCED: // TODO(b/337087142) Requires implementation for entry point.
+      case INSTANCE:
+        return !isEntryPoint;
       case PRODUCER:
-      case PRODUCED:
       case FUTURE:
         return true;
     }
     throw new AssertionError();
+  }
+
+  public static boolean dependencyCanBeProduction(DependencyEdge edge, BindingGraph graph) {
+    Node source = graph.network().incidentNodes(edge).source();
+    boolean isEntryPoint = source instanceof ComponentNode;
+    boolean isValidRequest =
+        canBeSatisfiedByProductionBinding(edge.dependencyRequest().kind(), isEntryPoint);
+    if (isEntryPoint) {
+      return isValidRequest;
+    }
+    if (source instanceof Binding) {
+      return isValidRequest && ((Binding) source).isProduction();
+    }
+    throw new IllegalArgumentException(
+        "expected a dagger.internal.codegen.model.Binding or ComponentNode: " + source);
   }
 
   private RequestKinds() {}

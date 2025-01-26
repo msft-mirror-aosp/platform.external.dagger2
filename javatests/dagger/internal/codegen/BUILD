@@ -15,7 +15,8 @@
 # Description:
 #   Tests for the Dagger compiler/codegen
 
-load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_jvm_library")
+load("@io_bazel_rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+load("@rules_java//java:defs.bzl", "java_library")
 load("//:build_defs.bzl", "DOCLINT_HTML_AND_SYNTAX")
 load("//:test_defs.bzl", "GenJavaTests")
 
@@ -72,7 +73,7 @@ java_library(
         "//third_party/java/guava/collect",
         "//third_party/java/javapoet",
         "//third_party/java/truth",
-        "@com_google_auto_value_auto_value//jar",
+        "@maven//:com_google_auto_value_auto_value",
     ],
 )
 
@@ -110,7 +111,7 @@ DEPS = [
     "//third_party/java/guava/collect",
     "//third_party/java/guava/util/concurrent",
     "//third_party/java/auto:value",
-    "@com_google_auto_value_auto_value//jar",
+    "@maven//:com_google_auto_value_auto_value",
     "//third_party/java/auto:common",
     "//third_party/java/compile_testing",
     "//third_party/java/javapoet",

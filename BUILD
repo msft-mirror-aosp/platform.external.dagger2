@@ -12,23 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@rules_java//java:defs.bzl", "java_library")
-load("@google_bazel_common//tools/javadoc:javadoc.bzl", "javadoc_library")
-load("@google_bazel_common//tools/jarjar:jarjar.bzl", "jarjar_library")
 load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "define_kt_toolchain")
+load("@rules_java//java:defs.bzl", "java_library")
+load("//tools/jarjar:jarjar.bzl", "jarjar_library")
+load("//tools/javadoc:javadoc.bzl", "javadoc_library")
 
 package(default_visibility = ["//visibility:public"])
-
-define_kt_toolchain(
-    name = "kotlin_toolchain",
-    api_version = "1.4",
-    jvm_target = "1.8",
-    language_version = "1.4",
-)
 
 package_group(
     name = "src",
     packages = ["//..."],
+)
+
+define_kt_toolchain(
+    name = "kotlin_toolchain",
+    api_version = "1.6",
+    jvm_target = "1.8",
+    language_version = "1.6",
 )
 
 java_library(
@@ -116,7 +116,7 @@ javadoc_library(
         "//java/dagger/producers:producers-srcs",
         "//java/dagger/spi:spi-srcs",
     ],
-    android_api_level = 32,
+    android_api_level = 34,
     # TODO(ronshapiro): figure out how to specify the version number for release builds
     doctitle = "Dagger Dependency Injection API",
     exclude_packages = [

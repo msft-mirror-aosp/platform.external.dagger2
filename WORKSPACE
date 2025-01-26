@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 #############################
@@ -46,6 +47,26 @@ load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
 
 bazel_skylib_workspace()
 
+#############################
+# Load rules_java repository
+#############################
+
+http_archive(
+    name = "rules_java",
+    sha256 = "c73336802d0b4882e40770666ad055212df4ea62cfa6edf9cb0f9d29828a0934",
+    url = "https://github.com/bazelbuild/rules_java/releases/download/5.3.5/rules_java-5.3.5.tar.gz",
+)
+
+#############################
+# Load Android Sdk
+#############################
+
+android_sdk_repository(
+    name = "androidsdk",
+    api_level = 34,
+    build_tools_version = "34.0.0",
+)
+
 ####################################################
 # Load Protobuf repository (needed by bazel-common)
 ####################################################
@@ -66,21 +87,6 @@ load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies", "rules_
 rules_proto_dependencies()
 
 rules_proto_toolchains()
-
-#############################
-# Load Bazel-Common repository
-#############################
-
-http_archive(
-    name = "google_bazel_common",
-    sha256 = "82a49fb27c01ad184db948747733159022f9464fc2e62da996fa700594d9ea42",
-    strip_prefix = "bazel-common-2a6b6406e12208e02b2060df0631fb30919080f3",
-    urls = ["https://github.com/google/bazel-common/archive/2a6b6406e12208e02b2060df0631fb30919080f3.zip"],
-)
-
-load("@google_bazel_common//:workspace_defs.bzl", "google_common_workspace_rules")
-
-google_common_workspace_rules()
 
 #############################
 # Load Protobuf dependencies
@@ -112,13 +118,13 @@ http_archive(
 # Load Robolectric repository
 #############################
 
-ROBOLECTRIC_VERSION = "4.4"
+ROBOLECTRIC_VERSION = "4.11.1"
 
 http_archive(
     name = "robolectric",
-    sha256 = "d4f2eb078a51f4e534ebf5e18b6cd4646d05eae9b362ac40b93831bdf46112c7",
+    sha256 = "1ea1cfe67848decf959316e80dd69af2bbaa359ae2195efe1366cbdf3e968356",
     strip_prefix = "robolectric-bazel-%s" % ROBOLECTRIC_VERSION,
-    urls = ["https://github.com/robolectric/robolectric-bazel/archive/%s.tar.gz" % ROBOLECTRIC_VERSION],
+    urls = ["https://github.com/robolectric/robolectric-bazel/releases/download/%s/robolectric-bazel-%s.tar.gz" % (ROBOLECTRIC_VERSION, ROBOLECTRIC_VERSION)],
 )
 
 load("@robolectric//bazel:robolectric.bzl", "robolectric_repositories")
@@ -129,33 +135,34 @@ robolectric_repositories()
 # Load Kotlin repository
 #############################
 
-RULES_KOTLIN_TAG = "v1.8"
+RULES_KOTLIN_TAG = "1.9.6"
 
-RULES_KOTLIN_SHA = "01293740a16e474669aba5b5a1fe3d368de5832442f164e4fbfc566815a8bc3a"
+RULES_KOTLIN_SHA = "3b772976fec7bdcda1d84b9d39b176589424c047eb2175bed09aac630e50af43"
 
 http_archive(
     name = "io_bazel_rules_kotlin",
     sha256 = RULES_KOTLIN_SHA,
-    urls = ["https://github.com/bazelbuild/rules_kotlin/releases/download/%s/rules_kotlin_release.tgz" % RULES_KOTLIN_TAG],
+    urls = ["https://github.com/bazelbuild/rules_kotlin/releases/download/v%s/rules_kotlin-v%s.tar.gz" % (RULES_KOTLIN_TAG, RULES_KOTLIN_TAG)],
 )
 
 load("@io_bazel_rules_kotlin//kotlin:repositories.bzl", "kotlin_repositories", "kotlinc_version")
 
-KOTLIN_VERSION = "1.9.20"
+# TODO: update to Kotlin 2 once rules_kotlin support it.
+#   See https://github.com/bazelbuild/rules_kotlin/issues/1176
+KOTLINC_VERSION = "1.9.24"
 
 # Get from https://github.com/JetBrains/kotlin/releases/
-KOTLINC_RELEASE_SHA = "15a8a2825b74ccf6c44e04e97672db802d2df75ce2fbb63ef0539bf3ae5006f0"
+KOTLINC_RELEASE_SHA = "eb7b68e01029fa67bc8d060ee54c12018f2c60ddc438cf21db14517229aa693b"
 
 kotlin_repositories(
     compiler_release = kotlinc_version(
-        release = KOTLIN_VERSION,
+        release = KOTLINC_VERSION,
+        # Get from https://github.com/JetBrains/kotlin/releases/
         sha256 = KOTLINC_RELEASE_SHA,
     ),
 )
 
-load("@io_bazel_rules_kotlin//kotlin:core.bzl", "kt_register_toolchains")
-
-kt_register_toolchains()
+register_toolchains("//:kotlin_toolchain")
 
 #############################
 # Load Maven dependencies
@@ -176,7 +183,19 @@ load("@rules_jvm_external//:defs.bzl", "maven_install")
 
 ANDROID_LINT_VERSION = "30.1.0"
 
+ANT_VERSION = "1.9.6"
+
+ASM_VERSION = "9.6"
+
 AUTO_COMMON_VERSION = "1.2.1"
+
+BYTE_BUDDY_VERSION = "1.9.10"
+
+CHECKER_FRAMEWORK_VERSION = "2.5.3"
+
+ECLIPSE_SISU_VERSION = "0.3.0"
+
+ERROR_PRONE_VERSION = "2.14.0"
 
 # NOTE(bcorso): Even though we set the version here, our Guava version in
 #  processor code will use whatever version is built into JavaBuilder, which is
@@ -187,13 +206,11 @@ GRPC_VERSION = "1.2.0"
 
 INCAP_VERSION = "0.2"
 
-BYTE_BUDDY_VERSION = "1.9.10"
+KOTLIN_VERSION = "2.0.21"
 
-CHECKER_FRAMEWORK_VERSION = "2.5.3"
+KSP_VERSION = KOTLIN_VERSION + "-1.0.28"
 
-ERROR_PRONE_VERSION = "2.14.0"
-
-KSP_VERSION = KOTLIN_VERSION + "-1.0.14"
+MAVEN_VERSION = "3.3.3"
 
 maven_install(
     artifacts = [
@@ -233,6 +250,8 @@ maven_install(
         "com.google.code.findbugs:jsr305:3.0.1",
         "com.google.devtools.ksp:symbol-processing:%s" % KSP_VERSION,
         "com.google.devtools.ksp:symbol-processing-api:%s" % KSP_VERSION,
+        "com.google.devtools.ksp:symbol-processing-common-deps:%s" % KSP_VERSION,
+        "com.google.devtools.ksp:symbol-processing-aa-embeddable:%s" % KSP_VERSION,
         "com.google.errorprone:error_prone_annotation:%s" % ERROR_PRONE_VERSION,
         "com.google.errorprone:error_prone_annotations:%s" % ERROR_PRONE_VERSION,
         "com.google.errorprone:error_prone_check_api:%s" % ERROR_PRONE_VERSION,
@@ -253,6 +272,7 @@ maven_install(
         "io.grpc:grpc-protobuf:%s" % GRPC_VERSION,
         "jakarta.inject:jakarta.inject-api:2.0.1",
         "javax.annotation:javax.annotation-api:1.3.2",
+        "javax.enterprise:cdi-api:1.0",
         "javax.inject:javax.inject:1",
         "javax.inject:javax.inject-tck:1",
         "junit:junit:4.13",
@@ -260,20 +280,34 @@ maven_install(
         "net.bytebuddy:byte-buddy-agent:%s" % BYTE_BUDDY_VERSION,
         "net.ltgt.gradle.incap:incap:%s" % INCAP_VERSION,
         "net.ltgt.gradle.incap:incap-processor:%s" % INCAP_VERSION,
+        "org.apache.ant:ant:%s" % ANT_VERSION,
+        "org.apache.ant:ant-launcher:%s" % ANT_VERSION,
+        "org.apache.maven:maven-artifact:%s" % MAVEN_VERSION,
+        "org.apache.maven:maven-model:%s" % MAVEN_VERSION,
+        "org.apache.maven:maven-plugin-api:%s" % MAVEN_VERSION,
         "org.checkerframework:checker-compat-qual:%s" % CHECKER_FRAMEWORK_VERSION,
         "org.checkerframework:dataflow:%s" % CHECKER_FRAMEWORK_VERSION,
         "org.checkerframework:javacutil:%s" % CHECKER_FRAMEWORK_VERSION,
+        "org.codehaus.plexus:plexus-utils:3.0.20",
+        "org.codehaus.plexus:plexus-classworlds:2.5.2",
+        "org.codehaus.plexus:plexus-component-annotations:1.5.5",
+        "org.eclipse.sisu:org.eclipse.sisu.plexus:%s" % ECLIPSE_SISU_VERSION,
+        "org.eclipse.sisu:org.eclipse.sisu.inject:%s" % ECLIPSE_SISU_VERSION,
         "org.hamcrest:hamcrest-core:1.3",
         "org.jetbrains.kotlin:kotlin-annotation-processing-embeddable:%s" % KOTLIN_VERSION,
         "org.jetbrains.kotlin:kotlin-compiler-embeddable:%s" % KOTLIN_VERSION,
         "org.jetbrains.kotlin:kotlin-daemon-embeddable:%s" % KOTLIN_VERSION,
+        "org.jetbrains.kotlin:kotlin-metadata-jvm:%s" % KOTLIN_VERSION,
         "org.jetbrains.kotlin:kotlin-stdlib:%s" % KOTLIN_VERSION,
-        "org.jetbrains.kotlinx:kotlinx-metadata-jvm:0.6.2",
-        "org.jspecify:jspecify:0.3.0",
+        "org.jspecify:jspecify:1.0.0",
         "org.mockito:mockito-core:2.28.2",
+        "org.pantsbuild:jarjar:1.7.2",
         "org.objenesis:objenesis:1.0",
-        "org.robolectric:robolectric:4.4",
-        "org.robolectric:shadows-framework:4.4",  # For ActivityController
+        "org.ow2.asm:asm:%s" % ASM_VERSION,
+        "org.ow2.asm:asm-tree:%s" % ASM_VERSION,
+        "org.ow2.asm:asm-commons:%s" % ASM_VERSION,
+        "org.robolectric:robolectric:%s" % ROBOLECTRIC_VERSION,
+        "org.robolectric:shadows-framework:%s" % ROBOLECTRIC_VERSION,  # For ActivityController
     ],
     repositories = [
         "https://repo1.maven.org/maven2",

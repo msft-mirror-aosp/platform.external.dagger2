@@ -329,16 +329,22 @@ public final class XElements {
         return asTypeElement(element).getQualifiedName();
       } else if (isExecutable(element)) {
         XExecutableElement executable = asExecutable(element);
+        // TODO(b/318709946) resolving ksp types can be expensive, therefore we should avoid it
+        // here for extreme cases until ksp improved the performance.
+        boolean tooManyParameters =
+            getProcessingEnv(element).getBackend().equals(XProcessingEnv.Backend.KSP)
+                && executable.getParameters().size() > 10;
         return String.format(
             "%s(%s)",
             getSimpleName(
-                isConstructor(element)
-                    ? asConstructor(element).getEnclosingElement()
-                    : executable),
-            executable.getParameters().stream()
-                .map(XExecutableParameterElement::getType)
-                .map(XTypes::toStableString)
-                .collect(joining(",")));
+                isConstructor(element) ? asConstructor(element).getEnclosingElement() : executable),
+            (tooManyParameters
+                    ? executable.getParameters().stream().limit(10)
+                    : executable.getParameters().stream()
+                        .map(XExecutableParameterElement::getType)
+                        .map(XTypes::toStableString)
+                        .collect(joining(",")))
+                + (tooManyParameters ? ", ..." : ""));
       } else if (isEnumEntry(element)
                      || isField(element)
                      || isMethodParameter(element)
