@@ -16,23 +16,27 @@
 
 package dagger.internal.codegen.binding;
 
+import static com.google.common.base.Preconditions.checkState;
 import static dagger.internal.codegen.xprocessing.XElements.asMethod;
-import static java.util.Arrays.asList;
+import static dagger.internal.codegen.xprocessing.XElements.isAbstract;
+import static dagger.internal.codegen.xprocessing.XElements.isStatic;
 
+import androidx.room.compiler.processing.XAnnotation;
 import androidx.room.compiler.processing.XElement;
 import androidx.room.compiler.processing.XElementKt;
 import androidx.room.compiler.processing.XType;
 import androidx.room.compiler.processing.XTypeElement;
+import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.errorprone.annotations.CheckReturnValue;
-import dagger.internal.codegen.base.ContributionType;
 import dagger.internal.codegen.base.ContributionType.HasContributionType;
 import dagger.internal.codegen.base.MapType;
 import dagger.internal.codegen.base.SetType;
+import dagger.internal.codegen.compileroption.CompilerOptions;
 import dagger.internal.codegen.model.BindingKind;
-import dagger.internal.codegen.model.DaggerAnnotation;
-import dagger.internal.codegen.model.DependencyRequest;
 import dagger.internal.codegen.model.Key;
+import dagger.internal.codegen.model.Scope;
+import dagger.internal.codegen.xprocessing.Nullability;
 import dagger.internal.codegen.xprocessing.XTypes;
 import java.util.Optional;
 
@@ -46,8 +50,20 @@ public abstract class ContributionBinding extends Binding implements HasContribu
   /** Returns the nullability of this binding. */
   public abstract Nullability nullability();
 
-  // Note: We're using DaggerAnnotation instead of XAnnotation for its equals/hashcode
-  public abstract Optional<DaggerAnnotation> mapKey();
+  private static final ImmutableSet<BindingKind> KINDS_TO_CHECK_FOR_NULL =
+      ImmutableSet.of(BindingKind.PROVISION, BindingKind.COMPONENT_PROVISION);
+
+  public boolean shouldCheckForNull(CompilerOptions compilerOptions) {
+    return KINDS_TO_CHECK_FOR_NULL.contains(kind())
+        && contributedPrimitiveType().isEmpty()
+        && !isNullable()
+        && compilerOptions.doCheckForNulls();
+  }
+
+  /** Returns the map key if this is a {@code Map} multibinding contribution. */
+  public Optional<XAnnotation> mapKey() {
+    return bindingElement().flatMap(MapKeys::getMapKey);
+  }
 
   /** If {@link #bindingElement()} is a method that returns a primitive type, returns that type. */
   public final Optional<XType> contributedPrimitiveType() {
@@ -59,7 +75,11 @@ public abstract class ContributionBinding extends Binding implements HasContribu
 
   @Override
   public boolean requiresModuleInstance() {
-    return !isContributingModuleKotlinObject() && super.requiresModuleInstance();
+    return contributingModule().isPresent()
+        && bindingElement().isPresent()
+        && !isAbstract(bindingElement().get())
+        && !isStatic(bindingElement().get())
+        && !isContributingModuleKotlinObject();
   }
 
   @Override
@@ -97,33 +117,47 @@ public abstract class ContributionBinding extends Binding implements HasContribu
 
   public abstract Builder<?, ?> toBuilder();
 
+  /** Returns a new {@link ContributionBinding} with the given {@link BindingType}. */
+  final ContributionBinding withBindingType(BindingType bindingType) {
+    checkState(optionalBindingType().isEmpty());
+    switch (kind()) {
+      case DELEGATE:
+        return ((DelegateBinding) this).toBuilder()
+            .optionalBindingType(Optional.of(bindingType))
+            .build();
+      case OPTIONAL:
+        return ((OptionalBinding) this).toBuilder()
+            .optionalBindingType(Optional.of(bindingType))
+            .build();
+      case MULTIBOUND_MAP:
+        return ((MultiboundMapBinding) this).toBuilder()
+            .optionalBindingType(Optional.of(bindingType))
+            .build();
+      case MULTIBOUND_SET:
+        return ((MultiboundSetBinding) this).toBuilder()
+            .optionalBindingType(Optional.of(bindingType))
+            .build();
+      default:
+        throw new AssertionError("Unexpected binding kind: " + kind());
+    }
+  }
+
   /**
    * Base builder for {@link com.google.auto.value.AutoValue @AutoValue} subclasses of {@link
    * ContributionBinding}.
    */
-  public abstract static class Builder<C extends ContributionBinding, B extends Builder<C, B>> {
+  abstract static class Builder<C extends ContributionBinding, B extends Builder<C, B>> {
     @CanIgnoreReturnValue
-    public abstract B dependencies(Iterable<DependencyRequest> dependencies);
+    abstract B unresolved(Optional<? extends Binding> unresolved);
 
     @CanIgnoreReturnValue
-    public B dependencies(DependencyRequest... dependencies) {
-      return dependencies(asList(dependencies));
-    }
-
-    @CanIgnoreReturnValue
-    public abstract B unresolved(C unresolved);
-
-    @CanIgnoreReturnValue
-    public abstract B contributionType(ContributionType contributionType);
-
-    @CanIgnoreReturnValue
-    public abstract B bindingElement(XElement bindingElement);
+    abstract B bindingElement(XElement bindingElement);
 
     @CanIgnoreReturnValue
     abstract B bindingElement(Optional<XElement> bindingElement);
 
     @CanIgnoreReturnValue
-    public final B clearBindingElement() {
+    final B clearBindingElement() {
       return bindingElement(Optional.empty());
     };
 
@@ -131,16 +165,10 @@ public abstract class ContributionBinding extends Binding implements HasContribu
     abstract B contributingModule(XTypeElement contributingModule);
 
     @CanIgnoreReturnValue
-    public abstract B key(Key key);
+    abstract B key(Key key);
 
     @CanIgnoreReturnValue
-    public abstract B nullability(Nullability nullability);
-
-    @CanIgnoreReturnValue
-    abstract B mapKey(Optional<DaggerAnnotation> mapKey);
-
-    @CanIgnoreReturnValue
-    public abstract B kind(BindingKind kind);
+    abstract B scope(Optional<Scope> scope);
 
     abstract C build();
   }

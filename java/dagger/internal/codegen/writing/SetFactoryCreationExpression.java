@@ -16,6 +16,7 @@
 
 package dagger.internal.codegen.writing;
 
+import static androidx.room.compiler.codegen.XTypeNameKt.toJavaPoet;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static dagger.internal.codegen.binding.SourceFiles.setFactoryClassName;
 
@@ -27,18 +28,18 @@ import dagger.internal.codegen.base.ContributionType;
 import dagger.internal.codegen.base.SetType;
 import dagger.internal.codegen.binding.BindingGraph;
 import dagger.internal.codegen.binding.BindingType;
-import dagger.internal.codegen.binding.ContributionBinding;
+import dagger.internal.codegen.binding.MultiboundSetBinding;
 import dagger.internal.codegen.javapoet.TypeNames;
 import dagger.internal.codegen.model.DependencyRequest;
 
 /** A factory creation expression for a multibound set. */
 final class SetFactoryCreationExpression extends MultibindingFactoryCreationExpression {
   private final BindingGraph graph;
-  private final ContributionBinding binding;
+  private final MultiboundSetBinding binding;
 
   @AssistedInject
   SetFactoryCreationExpression(
-      @Assisted ContributionBinding binding,
+      @Assisted MultiboundSetBinding binding,
       ComponentImplementation componentImplementation,
       ComponentRequestRepresentations componentRequestRepresentations,
       BindingGraph graph) {
@@ -49,7 +50,8 @@ final class SetFactoryCreationExpression extends MultibindingFactoryCreationExpr
 
   @Override
   public CodeBlock creationExpression() {
-    CodeBlock.Builder builder = CodeBlock.builder().add("$T.", setFactoryClassName(binding));
+    CodeBlock.Builder builder =
+        CodeBlock.builder().add("$T.", toJavaPoet(setFactoryClassName(binding)));
     if (!useRawType()) {
       SetType setType = SetType.from(binding.key());
       builder.add(
@@ -96,6 +98,6 @@ final class SetFactoryCreationExpression extends MultibindingFactoryCreationExpr
 
   @AssistedFactory
   static interface Factory {
-    SetFactoryCreationExpression create(ContributionBinding binding);
+    SetFactoryCreationExpression create(MultiboundSetBinding binding);
   }
 }

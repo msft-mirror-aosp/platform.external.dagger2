@@ -14,8 +14,9 @@
 # Description:
 #   Testing libraries for Hilt Android.
 
+load("@rules_java//java:defs.bzl", "java_library")
 load("//:build_defs.bzl", "POM_VERSION")
-load("//tools:maven.bzl", "gen_maven_artifact")
+load("//tools/maven:maven.bzl", "gen_maven_artifact")
 
 package(default_visibility = ["//:src"])
 
@@ -248,7 +249,7 @@ gen_maven_artifact(
         "com.google.guava:guava",
         "javax.annotation:javax.annotation-api",
     ],
-    javadoc_android_api_level = 32,
+    javadoc_android_api_level = 34,
     javadoc_exclude_packages = [
         "dagger.hilt.internal",
         "dagger.hilt.android.internal",

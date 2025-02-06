@@ -16,6 +16,7 @@
 
 package dagger.internal.codegen;
 
+
 import androidx.room.compiler.processing.util.Source;
 import com.google.common.collect.ImmutableMap;
 import dagger.testing.compile.CompilerTests;
@@ -33,6 +34,24 @@ public class ProductionComponentProcessorTest {
   public static Collection<Object[]> parameters() {
     return CompilerMode.TEST_PARAMETERS;
   }
+
+  private static final Source EXECUTOR_MODULE =
+      CompilerTests.javaSource(
+          "test.ExecutorModule",
+          "package test;",
+          "",
+          "import com.google.common.util.concurrent.MoreExecutors;",
+          "import dagger.Module;",
+          "import dagger.Provides;",
+          "import dagger.producers.Production;",
+          "import java.util.concurrent.Executor;",
+          "",
+          "@Module",
+          "final class ExecutorModule {",
+          "  @Provides @Production Executor executor() {",
+          "    return MoreExecutors.directExecutor();",
+          "  }",
+          "}");
 
   @Rule public GoldenFileRule goldenFileRule = new GoldenFileRule();
 
@@ -121,23 +140,6 @@ public class ProductionComponentProcessorTest {
 
   @Test
   public void dependsOnProductionExecutor() throws Exception {
-    Source moduleFile =
-        CompilerTests.javaSource(
-            "test.ExecutorModule",
-            "package test;",
-            "",
-            "import com.google.common.util.concurrent.MoreExecutors;",
-            "import dagger.Module;",
-            "import dagger.Provides;",
-            "import dagger.producers.Production;",
-            "import java.util.concurrent.Executor;",
-            "",
-            "@Module",
-            "final class ExecutorModule {",
-            "  @Provides @Production Executor executor() {",
-            "    return MoreExecutors.directExecutor();",
-            "  }",
-            "}");
     Source producerModuleFile =
         CompilerTests.javaSource(
             "test.SimpleModule",
@@ -174,7 +176,7 @@ public class ProductionComponentProcessorTest {
             "}");
 
     String errorMessage = "String may not depend on the production executor";
-    CompilerTests.daggerCompiler(moduleFile, producerModuleFile, componentFile)
+    CompilerTests.daggerCompiler(EXECUTOR_MODULE, producerModuleFile, componentFile)
         .withProcessingOptions(compilerMode.processorOptions())
         .compile(
             subject -> {
@@ -413,6 +415,225 @@ public class ProductionComponentProcessorTest {
             subject -> {
               subject.hasErrorCount(0);
               subject.generatedSource(goldenFileRule.goldenSource("test/DaggerParent"));
+            });
+  }
+
+  @Test
+  public void requestProducerNodeWithProvider_failsWithNotSupportedError() {
+    Source producerModuleFile =
+        CompilerTests.javaSource(
+            "test.SimpleModule",
+            "package test;",
+            "",
+            "import dagger.producers.ProducerModule;",
+            "import dagger.producers.Produces;",
+            "import javax.inject.Provider;",
+            "import java.util.concurrent.Executor;",
+            "import dagger.producers.Production;",
+            "",
+            "@ProducerModule",
+            "final class SimpleModule {",
+            "  @Produces String str(Provider<Integer> num) {",
+            "    return \"\";",
+            "  }",
+            "  @Produces Integer num() { return 1; }",
+            "}");
+    Source componentFile =
+        CompilerTests.javaSource(
+            "test.SimpleComponent",
+            "package test;",
+            "",
+            "import com.google.common.util.concurrent.ListenableFuture;",
+            "import dagger.producers.ProductionComponent;",
+            "",
+            "@ProductionComponent(modules = {ExecutorModule.class, SimpleModule.class})",
+            "interface SimpleComponent {",
+            "  ListenableFuture<String> str();",
+            "",
+            "  @ProductionComponent.Builder",
+            "  interface Builder {",
+            "    SimpleComponent build();",
+            "  }",
+            "}");
+
+    CompilerTests.daggerCompiler(EXECUTOR_MODULE, producerModuleFile, componentFile)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(
+                  "request kind PROVIDER cannot be satisfied by production binding");
+            });
+  }
+
+  @Test
+  public void productionBindingKind_failsIfScoped() {
+    Source component =
+        CompilerTests.javaSource(
+            "test.TestComponent",
+            "package test;",
+            "",
+            "import com.google.common.util.concurrent.ListenableFuture;",
+            "import dagger.producers.ProductionComponent;",
+            "",
+            "@ProductionComponent(modules = {ExecutorModule.class, TestModule.class})",
+            "interface TestComponent {",
+            "  ListenableFuture<String> str();",
+            "}");
+    Source module =
+        CompilerTests.javaSource(
+            "test.TestModule",
+            "package test;",
+            "",
+            "import dagger.producers.ProducerModule;",
+            "import dagger.producers.Produces;",
+            "import dagger.producers.ProductionScope;",
+            "import javax.inject.Provider;",
+            "import java.util.concurrent.Executor;",
+            "import dagger.producers.Production;",
+            "",
+            "@ProducerModule",
+            "interface TestModule {",
+            "  @ProductionScope",
+            "  @Produces",
+            "  static String provideString() { return \"\"; }",
+            "}");
+
+    CompilerTests.daggerCompiler(component, module, EXECUTOR_MODULE)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining("@Produces methods cannot be scoped");
+            });
+  }
+
+  @Test
+  public void delegateToProductionBindingKind_failsIfScoped() {
+    Source component =
+        CompilerTests.javaSource(
+            "test.TestComponent",
+            "package test;",
+            "",
+            "import com.google.common.util.concurrent.ListenableFuture;",
+            "import dagger.producers.ProductionComponent;",
+            "",
+            "@ProductionComponent(modules = {ExecutorModule.class, TestModule.class})",
+            "interface TestComponent {",
+            "  ListenableFuture<Foo> foo();",
+            "}");
+    Source module =
+        CompilerTests.javaSource(
+            "test.TestModule",
+            "package test;",
+            "",
+            "import dagger.Binds;",
+            "import dagger.producers.ProducerModule;",
+            "import dagger.producers.Produces;",
+            "import dagger.producers.ProductionScope;",
+            "import javax.inject.Provider;",
+            "import java.util.concurrent.Executor;",
+            "import dagger.producers.Production;",
+            "",
+            "@ProducerModule",
+            "interface TestModule {",
+            "  @ProductionScope",
+            "  @Binds",
+            "  Foo bind(FooImpl impl);",
+            "",
+            "  @Produces",
+            "  static FooImpl fooImpl() { return new FooImpl(); }",
+            "}");
+    Source foo =
+        CompilerTests.javaSource(
+            "test.Foo",
+            "package test;",
+            "",
+            "interface Foo {}");
+    Source fooImpl =
+        CompilerTests.javaSource(
+            "test.FooImpl",
+            "package test;",
+            "",
+            "final class FooImpl implements Foo {}");
+
+    CompilerTests.daggerCompiler(component, module, foo, fooImpl, EXECUTOR_MODULE)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(
+                  "@ProductionScope @Binds Foo TestModule.bind(FooImpl) cannot be scoped "
+                      + "because it delegates to an @Produces method");
+            });
+  }
+
+  @Test
+  public void multipleDelegatesToProductionBindingKind_failsIfScoped() {
+    Source component =
+        CompilerTests.javaSource(
+            "test.TestComponent",
+            "package test;",
+            "",
+            "import com.google.common.util.concurrent.ListenableFuture;",
+            "import dagger.producers.ProductionComponent;",
+            "",
+            "@ProductionComponent(modules = {ExecutorModule.class, TestModule.class})",
+            "interface TestComponent {",
+            "  ListenableFuture<FooSuper> fooSuper();",
+            "}");
+    Source module =
+        CompilerTests.javaSource(
+            "test.TestModule",
+            "package test;",
+            "",
+            "import dagger.Binds;",
+            "import dagger.producers.ProducerModule;",
+            "import dagger.producers.Produces;",
+            "import dagger.producers.ProductionScope;",
+            "import javax.inject.Provider;",
+            "import java.util.concurrent.Executor;",
+            "import dagger.producers.Production;",
+            "",
+            "@ProducerModule",
+            "interface TestModule {",
+            "  @ProductionScope",
+            "  @Binds",
+            "  FooSuper bindFooSuper(Foo impl);",
+            "",
+            "  @Binds",
+            "  Foo bindFoo(FooImpl impl);",
+            "",
+            "  @Produces",
+            "  static FooImpl fooImpl() { return new FooImpl(); }",
+            "}");
+    Source fooSuper =
+        CompilerTests.javaSource(
+            "test.FooSuper",
+            "package test;",
+            "",
+            "interface FooSuper {}");
+    Source foo =
+        CompilerTests.javaSource(
+            "test.Foo",
+            "package test;",
+            "",
+            "interface Foo extends FooSuper {}");
+    Source fooImpl =
+        CompilerTests.javaSource(
+            "test.FooImpl",
+            "package test;",
+            "",
+            "final class FooImpl implements Foo {}");
+
+    CompilerTests.daggerCompiler(component, module, fooSuper, foo, fooImpl, EXECUTOR_MODULE)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(
+                  "@ProductionScope @Binds FooSuper TestModule.bindFooSuper(Foo) cannot be scoped "
+                      + "because it delegates to an @Produces method");
             });
   }
 }

@@ -276,7 +276,6 @@ public class BindsMethodValidationTest {
             });
   }
 
-
   @Test
   public void bindsMissingTypeInReturnTypeHierarchy() {
     Source module =
@@ -339,6 +338,107 @@ public class BindsMethodValidationTest {
                           + "\n      => type (DECLARED supertype): test.Parent<java.lang.String>"
                           + "\n      => type (ERROR supertype): %1$s",
                       isJavac ? "MissingType" : "error.NonExistentClass"));
+            });
+  }
+
+  @Test
+  public void bindsNullableToNonNullable_fails() {
+    Source module =
+        CompilerTests.javaSource(
+            "test.TestComponent",
+            "package test;",
+            "",
+            "import dagger.Binds;",
+            "import dagger.Module;",
+            "import javax.annotation.Nullable;",
+            "",
+            "@Module",
+            "interface TestModule {",
+            "  @Binds Object bind(@Nullable String str);",
+            "}");
+
+    CompilerTests.daggerCompiler(module)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(
+                  "@Binds methods' nullability must match the nullability of its parameter");
+            });
+  }
+
+  @Test
+  public void bindsNonNullableToNullable_fails() {
+    Source module =
+        CompilerTests.javaSource(
+            "test.TestComponent",
+            "package test;",
+            "",
+            "import dagger.Binds;",
+            "import dagger.Module;",
+            "import javax.annotation.Nullable;",
+            "",
+            "@Module",
+            "interface TestModule {",
+            "  @Binds @Nullable Object bind(String str);",
+            "}");
+
+    CompilerTests.daggerCompiler(module)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining(
+                  "@Binds methods' nullability must match the nullability of its parameter");
+            });
+  }
+
+  // This is a regression test for b/370367984.
+  @Test
+  public void bindsMapKVAndRequestMapKProviderV_failsWithMissingBindingError() {
+    Source component =
+        CompilerTests.javaSource(
+            "test.TestComponent",
+            "package test;",
+            "import dagger.Component;",
+            "import javax.inject.Provider;",
+            "import java.util.Map;",
+            "",
+            "@Component(modules = {TestModule.class})",
+            "interface TestComponent {",
+            "  Map<K, Provider<V>> getMap();",
+            "}");
+    Source module =
+        CompilerTests.javaSource(
+            "test.TestModule",
+            "package test;",
+            "import dagger.Binds;",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import java.util.Map;",
+            "",
+            "@Module",
+            "interface TestModule {",
+            "  @Binds Map<K, V> bind(@TestQualifier Map<K, V> impl);",
+            "",
+            "  @Provides",
+            "  @TestQualifier",
+            "  static Map<K, V> provideMap() {",
+            "    return (Map<K, V>) null;",
+            "  }",
+            "}");
+    Source qualifier =
+        CompilerTests.javaSource(
+            "test.TestQualifier",
+            "package test;",
+            "import javax.inject.Qualifier;",
+            "",
+            "@Qualifier @interface TestQualifier {}");
+    Source k = CompilerTests.javaSource("test.K", "package test;", "interface K {}");
+    Source v = CompilerTests.javaSource("test.V", "package test;", "interface V {}");
+    CompilerTests.daggerCompiler(component, module, qualifier, k, v)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(1);
+              subject.hasErrorContaining("Map<test.K,Provider<test.V>> cannot be provided");
             });
   }
 

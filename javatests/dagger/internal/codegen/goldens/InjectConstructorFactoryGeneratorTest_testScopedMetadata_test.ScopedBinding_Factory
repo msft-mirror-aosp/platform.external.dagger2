@@ -18,7 +18,9 @@ import javax.annotation.processing.Generated;
     "rawtypes",
     "KotlinInternal",
     "KotlinInternalInJava",
-    "cast"
+    "cast",
+    "deprecation",
+    "nullness:initialization.field.uninitialized"
 })
 public final class ScopedBinding_Factory implements Factory<ScopedBinding> {
   @Override
@@ -35,7 +37,7 @@ public final class ScopedBinding_Factory implements Factory<ScopedBinding> {
   }
 
   private static final class InstanceHolder {
-    private static final ScopedBinding_Factory INSTANCE = new ScopedBinding_Factory();
+    static final ScopedBinding_Factory INSTANCE = new ScopedBinding_Factory();
   }
 }
 

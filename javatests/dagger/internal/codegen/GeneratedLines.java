@@ -33,7 +33,9 @@ public final class GeneratedLines {
 
   private static final String SUPPRESS_WARNINGS_ANNOTATION =
       "@SuppressWarnings({"
-          + "\"unchecked\", \"rawtypes\", \"KotlinInternal\", \"KotlinInternalInJava\", \"cast\""
+          + "\"unchecked\", \"rawtypes\", \"KotlinInternal\", \"KotlinInternalInJava\", \"cast\", "
+          + "\"deprecation\","
+          + "\"nullness:initialization.field.uninitialized\""
           + "})";
 
   private static final String IMPORT_DAGGER_GENERATED = "import dagger.internal.DaggerGenerated;";

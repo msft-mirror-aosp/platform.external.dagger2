@@ -31,8 +31,9 @@ public final class AnnotationSpecs {
     UNCHECKED("unchecked"),
     FUTURE_RETURN_VALUE_IGNORED("FutureReturnValueIgnored"),
     KOTLIN_INTERNAL("KotlinInternal", "KotlinInternalInJava"),
-    CAST("cast")
-    ;
+    CAST("cast"),
+    DEPRECATION("deprecation"),
+    UNINITIALIZED("nullness:initialization.field.uninitialized");
 
     private final ImmutableList<String> values;
 
