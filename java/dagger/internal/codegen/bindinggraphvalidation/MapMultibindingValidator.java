@@ -17,31 +17,31 @@
 package dagger.internal.codegen.bindinggraphvalidation;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.collect.Multimaps.filterKeys;
 import static dagger.internal.codegen.base.Formatter.INDENT;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
-import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSetMultimap;
 import static dagger.internal.codegen.model.BindingKind.MULTIBOUND_MAP;
+import static dagger.internal.codegen.xprocessing.XAnnotations.getClassName;
 import static javax.tools.Diagnostic.Kind.ERROR;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Multimaps;
-import com.google.common.collect.SetMultimap;
 import com.squareup.javapoet.ClassName;
 import dagger.internal.codegen.base.MapType;
-import dagger.internal.codegen.binding.BindingDeclaration;
-import dagger.internal.codegen.binding.BindingDeclarationFormatter;
 import dagger.internal.codegen.binding.BindingNode;
 import dagger.internal.codegen.binding.ContributionBinding;
+import dagger.internal.codegen.binding.Declaration;
+import dagger.internal.codegen.binding.DeclarationFormatter;
 import dagger.internal.codegen.binding.KeyFactory;
-import dagger.internal.codegen.javapoet.TypeNames;
 import dagger.internal.codegen.model.Binding;
 import dagger.internal.codegen.model.BindingGraph;
 import dagger.internal.codegen.model.DiagnosticReporter;
 import dagger.internal.codegen.model.Key;
 import dagger.internal.codegen.validation.ValidationBindingGraphPlugin;
+import dagger.internal.codegen.xprocessing.XAnnotations;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Set;
 import javax.inject.Inject;
 
@@ -51,13 +51,13 @@ import javax.inject.Inject;
  */
 final class MapMultibindingValidator extends ValidationBindingGraphPlugin {
 
-  private final BindingDeclarationFormatter bindingDeclarationFormatter;
+  private final DeclarationFormatter declarationFormatter;
   private final KeyFactory keyFactory;
 
   @Inject
   MapMultibindingValidator(
-      BindingDeclarationFormatter bindingDeclarationFormatter, KeyFactory keyFactory) {
-    this.bindingDeclarationFormatter = bindingDeclarationFormatter;
+      DeclarationFormatter declarationFormatter, KeyFactory keyFactory) {
+    this.declarationFormatter = declarationFormatter;
     this.keyFactory = keyFactory;
   }
 
@@ -90,41 +90,19 @@ final class MapMultibindingValidator extends ValidationBindingGraphPlugin {
    * </ol>
    */
   private ImmutableSet<Binding> mapMultibindings(BindingGraph bindingGraph) {
-    ImmutableSetMultimap<Key, Binding> mapMultibindings =
-        bindingGraph.bindings().stream()
-            .filter(node -> node.kind().equals(MULTIBOUND_MAP))
-            .collect(toImmutableSetMultimap(Binding::key, node -> node));
+    Set<Key> visitedKeys = new HashSet<>();
+    return bindingGraph.bindings().stream()
+        .filter(binding -> binding.kind().equals(MULTIBOUND_MAP))
+        // Sort by the order of the value in the RequestKind:
+        // (Map<K, V>, then Map<K, Provider<V>>, then Map<K, Producer<V>>).
+        .sorted(Comparator.comparing(binding -> MapType.from(binding.key()).valueRequestKind()))
+        // Only take the first binding (post sorting) per unwrapped key.
+        .filter(binding -> visitedKeys.add(unwrappedKey(binding)))
+        .collect(toImmutableSet());
+  }
 
-    // Mutlbindings for Map<K, V>
-    SetMultimap<Key, Binding> plainValueMapMultibindings =
-        filterKeys(mapMultibindings, key -> !MapType.from(key).valuesAreFrameworkType());
-
-    // Multibindings for Map<K, Provider<V>> where Map<K, V> isn't in plainValueMapMultibindings
-    SetMultimap<Key, Binding> providerValueMapMultibindings =
-        filterKeys(
-            mapMultibindings,
-            key ->
-                MapType.from(key).valuesAreTypeOf(TypeNames.PROVIDER)
-                    && !plainValueMapMultibindings.containsKey(keyFactory.unwrapMapValueType(key)));
-
-    // Multibindings for Map<K, Producer<V>> where Map<K, V> isn't in plainValueMapMultibindings and
-    // Map<K, Provider<V>> isn't in providerValueMapMultibindings
-    SetMultimap<Key, Binding> producerValueMapMultibindings =
-        filterKeys(
-            mapMultibindings,
-            key ->
-                MapType.from(key).valuesAreTypeOf(TypeNames.PRODUCER)
-                    && !plainValueMapMultibindings.containsKey(keyFactory.unwrapMapValueType(key))
-                    && !providerValueMapMultibindings.containsKey(
-                        keyFactory
-                            .rewrapMapKey(key, TypeNames.PRODUCER, TypeNames.PROVIDER)
-                            .get()));
-
-    return new ImmutableSet.Builder<Binding>()
-        .addAll(plainValueMapMultibindings.values())
-        .addAll(providerValueMapMultibindings.values())
-        .addAll(producerValueMapMultibindings.values())
-        .build();
+  private Key unwrappedKey(Binding binding) {
+    return keyFactory.unwrapMapValueType(binding.key());
   }
 
   private ImmutableSet<ContributionBinding> mapBindingContributions(
@@ -141,7 +119,11 @@ final class MapMultibindingValidator extends ValidationBindingGraphPlugin {
       ImmutableSet<ContributionBinding> contributions,
       DiagnosticReporter diagnosticReporter) {
     ImmutableSetMultimap<?, ContributionBinding> contributionsByMapKey =
-        ImmutableSetMultimap.copyOf(Multimaps.index(contributions, ContributionBinding::mapKey));
+        ImmutableSetMultimap.copyOf(
+            Multimaps.index(
+                contributions,
+                // Note: We're wrapping in XAnnotations.equivalence() to get proper equals/hashcode.
+                binding -> binding.mapKey().map(XAnnotations.equivalence()::wrap)));
 
     for (Set<ContributionBinding> contributionsForOneMapKey :
         Multimaps.asMap(contributionsByMapKey).values()) {
@@ -160,7 +142,7 @@ final class MapMultibindingValidator extends ValidationBindingGraphPlugin {
       DiagnosticReporter diagnosticReporter) {
     ImmutableSetMultimap<ClassName, ContributionBinding> contributionsByMapKeyAnnotationType =
         ImmutableSetMultimap.copyOf(
-            Multimaps.index(contributions, mapBinding -> mapBinding.mapKey().get().className()));
+            Multimaps.index(contributions, mapBinding -> getClassName(mapBinding.mapKey().get())));
 
     if (contributionsByMapKeyAnnotationType.keySet().size() > 1) {
       diagnosticReporter.reportBinding(
@@ -181,7 +163,7 @@ final class MapMultibindingValidator extends ValidationBindingGraphPlugin {
         .forEach(
             (annotationType, contributions) -> {
               message.append('\n').append(INDENT).append(annotationType).append(':');
-              bindingDeclarationFormatter.formatIndentedList(message, contributions, 2);
+              declarationFormatter.formatIndentedList(message, contributions, 2);
             });
     return message.toString();
   }
@@ -191,9 +173,9 @@ final class MapMultibindingValidator extends ValidationBindingGraphPlugin {
     StringBuilder message =
         new StringBuilder("The same map key is bound more than once for ").append(mapBindingKey);
 
-    bindingDeclarationFormatter.formatIndentedList(
+    declarationFormatter.formatIndentedList(
         message,
-        ImmutableList.sortedCopyOf(BindingDeclaration.COMPARATOR, contributionsForOneMapKey),
+        ImmutableList.sortedCopyOf(Declaration.COMPARATOR, contributionsForOneMapKey),
         1);
     return message.toString();
   }

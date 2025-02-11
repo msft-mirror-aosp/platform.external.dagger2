@@ -19,6 +19,7 @@ package dagger.internal.codegen.writing;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static dagger.internal.codegen.binding.BindingRequest.bindingRequest;
+import static dagger.internal.codegen.binding.MapKeys.getLazyClassMapKeyExpression;
 import static dagger.internal.codegen.binding.MapKeys.getMapKeyExpression;
 import static dagger.internal.codegen.javapoet.CodeBlocks.toParametersCodeBlock;
 import static dagger.internal.codegen.langmodel.Accessibility.isTypeAccessibleFrom;
@@ -39,7 +40,7 @@ import dagger.internal.codegen.base.MapType;
 import dagger.internal.codegen.binding.BindingGraph;
 import dagger.internal.codegen.binding.ContributionBinding;
 import dagger.internal.codegen.binding.MapKeys;
-import dagger.internal.codegen.binding.ProvisionBinding;
+import dagger.internal.codegen.binding.MultiboundMapBinding;
 import dagger.internal.codegen.javapoet.Expression;
 import dagger.internal.codegen.javapoet.TypeNames;
 import dagger.internal.codegen.model.BindingKind;
@@ -52,15 +53,14 @@ final class MapRequestRepresentation extends RequestRepresentation {
   private static final int MAX_IMMUTABLE_MAP_OF_KEY_VALUE_PAIRS = 5;
 
   private final XProcessingEnv processingEnv;
-  private final ProvisionBinding binding;
+  private final MultiboundMapBinding binding;
   private final ImmutableMap<DependencyRequest, ContributionBinding> dependencies;
   private final ComponentRequestRepresentations componentRequestRepresentations;
   private final boolean useLazyClassKey;
-  private final LazyClassKeyProviders lazyClassKeyProviders;
 
   @AssistedInject
   MapRequestRepresentation(
-      @Assisted ProvisionBinding binding,
+      @Assisted MultiboundMapBinding binding,
       XProcessingEnv processingEnv,
       BindingGraph graph,
       ComponentImplementation componentImplementation,
@@ -73,8 +73,6 @@ final class MapRequestRepresentation extends RequestRepresentation {
     this.dependencies =
         Maps.toMap(binding.dependencies(), dep -> graph.contributionBinding(dep.key()));
     this.useLazyClassKey = MapKeys.useLazyClassKey(binding, graph);
-    this.lazyClassKeyProviders =
-        componentImplementation.shardImplementation(binding).getLazyClassKeyProviders();
   }
 
   @Override
@@ -153,7 +151,7 @@ final class MapRequestRepresentation extends RequestRepresentation {
     return CodeBlock.of(
         "$L, $L",
         useLazyClassKey
-            ? lazyClassKeyProviders.getMapKeyExpression(dependency.key())
+            ? getLazyClassMapKeyExpression(dependencies.get(dependency))
             : getMapKeyExpression(dependencies.get(dependency), requestingClass, processingEnv),
         componentRequestRepresentations
             .getDependencyExpression(bindingRequest(dependency), requestingClass)
@@ -194,6 +192,6 @@ final class MapRequestRepresentation extends RequestRepresentation {
 
   @AssistedFactory
   static interface Factory {
-    MapRequestRepresentation create(ProvisionBinding binding);
+    MapRequestRepresentation create(MultiboundMapBinding binding);
   }
 }

@@ -16,6 +16,7 @@
 
 package dagger.internal.codegen.binding;
 
+import static androidx.room.compiler.codegen.XTypeNameKt.toJavaPoet;
 import static androidx.room.compiler.processing.XTypeKt.isArray;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.getOnlyElement;
@@ -46,13 +47,14 @@ import dagger.MapKey;
 import dagger.internal.codegen.base.DaggerSuperficialValidation;
 import dagger.internal.codegen.base.MapKeyAccessibility;
 import dagger.internal.codegen.javapoet.TypeNames;
-import dagger.internal.codegen.model.DaggerAnnotation;
 import dagger.internal.codegen.xprocessing.XElements;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
 /** Methods for extracting {@link MapKey} annotations and key code blocks from binding elements. */
 public final class MapKeys {
+  public static final String LAZY_CLASS_KEY_NAME_FIELD = "lazyClassKeyName";
+  public static final String KEEP_FIELD_TYPE_FIELD = "keepFieldType";
 
   /**
    * If {@code bindingElement} is annotated with a {@link MapKey} annotation, returns it.
@@ -134,7 +136,7 @@ public final class MapKeys {
    */
   public static CodeBlock getMapKeyExpression(
       ContributionBinding binding, ClassName requestingClass, XProcessingEnv processingEnv) {
-    XAnnotation mapKeyAnnotation = binding.mapKey().get().xprocessing();
+    XAnnotation mapKeyAnnotation = binding.mapKey().get();
     return MapKeyAccessibility.isMapKeyAccessibleFrom(
             mapKeyAnnotation, requestingClass.packageName())
         ? directMapKeyExpression(mapKeyAnnotation, processingEnv)
@@ -176,7 +178,8 @@ public final class MapKeys {
    * XProcessingEnv)} is generated.
    */
   public static ClassName mapKeyProxyClassName(ContributionBinding binding) {
-    return elementBasedClassName(asExecutable(binding.bindingElement().get()), "MapKey");
+    return toJavaPoet(
+        elementBasedClassName(asExecutable(binding.bindingElement().get()), "MapKey"));
   }
 
   /**
@@ -188,7 +191,6 @@ public final class MapKeys {
       ContributionBinding binding, XProcessingEnv processingEnv) {
     return binding
         .mapKey()
-        .map(DaggerAnnotation::xprocessing)
         .filter(mapKey -> !isMapKeyPubliclyAccessible(mapKey))
         .map(
             mapKey ->
@@ -213,11 +215,20 @@ public final class MapKeys {
           && contributionBinding
               .mapKey()
               .get()
-              .xprocessing()
               .getClassName()
               .equals(TypeNames.LAZY_CLASS_KEY);
     }
     return false;
+  }
+
+  public static CodeBlock getLazyClassMapKeyExpression(ContributionBinding contributionBinding) {
+    ClassName proxyClassName =
+        lazyClassKeyProxyClassName(XElements.asMethod(contributionBinding.bindingElement().get()));
+    return CodeBlock.of("$T.$N", proxyClassName, LAZY_CLASS_KEY_NAME_FIELD);
+  }
+
+  public static ClassName lazyClassKeyProxyClassName(XMethodElement methodElement) {
+    return toJavaPoet(elementBasedClassName(methodElement, "_LazyMapKey"));
   }
 
   private MapKeys() {}

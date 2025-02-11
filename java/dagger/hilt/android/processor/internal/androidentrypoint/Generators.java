@@ -28,6 +28,7 @@ import androidx.room.compiler.processing.JavaPoetExtKt;
 import androidx.room.compiler.processing.XAnnotation;
 import androidx.room.compiler.processing.XConstructorElement;
 import androidx.room.compiler.processing.XElement;
+import androidx.room.compiler.processing.XType;
 import androidx.room.compiler.processing.XTypeElement;
 import androidx.room.compiler.processing.XVariableElement;
 import com.google.common.base.Preconditions;
@@ -45,6 +46,7 @@ import com.squareup.javapoet.TypeSpec;
 import dagger.hilt.android.processor.internal.AndroidClassNames;
 import dagger.hilt.android.processor.internal.androidentrypoint.AndroidEntryPointMetadata.AndroidType;
 import dagger.hilt.processor.internal.ClassNames;
+import dagger.hilt.processor.internal.Processors;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -65,15 +67,20 @@ final class Generators {
   }
 
   /** Copies all constructors with arguments to the builder. */
-  static void copyConstructors(XTypeElement baseClass, TypeSpec.Builder builder) {
-    copyConstructors(baseClass, CodeBlock.builder().build(), builder);
+  static void copyConstructors(
+      XTypeElement baseClass, TypeSpec.Builder builder, XTypeElement subclassReference) {
+    copyConstructors(baseClass, CodeBlock.builder().build(), builder, subclassReference);
   }
 
   /** Copies all constructors with arguments along with an appended body to the builder. */
-  static void copyConstructors(XTypeElement baseClass, CodeBlock body, TypeSpec.Builder builder) {
+  static void copyConstructors(
+      XTypeElement baseClass,
+      CodeBlock body,
+      TypeSpec.Builder builder,
+      XTypeElement subclassReference) {
     ImmutableList<XConstructorElement> constructors =
         baseClass.getConstructors().stream()
-            .filter(constructor -> !constructor.isPrivate())
+            .filter(constructor -> isConstructorVisibleToSubclass(constructor, subclassReference))
             .collect(toImmutableList());
 
     if (constructors.size() == 1
@@ -84,6 +91,30 @@ final class Generators {
     }
 
     constructors.forEach(constructor -> builder.addMethod(copyConstructor(constructor, body)));
+  }
+
+  /**
+   * Returns true if the constructor is visibile to a subclass in the same package as the reference.
+   * A reference is used because usually for generators the subclass is being generated and so
+   * doesn't actually exist.
+   */
+  static boolean isConstructorVisibleToSubclass(
+      XConstructorElement constructor, XTypeElement subclassReference) {
+    // Check if the constructor has package private visibility and we're outside the package
+    if (Processors.hasJavaPackagePrivateVisibility(constructor)
+        && !constructor
+            .getEnclosingElement()
+            .getPackageName()
+            .contentEquals(subclassReference.getPackageName())) {
+      return false;
+      // Or if it is private, we know generated code can't be in the same file
+    } else if (constructor.isPrivate()) {
+      return false;
+    }
+
+    // Assume this is for a subclass per the name, so both protected and public methods are always
+    // accessible.
+    return true;
   }
 
   /** Returns Optional with AnnotationSpec for Nullable if found on element, empty otherwise. */
@@ -100,14 +131,30 @@ final class Generators {
     return Optional.empty();
   }
 
+  /** Returns a TypeName for the given type, including any @Nullable annotations on it. */
+  private static TypeName withAnyNullnessAnnotation(XType type) {
+    for (XAnnotation annotation : type.getAllAnnotations()) {
+      if (annotation.getClassName().simpleName().contentEquals("Nullable")) {
+        return type.getTypeName().annotated(toAnnotationSpec(annotation));
+      }
+    }
+    return type.getTypeName();
+  }
+
   /**
-   * Returns a ParameterSpec of the input parameter, @Nullable annotated if existing in original
-   * (this does not handle Nullable type annotations).
+   * Returns a ParameterSpec of the input parameter, @Nullable annotated if existing in original.
    */
   private static ParameterSpec getParameterSpecWithNullable(XVariableElement parameter) {
-    ParameterSpec.Builder builder =
-        ParameterSpec.builder(parameter.getType().getTypeName(), getSimpleName(parameter));
-    getNullableAnnotationSpec(parameter).ifPresent(builder::addAnnotation);
+    TypeName type = withAnyNullnessAnnotation(parameter.getType());
+    ParameterSpec.Builder builder = ParameterSpec.builder(type, getSimpleName(parameter));
+    /*
+     * If we already have a type-use Nullable, don't consider also adding a declaration Nullable,
+     * which could be a duplicate in the case of "hybrid" annotations that support both type-use and
+     * declaration targets.
+     */
+    if (!type.isAnnotated()) {
+      getNullableAnnotationSpec(parameter).ifPresent(builder::addAnnotation);
+    }
     return builder.build();
   }
 

@@ -16,10 +16,11 @@
 
 package dagger.internal;
 
+import org.jspecify.annotations.Nullable;
+
 /**
- * Internal Provider interface to make support for {@code javax.inject.Provider} and
- * {@code jakarta.inject.Provider} easier. Do not use outside of Dagger implementation code.
+ * Internal Provider interface to make support for {@code javax.inject.Provider} and {@code
+ * jakarta.inject.Provider} easier. Do not use outside of Dagger implementation code.
  */
-// TODO(erichang): Make this also extend the Jakarta Provider
-public interface Provider<T> extends javax.inject.Provider<T> {
-}
+public interface Provider<T extends @Nullable Object>
+    extends javax.inject.Provider<T>, jakarta.inject.Provider<T> {}

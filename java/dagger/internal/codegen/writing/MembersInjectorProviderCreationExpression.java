@@ -16,6 +16,7 @@
 
 package dagger.internal.codegen.writing;
 
+import static androidx.room.compiler.codegen.XTypeNameKt.toJavaPoet;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static dagger.internal.codegen.binding.SourceFiles.membersInjectorNameForType;
@@ -29,7 +30,7 @@ import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
 import dagger.assisted.AssistedInject;
 import dagger.internal.codegen.binding.MembersInjectionBinding.InjectionSite;
-import dagger.internal.codegen.binding.ProvisionBinding;
+import dagger.internal.codegen.binding.MembersInjectorBinding;
 import dagger.internal.codegen.writing.ComponentImplementation.ShardImplementation;
 import dagger.internal.codegen.writing.FrameworkFieldInitializer.FrameworkInstanceCreationExpression;
 
@@ -39,11 +40,11 @@ final class MembersInjectorProviderCreationExpression
 
   private final ShardImplementation shardImplementation;
   private final ComponentRequestRepresentations componentRequestRepresentations;
-  private final ProvisionBinding binding;
+  private final MembersInjectorBinding binding;
 
   @AssistedInject
   MembersInjectorProviderCreationExpression(
-      @Assisted ProvisionBinding binding,
+      @Assisted MembersInjectorBinding binding,
       ComponentImplementation componentImplementation,
       ComponentRequestRepresentations componentRequestRepresentations) {
     this.binding = checkNotNull(binding);
@@ -73,7 +74,7 @@ final class MembersInjectorProviderCreationExpression
       membersInjector =
           CodeBlock.of(
               "$T.create($L)",
-              membersInjectorNameForType(injectedTypeElement),
+              toJavaPoet(membersInjectorNameForType(injectedTypeElement)),
               componentRequestRepresentations.getCreateMethodArgumentsCodeBlock(
                   binding, shardImplementation.name()));
     }
@@ -100,6 +101,6 @@ final class MembersInjectorProviderCreationExpression
 
   @AssistedFactory
   static interface Factory {
-    MembersInjectorProviderCreationExpression create(ProvisionBinding binding);
+    MembersInjectorProviderCreationExpression create(MembersInjectorBinding binding);
   }
 }
