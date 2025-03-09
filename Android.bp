@@ -242,6 +242,7 @@ java_library {
 
 java_library {
     name: "hilt_core",
+    visibility: ["//prebuilts/sdk/current/androidx/m2repository/androidx/hilt/hilt-common:__subpackages__"],
     srcs: [
         "java/dagger/hilt/*.java",
         "java/dagger/hilt/codegen/*.java",
