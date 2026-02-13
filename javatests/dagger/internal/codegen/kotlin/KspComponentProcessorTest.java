@@ -16,7 +16,7 @@
 
 package dagger.internal.codegen.kotlin;
 
-import androidx.room.compiler.processing.util.Source;
+import androidx.room3.compiler.processing.util.Source;
 import dagger.testing.compile.CompilerTests;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -86,7 +86,7 @@ public final class KspComponentProcessorTest {
                       "  private static final class MyComponentImpl implements MyComponent {",
                       "    private final MyComponentImpl myComponentImpl = this;",
                       "",
-                      "    private MyComponentImpl() {",
+                      "    MyComponentImpl() {",
                       "",
                       "",
                       "    }",
@@ -192,7 +192,7 @@ public final class KspComponentProcessorTest {
                       "  private static final class MyComponentImpl implements MyComponent {",
                       "    private final MyComponentImpl myComponentImpl = this;",
                       "",
-                      "    private MyComponentImpl() {",
+                      "    MyComponentImpl() {",
                       "",
                       "",
                       "    }",
@@ -277,9 +277,9 @@ public final class KspComponentProcessorTest {
                       "  private static final class MyComponentImpl implements MyComponent {",
                       "    private final MyComponentImpl myComponentImpl = this;",
                       "",
-                      "    private Provider<Foo> fooProvider;",
+                      "    Provider<Foo> fooProvider;",
                       "",
-                      "    private MyComponentImpl() {",
+                      "    MyComponentImpl() {",
                       "",
                       "      initialize();",
                       "",
@@ -392,7 +392,7 @@ public final class KspComponentProcessorTest {
                       "",
                       "    private final MyComponentImpl myComponentImpl = this;",
                       "",
-                      "    private MyComponentImpl(MyModule myModuleParam) {",
+                      "    MyComponentImpl(MyModule myModuleParam) {",
                       "      this.myModule = myModuleParam;",
                       "",
                       "    }",
@@ -501,7 +501,7 @@ public final class KspComponentProcessorTest {
                       "",
                       "    private final MyComponentImpl myComponentImpl = this;",
                       "",
-                      "    private MyComponentImpl(MyModule myModuleParam) {",
+                      "    MyComponentImpl(MyModule myModuleParam) {",
                       "      this.myModule = myModuleParam;",
                       "",
                       "    }",
@@ -616,7 +616,7 @@ public final class KspComponentProcessorTest {
                       "",
                       "    private final MyComponentImpl myComponentImpl = this;",
                       "",
-                      "    private MyComponentImpl(MyModule myModuleParam) {",
+                      "    MyComponentImpl(MyModule myModuleParam) {",
                       "      this.myModule = myModuleParam;",
                       "",
                       "    }",

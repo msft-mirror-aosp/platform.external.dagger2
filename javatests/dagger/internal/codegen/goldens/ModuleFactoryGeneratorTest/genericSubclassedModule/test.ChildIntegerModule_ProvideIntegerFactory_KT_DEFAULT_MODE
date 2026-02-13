@@ -1,0 +1,41 @@
+package test
+
+import dagger.`internal`.DaggerGenerated
+import dagger.`internal`.Factory
+import dagger.`internal`.Preconditions
+import dagger.`internal`.QualifierMetadata
+import dagger.`internal`.ScopeMetadata
+import javax.`annotation`.processing.Generated
+import kotlin.Any
+import kotlin.Suppress
+import kotlin.jvm.JvmStatic
+
+@ScopeMetadata
+@QualifierMetadata
+@DaggerGenerated
+@Generated(
+  value = ["dagger.internal.codegen.ComponentProcessor"],
+  comments = "https://dagger.dev",
+)
+@Suppress(names = [
+    "UNCHECKED_CAST",
+    "USELESS_CAST",
+    "DEPRECATION"
+])
+public class ChildIntegerModule_ProvideIntegerFactory : Factory<Any?> {
+  private val module: ChildIntegerModule
+
+  private constructor(module: ChildIntegerModule) {
+    this.module = module
+  }
+
+  public override fun `get`(): Any? = provideInteger(module)
+
+  public companion object {
+    @JvmStatic
+    public fun create(module: Any?): ChildIntegerModule_ProvideIntegerFactory = ChildIntegerModule_ProvideIntegerFactory((module) as ChildIntegerModule)
+
+    @JvmStatic
+    public fun provideInteger(instance: Any?): Any? = Preconditions.checkNotNullFromProvides(((instance) as ChildIntegerModule).provideInteger())
+  }
+}

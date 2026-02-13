@@ -7,13 +7,16 @@ on:
         description: 'The Dagger version to use in this release.'
         required: true
 
+# Cancel in-progress jobs for the same workflow and branch except for the master branch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
 env:
+  USE_AGP_VERSION: '9.0.0'
   USE_JAVA_DISTRIBUTION: 'zulu'
-  USE_JAVA_VERSION: '11'
-  # This is required by Gradle 8.0+.
-  USE_JAVA_VERSION_FOR_GRADLE_PLUGIN: '17'
-  # Required by JDK Toolchain Configuration
-  USE_JAVA_VERSION_FOR_GRADLE: '18'
+  USE_JAVA_VERSION_FOR_BAZEL: '21'
+  USE_JAVA_VERSION_FOR_GRADLE: '21'
   DAGGER_RELEASE_VERSION: "${{ github.event.inputs.dagger_release_version }}"
   # The default Maven 3.9.0 has a regression so we manually install 3.8.7.
   # https://issues.apache.org/jira/browse/MNG-7679
@@ -66,20 +69,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/test-gradle-plugin
   artifact-android-local-tests:
-    name: 'Artifact Android local tests (AGP ${{ matrix.agp }})'
+    name: 'Artifact Android local tests'
     needs: bazel-build
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - agp: '8.1.1'
-            jdk: '17'
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/artifact-android-local-tests
-        with:
-          agp: '${{ matrix.agp }}'
-          jdk: '${{ matrix.jdk }}'
   publish-artifacts:
     name: 'Publish Artifact'
     needs: [
@@ -90,13 +85,15 @@ jobs:
       test-gradle-plugin
     ]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - name: 'Install Java ${{ env.USE_JAVA_VERSION }}'
+      - name: 'Install Java ${{ env.USE_JAVA_VERSION_FOR_BAZEL }}'
         uses: actions/setup-java@v4
         with:
           distribution: '${{ env.USE_JAVA_DISTRIBUTION }}'
-          java-version: '${{ env.USE_JAVA_VERSION }}'
-          server-id: sonatype-nexus-staging
+          java-version: '${{ env.USE_JAVA_VERSION_FOR_BAZEL }}'
+          server-id: sonatype-central-staging
           server-username: CI_DEPLOY_USERNAME
           server-password: CI_DEPLOY_PASSWORD
           gpg-private-key: ${{ secrets.CI_GPG_PRIVATE_KEY }}
@@ -115,7 +112,7 @@ jobs:
       - name: 'Cache Bazel files'
         uses: actions/cache@v4
         with:
-          path: ~/.cache/bazel
+          path: ~/.cache/bazel_github # The bazel cache path set in .bazelrc.
           key: ${{ runner.os }}-bazel-build-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-bazel-build-
@@ -133,13 +130,18 @@ jobs:
           util/deploy-all.sh \
             "gpg:sign-and-deploy-file" \
             "${{ env.DAGGER_RELEASE_VERSION }}" \
-            "-DrepositoryId=sonatype-nexus-staging" \
-            "-Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+            "-DrepositoryId=sonatype-central-staging" \
+            "-Durl=https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/"
         shell: bash
         env:
           CI_DEPLOY_USERNAME: ${{ secrets.CI_DEPLOY_USERNAME }}
           CI_DEPLOY_PASSWORD: ${{ secrets.CI_DEPLOY_PASSWORD }}
           CI_GPG_PASSPHRASE: ${{ secrets.CI_GPG_PASSPHRASE }}
+      - name: 'Upload artifacts to Sonatype'
+        run: util/upload-to-sonatype.sh
+        shell: bash
+        env:
+          SONATYPE_TOKEN: ${{ secrets.SONATYPE_TOKEN }}
       - name: 'Set git credentials'
         run: |
             git config --global user.email "dagger-dev+github@google.com"
@@ -154,10 +156,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
       - name: 'Clean bazel cache'
-        # According to the documentation, we should be able to exclude these via
-        # the actions/cache path, e.g. "!~/.cache/bazel/*/*/external/" but that
-        # doesn't seem to work.
-        run: |
-          rm -rf $(bazel info repository_cache)
-          rm -rf ~/.cache/bazel/*/*/external/
+        run: rm -rf $(bazel info repository_cache)
         shell: bash

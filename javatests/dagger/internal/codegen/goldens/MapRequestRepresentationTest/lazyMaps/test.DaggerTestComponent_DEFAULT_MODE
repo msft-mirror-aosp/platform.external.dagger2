@@ -1,0 +1,102 @@
+package test;
+
+import dagger.Lazy;
+import dagger.internal.DaggerGenerated;
+import dagger.internal.MapLazyFactory;
+import dagger.internal.MapProviderLazyFactory;
+import dagger.internal.Provider;
+import java.util.Map;
+import javax.annotation.processing.Generated;
+
+@DaggerGenerated
+@Generated(
+    value = "dagger.internal.codegen.ComponentProcessor",
+    comments = "https://dagger.dev"
+)
+@SuppressWarnings({
+    "unchecked",
+    "rawtypes",
+    "KotlinInternal",
+    "KotlinInternalInJava",
+    "cast",
+    "deprecation",
+    "nullness:initialization.field.uninitialized"
+})
+final class DaggerTestComponent {
+  private DaggerTestComponent() {
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static TestComponent create() {
+    return new Builder().build();
+  }
+
+  static final class Builder {
+    private Builder() {
+    }
+
+    public TestComponent build() {
+      return new TestComponentImpl();
+    }
+  }
+
+  private static final class TestComponentImpl implements TestComponent {
+    private final TestComponentImpl testComponentImpl = this;
+
+    Provider<Map<String, Lazy<Integer>>> mapOfStringAndLazyOfIntegerProvider;
+
+    Provider mapOfStringAndProviderOfLazyOfIntegerProvider;
+
+    TestComponentImpl() {
+
+      initialize();
+
+    }
+
+    @SuppressWarnings("unchecked")
+    private void initialize() {
+      this.mapOfStringAndLazyOfIntegerProvider = mapOfStringAndLazyOfIntegerBuilder();
+      this.mapOfStringAndProviderOfLazyOfIntegerProvider = mapOfStringAndProviderOfLazyOfIntegerBuilder();
+    }
+
+    MapLazyFactory<String, Integer> mapOfStringAndLazyOfIntegerBuilder() {
+      MapLazyFactory.Builder<String, Integer> builder = MapLazyFactory.builder(3);
+      builder.put("key0", LazyMaps_TestModule_Int0Factory.create());
+      builder.put("key1", LazyMaps_TestModule_Int1Factory.create());
+      builder.put("key2", LazyMaps_TestModule_Int2Factory.create());
+      return builder.build();
+    }
+
+    MapProviderLazyFactory<String, Integer> mapOfStringAndProviderOfLazyOfIntegerBuilder() {
+      MapProviderLazyFactory.Builder<String, Integer> builder = MapProviderLazyFactory.builder(3);
+      builder.put("key0", LazyMaps_TestModule_Int0Factory.create());
+      builder.put("key1", LazyMaps_TestModule_Int1Factory.create());
+      builder.put("key2", LazyMaps_TestModule_Int2Factory.create());
+      return builder.build();
+    }
+
+    @Override
+    public Map<String, Lazy<Integer>> mapOfLazy() {
+      return mapOfStringAndLazyOfIntegerProvider.get();
+    }
+
+    @Override
+    public Map<String, javax.inject.Provider<Lazy<Integer>>> mapOfProviderOfLazy() {
+      return (Map<String, javax.inject.Provider<Lazy<Integer>>>) (mapOfStringAndProviderOfLazyOfIntegerProvider.get());
+    }
+
+    @Override
+    public javax.inject.Provider<Map<String, Lazy<Integer>>> providerOfMapOfLazy() {
+      return mapOfStringAndLazyOfIntegerProvider;
+    }
+
+    @Override
+    public javax.inject.Provider<Map<String, javax.inject.Provider<Lazy<Integer>>>> providerOfMapOfProviderOfLazy(
+        ) {
+      return mapOfStringAndProviderOfLazyOfIntegerProvider;
+    }
+  }
+}

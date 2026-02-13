@@ -83,10 +83,12 @@ class BuildCacheTest(private val enableAggregatingTask: Boolean) {
     val cacheableTasks: List<String> =
       mutableListOf<String>().apply {
         add(":compileDebugJavaWithJavac")
+        add(":compileDebugNavigationResources")
         add(":compressDebugAssets")
         add(":desugarDebugFileDependencies")
         add(":extractDeepLinksDebug")
-        add(":generateDebugResValues")
+        add(":generateDebugRFile")
+        add(":generateDebugResources")
         // When aggregating task is enabled, the plugin adds two more tasks that should be
         // cacheable.
         if (enableAggregatingTask) {
@@ -94,10 +96,7 @@ class BuildCacheTest(private val enableAggregatingTask: Boolean) {
           add(":hiltJavaCompileDebug")
         }
         add(":javaPreCompileDebug")
-        add(":mergeDebugAssets")
-        add(":mergeDebugJniLibFolders")
         add(":mergeDebugResources")
-        add(":mergeDebugShaders")
         add(":mergeExtDexDebug")
         add(":mergeLibDexDebug")
         add(":mergeProjectDexDebug")
@@ -105,6 +104,7 @@ class BuildCacheTest(private val enableAggregatingTask: Boolean) {
         add(":parseDebugLocalResources")
         add(":processDebugMainManifest")
         add(":processDebugManifestForPackage")
+        add(":processDebugNavigationResources")
         add(":transformDebugClassesWithAsm")
       }
 

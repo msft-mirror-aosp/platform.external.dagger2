@@ -38,8 +38,8 @@ release.
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
-DAGGER_TAG = "2.55"
-DAGGER_SHA = "ad2272bb59f4b15b9f1c3dad9ec806af7b75bcf5f04e83974dad8e65c581bba4"
+DAGGER_TAG = "2.59.1"
+DAGGER_SHA = "1faec1f454936fc9739a2bdf3c909528a031a8561113c3a4b350ee48c6746150"
 http_archive(
     name = "dagger",
     strip_prefix = "dagger-dagger-%s" % DAGGER_TAG,
@@ -326,7 +326,7 @@ See [the CONTRIBUTING.md docs][Building Dagger].
 [bazel-external-deps]: https://docs.bazel.build/versions/master/external.html#depending-on-other-bazel-projects
 [`maven_install`]: https://github.com/bazelbuild/rules_jvm_external#exporting-and-consuming-artifacts-from-external-repositories
 [Building Dagger]: CONTRIBUTING.md#building-dagger
-[dagger-snap]: https://oss.sonatype.org/content/repositories/snapshots/com/google/dagger/
+[dagger-snap]: https://central.sonatype.com/repository/maven-snapshots/com/google/dagger/
 [databinding]: https://developer.android.com/topic/libraries/data-binding/
 [gaktalk]: https://www.youtube.com/watch?v=oK_XtfXPkqw
 [GitHub Issues]: https://github.com/google/dagger/issues

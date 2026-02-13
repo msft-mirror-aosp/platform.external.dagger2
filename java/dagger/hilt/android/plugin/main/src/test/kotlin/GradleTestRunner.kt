@@ -144,7 +144,8 @@ class GradleTestRunner(val tempFolder: TemporaryFolder) {
             mavenCentral()
           }
           dependencies {
-            classpath 'com.android.tools.build:gradle:7.1.2'
+            classpath 'com.android.tools.build:gradle:$AGP_VERSION'
+            classpath 'com.android.legacy-kapt:com.android.legacy-kapt.gradle.plugin:$AGP_VERSION'
             ${pluginClasspaths.joinToString(separator = "\n") { "classpath '$it'" }}
           }
         }
@@ -156,13 +157,13 @@ class GradleTestRunner(val tempFolder: TemporaryFolder) {
         }
 
         android {
-          compileSdkVersion 33
-          buildToolsVersion "33.0.1"
+          compileSdkVersion 36
+          buildToolsVersion "36.0.0"
 
           defaultConfig {
             ${ if (isAppProject) "applicationId \"plugin.test\"" else "" }
             minSdkVersion 21
-            targetSdkVersion 33
+            targetSdkVersion 36
           }
 
           namespace = "minimal"
@@ -183,13 +184,14 @@ class GradleTestRunner(val tempFolder: TemporaryFolder) {
         }
 
         dependencies {
-          implementation(platform('org.jetbrains.kotlin:kotlin-bom:1.8.0'))
+          implementation(platform('org.jetbrains.kotlin:kotlin-bom:2.2.0'))
           ${dependencies.joinToString(separator = "\n")}
         }
 
         hilt {
           ${hiltOptions.joinToString(separator = "\n")}
         }
+
         ${additionalClosures.joinToString(separator = "\n")}
         """
             .trimIndent()
@@ -203,9 +205,11 @@ class GradleTestRunner(val tempFolder: TemporaryFolder) {
       tempFolder.newFile("gradle.properties").apply {
         writeText(
           """
-        android.useAndroidX=true
         // TODO(b/296583777): See if there's a better way to fix the OOM error.
         org.gradle.jvmargs=-XX:MaxMetaspaceSize=1g
+
+        # TODO: Remove once https://github.com/google/ksp/issues/2729 is fixed.
+        android.disallowKotlinSourceSets=false
         """
             .trimIndent()
         )
@@ -219,7 +223,7 @@ class GradleTestRunner(val tempFolder: TemporaryFolder) {
         writeText(
           """
         <?xml version="1.0" encoding="utf-8"?>
-        <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="minimal">
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android">
             <application
                 android:name="${appClassName ?: "android.app.Application"}"
                 android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
@@ -263,5 +267,9 @@ class GradleTestRunner(val tempFolder: TemporaryFolder) {
         }
       }
     }
+  }
+
+  companion object {
+    const val AGP_VERSION = "9.0.0"
   }
 }

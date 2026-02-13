@@ -15,15 +15,15 @@
 # Description:
 #   Functional tests for Dagger
 
-load("@rules_java//java:defs.bzl", "java_library")
+load("//:test_defs.bzl", "GenJavaLibrary")
 
 package(default_visibility = ["//:src"])
 
-java_library(
+GenJavaLibrary(
     name = "subpackage",
     srcs = glob(["*.java"]),
     deps = [
-        "//:dagger_with_compiler",
+        "//third_party/java/dagger",
         "//third_party/java/jsr330_inject",
     ],
 )

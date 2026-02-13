@@ -20,8 +20,7 @@ import static dagger.internal.codegen.DaggerModuleMethodSubject.Factory.assertTh
 import static dagger.internal.codegen.DaggerModuleMethodSubject.Factory.assertThatModuleMethod;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import androidx.room.compiler.processing.XProcessingEnv;
-import androidx.room.compiler.processing.util.Source;
+import androidx.room3.compiler.processing.util.Source;
 import com.google.common.collect.ImmutableList;
 import dagger.Module;
 import dagger.multibindings.IntKey;
@@ -30,7 +29,6 @@ import dagger.producers.ProducerModule;
 import dagger.testing.compile.CompilerTests;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
-import java.util.Collection;
 import javax.inject.Qualifier;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -40,7 +38,7 @@ import org.junit.runners.Parameterized.Parameters;
 @RunWith(Parameterized.class)
 public class BindsMethodValidationTest {
   @Parameters
-  public static Collection<Object[]> data() {
+  public static ImmutableList<Object[]> data() {
     return ImmutableList.copyOf(new Object[][] {{Module.class}, {ProducerModule.class}});
   }
 
@@ -252,27 +250,21 @@ public class BindsMethodValidationTest {
                   subject.hasErrorCount(2);
                   break;
               }
-              // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
-              boolean isJavac = CompilerTests.backend(subject) == XProcessingEnv.Backend.JAVAC;
               subject.hasErrorContaining(
-                  String.format(
-                      "ModuleProcessingStep was unable to process 'test.TestModule' because '%s' "
-                          + "could not be resolved.",
-                      isJavac ? "MissingType" : "error.NonExistentClass"));
+                  "ModuleProcessingStep was unable to process 'test.TestModule' because "
+                      + "'MissingType' could not be resolved.");
               subject.hasErrorContaining(
-                  String.format(
-                      "BindingMethodProcessingStep was unable to process"
-                          + " 'bindObject(test.Child<java.lang.String>)' because '%1$s' could not "
-                          + "be resolved."
-                          + "\n  "
-                          + "\n  Dependency trace:"
-                          + "\n      => element (INTERFACE): test.TestModule"
-                          + "\n      => element (METHOD): bindObject(test.Child<java.lang.String>)"
-                          + "\n      => element (PARAMETER): child"
-                          + "\n      => type (DECLARED parameter): test.Child<java.lang.String>"
-                          + "\n      => type (DECLARED supertype): test.Parent<java.lang.String>"
-                          + "\n      => type (ERROR supertype): %1$s",
-                      isJavac ? "MissingType" : "error.NonExistentClass"));
+                  "BindingMethodProcessingStep was unable to process "
+                      + "'bindObject(test.Child<java.lang.String>)' because 'MissingType' could "
+                      + "not be resolved."
+                      + "\n  "
+                      + "\n  Dependency trace:"
+                      + "\n      => element (INTERFACE): test.TestModule"
+                      + "\n      => element (METHOD): bindObject(test.Child<java.lang.String>)"
+                      + "\n      => element (PARAMETER): child"
+                      + "\n      => type (DECLARED parameter): test.Child<java.lang.String>"
+                      + "\n      => type (DECLARED supertype): test.Parent<java.lang.String>"
+                      + "\n      => type (ERROR supertype): MissingType");
             });
   }
 
@@ -318,26 +310,19 @@ public class BindsMethodValidationTest {
                   subject.hasErrorCount(2);
                   break;
               }
-              // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
-              boolean isJavac = CompilerTests.backend(subject) == XProcessingEnv.Backend.JAVAC;
               subject.hasErrorContaining(
-                  String.format(
-                      "ModuleProcessingStep was unable to process 'test.TestModule' because '%s' "
-                          + "could not be resolved.",
-                      isJavac ? "MissingType" : "error.NonExistentClass"));
+                  "ModuleProcessingStep was unable to process 'test.TestModule' because "
+                      + "'MissingType' could not be resolved.");
               subject.hasErrorContaining(
-                  String.format(
-                      "BindingMethodProcessingStep was unable to process "
-                          + "'bindChild(java.lang.String)' because '%1$s' could not be"
-                          + " resolved."
-                          + "\n  "
-                          + "\n  Dependency trace:"
-                          + "\n      => element (INTERFACE): test.TestModule"
-                          + "\n      => element (METHOD): bindChild(java.lang.String)"
-                          + "\n      => type (DECLARED return type): test.Child<java.lang.String>"
-                          + "\n      => type (DECLARED supertype): test.Parent<java.lang.String>"
-                          + "\n      => type (ERROR supertype): %1$s",
-                      isJavac ? "MissingType" : "error.NonExistentClass"));
+                  "BindingMethodProcessingStep was unable to process 'bindChild(java.lang.String)' "
+                      + "because 'MissingType' could not be resolved."
+                      + "\n  "
+                      + "\n  Dependency trace:"
+                      + "\n      => element (INTERFACE): test.TestModule"
+                      + "\n      => element (METHOD): bindChild(java.lang.String)"
+                      + "\n      => type (DECLARED return type): test.Child<java.lang.String>"
+                      + "\n      => type (DECLARED supertype): test.Parent<java.lang.String>"
+                      + "\n      => type (ERROR supertype): MissingType");
             });
   }
 

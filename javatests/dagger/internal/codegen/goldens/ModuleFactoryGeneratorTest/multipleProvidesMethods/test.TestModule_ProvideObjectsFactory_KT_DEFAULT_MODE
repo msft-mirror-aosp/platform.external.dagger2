@@ -1,0 +1,70 @@
+package test
+
+import dagger.MembersInjector
+import dagger.`internal`.DaggerGenerated
+import dagger.`internal`.Factory
+import dagger.`internal`.Preconditions
+import dagger.`internal`.Provider
+import dagger.`internal`.QualifierMetadata
+import dagger.`internal`.ScopeMetadata
+import javax.`annotation`.processing.Generated
+import kotlin.Any
+import kotlin.Suppress
+import kotlin.jvm.JvmStatic
+
+@ScopeMetadata
+@QualifierMetadata(value = [
+    "test.QualifierA",
+    "test.QualifierB"
+])
+@DaggerGenerated
+@Generated(
+  value = ["dagger.internal.codegen.ComponentProcessor"],
+  comments = "https://dagger.dev",
+)
+@Suppress(names = [
+    "UNCHECKED_CAST",
+    "USELESS_CAST",
+    "DEPRECATION"
+])
+public class TestModule_ProvideObjectsFactory : Factory<Any?> {
+  private val module: TestModule
+
+  private val aProvider: Provider<Any?>
+
+  private val bProvider: Provider<Any?>
+
+  private val xInjectorProvider: Provider<MembersInjector<X?>?>
+
+  private constructor(
+    module: TestModule,
+    aProvider: Provider<Any?>,
+    bProvider: Provider<Any?>,
+    xInjectorProvider: Provider<MembersInjector<X?>?>,
+  ) {
+    this.module = module
+    this.aProvider = aProvider
+    this.bProvider = bProvider
+    this.xInjectorProvider = xInjectorProvider
+  }
+
+  public override fun `get`(): Any? = provideObjects(module, aProvider.get(), bProvider.get(), xInjectorProvider.get())
+
+  public companion object {
+    @JvmStatic
+    public fun create(
+      module: Any?,
+      aProvider: Provider<*>,
+      bProvider: Provider<*>,
+      xInjectorProvider: Provider<*>,
+    ): TestModule_ProvideObjectsFactory = TestModule_ProvideObjectsFactory((module) as TestModule, (aProvider) as Provider<Any?>, (bProvider) as Provider<Any?>, (xInjectorProvider) as Provider<MembersInjector<X?>?>)
+
+    @JvmStatic
+    public fun provideObjects(
+      instance: Any?,
+      a: Any?,
+      b: Any?,
+      xInjector: Any?,
+    ): Any? = Preconditions.checkNotNullFromProvides(((instance) as TestModule).provideObjects((a) as Any?, (b) as Any?, (xInjector) as MembersInjector<X?>?))
+  }
+}

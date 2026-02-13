@@ -3,6 +3,7 @@
 
 .classpath
 .factorypath
+.kotlin
 .project
 .settings
 eclipsebin
@@ -10,8 +11,8 @@ eclipsebin
 bin
 gen
 build
+buildOut
 out
-#lib
 
 target
 pom.xml.*
@@ -31,6 +32,7 @@ dependency-reduced-pom.xml
 gen-external-apklibs
 
 bazel-*
+*.bazel.lock
 
 *.pyc
 

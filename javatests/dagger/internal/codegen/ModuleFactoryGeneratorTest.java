@@ -16,21 +16,22 @@
 
 package dagger.internal.codegen;
 
-import static dagger.internal.codegen.DaggerModuleMethodSubject.Factory.assertThatMethodInUnannotatedClass;
-import static dagger.internal.codegen.DaggerModuleMethodSubject.Factory.assertThatModuleMethod;
 
-import androidx.room.compiler.processing.XProcessingEnv;
-import androidx.room.compiler.processing.util.Source;
+import androidx.room3.compiler.processing.XProcessingEnv;
+import androidx.room3.compiler.processing.util.CompilationResultSubject;
+import androidx.room3.compiler.processing.util.Source;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import dagger.testing.compile.CompilerTests;
+import dagger.testing.compile.CompilerTests.DaggerCompiler;
 import dagger.testing.golden.GoldenFileRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class ModuleFactoryGeneratorTest {
 
   private static final Source NON_TYPE_USE_NULLABLE =
@@ -39,6 +40,32 @@ public class ModuleFactoryGeneratorTest {
           "package test;",
           "",
           "public @interface Nullable {}");
+
+  @Parameters(name = "{0}")
+  public static ImmutableList<Object[]> parameters() {
+    return CompilerMode.TEST_PARAMETERS;
+  }
+
+  private final CompilerMode compilerMode;
+
+  public ModuleFactoryGeneratorTest(CompilerMode compilerMode) {
+    this.compilerMode = compilerMode;
+  }
+
+  private DaggerModuleMethodSubject assertThatMethodInUnannotatedClass(String method) {
+    return DaggerModuleMethodSubject.Factory.assertThatMethodInUnannotatedClass(method)
+        .withProcessorOptions(compilerMode.processorOptions());
+  }
+
+  private DaggerModuleMethodSubject assertThatModuleMethod(String method) {
+    return DaggerModuleMethodSubject.Factory.assertThatModuleMethod(method)
+        .withProcessorOptions(compilerMode.processorOptions());
+  }
+
+  private DaggerCompiler daggerCompiler(Source... sources) {
+    return CompilerTests.daggerCompiler(sources)
+        .withProcessingOptions(compilerMode.processorOptions());
+  }
 
   @Rule public GoldenFileRule goldenFileRule = new GoldenFileRule();
 
@@ -166,7 +193,7 @@ public class ModuleFactoryGeneratorTest {
             "",
             "@Module",
             "final class TestModule<A> {}");
-    CompilerTests.daggerCompiler(moduleFile)
+    daggerCompiler(moduleFile)
         .compile(
             subject -> {
               subject.hasErrorCount(1);
@@ -254,7 +281,7 @@ public class ModuleFactoryGeneratorTest {
             ")",
             "class TestModule {}");
 
-    CompilerTests.daggerCompiler(module)
+    daggerCompiler(module)
         .compile(
             subject -> {
               subject.hasErrorCount(2);
@@ -285,12 +312,11 @@ public class ModuleFactoryGeneratorTest {
             "    return \"\";",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(moduleFile)
+    daggerCompiler(moduleFile)
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/TestModule_ProvideStringFactory"));
+              assertSourceMatchesGolden(subject, "test/TestModule_ProvideStringFactory");
             });
   }
 
@@ -310,12 +336,15 @@ public class ModuleFactoryGeneratorTest {
             "  }",
             "}");
     CompilerTests.daggerCompiler(moduleFile)
-        .withProcessingOptions(ImmutableMap.of("dagger.nullableValidation", "WARNING"))
+        .withProcessingOptions(
+            ImmutableMap.<String, String>builder()
+                .putAll(compilerMode.processorOptions())
+                .put("dagger.nullableValidation", "WARNING")
+                .buildOrThrow())
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/TestModule_ProvideStringFactory"));
+              assertSourceMatchesGolden(subject, "test/TestModule_ProvideStringFactory");
             });
   }
 
@@ -333,12 +362,11 @@ public class ModuleFactoryGeneratorTest {
             "final class TestModule {",
             "  @Provides @Nullable String provideString() { return null; }",
             "}");
-    CompilerTests.daggerCompiler(moduleFile, NON_TYPE_USE_NULLABLE)
+    daggerCompiler(moduleFile, NON_TYPE_USE_NULLABLE)
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/TestModule_ProvideStringFactory"));
+              assertSourceMatchesGolden(subject, "test/TestModule_ProvideStringFactory");
             });
   }
 
@@ -356,7 +384,7 @@ public class ModuleFactoryGeneratorTest {
             "class TestModule {",
             "  @Provides fun provideString(): String? { return null; }",
             "}");
-    CompilerTests.daggerCompiler(moduleFile)
+    daggerCompiler(moduleFile)
         .compile(
             subject -> {
               subject.hasErrorCount(0);
@@ -392,7 +420,7 @@ public class ModuleFactoryGeneratorTest {
                           + " Factory<String> {",
                       "  private final TestModule module;",
                       "",
-                      "  public TestModule_ProvideStringFactory(TestModule module) {",
+                      "  private TestModule_ProvideStringFactory(TestModule module) {",
                       "    this.module = module;",
                       "  }",
                       "",
@@ -452,12 +480,11 @@ public class ModuleFactoryGeneratorTest {
             "    return new Object();",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(classXFile, moduleFile, QUALIFIER_A, QUALIFIER_B)
+    daggerCompiler(classXFile, moduleFile, QUALIFIER_A, QUALIFIER_B)
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/TestModule_ProvideObjectsFactory"));
+              assertSourceMatchesGolden(subject, "test/TestModule_ProvideObjectsFactory");
             });
   }
 
@@ -479,12 +506,11 @@ public class ModuleFactoryGeneratorTest {
             "    return \"\";",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(moduleFile)
+    daggerCompiler(moduleFile)
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/TestModule_ProvideStringFactory"));
+              assertSourceMatchesGolden(subject, "test/TestModule_ProvideStringFactory");
             });
   }
 
@@ -507,12 +533,11 @@ public class ModuleFactoryGeneratorTest {
             "    return new ArrayList<>();",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(moduleFile)
+    daggerCompiler(moduleFile)
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/TestModule_ProvideWildcardListFactory"));
+              assertSourceMatchesGolden(subject, "test/TestModule_ProvideWildcardListFactory");
             });
   }
 
@@ -533,12 +558,11 @@ public class ModuleFactoryGeneratorTest {
             "    return null;",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(moduleFile)
+    daggerCompiler(moduleFile)
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/TestModule_ProvideStringsFactory"));
+              assertSourceMatchesGolden(subject, "test/TestModule_ProvideStringsFactory");
             });
   }
 
@@ -560,7 +584,7 @@ public class ModuleFactoryGeneratorTest {
         "    return \"\";",
         "  }",
         "}");
-    CompilerTests.daggerCompiler(moduleFile)
+    daggerCompiler(moduleFile)
         .compile(
             subject -> {
               subject.hasErrorCount(2);
@@ -597,7 +621,7 @@ public class ModuleFactoryGeneratorTest {
             "    return \"\";",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(moduleFile)
+    daggerCompiler(moduleFile)
         .compile(
             subject -> {
               subject.hasErrorCount(2);
@@ -648,7 +672,7 @@ public class ModuleFactoryGeneratorTest {
             "    return null;",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(moduleFile).compile(subject -> subject.hasErrorCount(0));
+    daggerCompiler(moduleFile).compile(subject -> subject.hasErrorCount(0));
   }
 
   @Test
@@ -664,7 +688,7 @@ public class ModuleFactoryGeneratorTest {
             "  @Module private static final class PrivateModule {",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(moduleFile)
+    daggerCompiler(moduleFile)
         .compile(
             subject -> {
               subject.hasErrorCount(1);
@@ -690,7 +714,7 @@ public class ModuleFactoryGeneratorTest {
             "  @Provides fun provideInt(): Int = 1",
             "}");
 
-    CompilerTests.daggerCompiler(moduleFile)
+    daggerCompiler(moduleFile)
         .compile(
             subject -> {
               subject.hasErrorCount(1);
@@ -714,7 +738,7 @@ public class ModuleFactoryGeneratorTest {
         "    }",
         "  }",
         "}");
-    CompilerTests.daggerCompiler(moduleFile)
+    daggerCompiler(moduleFile)
         .compile(
             subject -> {
               subject.hasErrorCount(1);
@@ -775,7 +799,7 @@ public class ModuleFactoryGeneratorTest {
         "@Module",
         "public final class OtherPublicModule {",
         "}");
-    CompilerTests.daggerCompiler(
+    daggerCompiler(
             publicModuleFile,
             badNonPublicModuleFile,
             okNonPublicModuleFile,
@@ -861,20 +885,15 @@ public class ModuleFactoryGeneratorTest {
         "  List<Number> numberList();",
         "  List<Integer> integerList();",
         "}");
-    CompilerTests.daggerCompiler(parent, numberChild, integerChild, component)
+    daggerCompiler(parent, numberChild, integerChild, component)
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/ParentModule_ProvideListBFactory"));
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/ParentModule_ProvideBElementFactory"));
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/ParentModule_ProvideBEntryFactory"));
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/ChildNumberModule_ProvideNumberFactory"));
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/ChildIntegerModule_ProvideIntegerFactory"));
+              assertSourceMatchesGolden(subject, "test/ParentModule_ProvideListBFactory");
+              assertSourceMatchesGolden(subject, "test/ParentModule_ProvideBElementFactory");
+              assertSourceMatchesGolden(subject, "test/ParentModule_ProvideBEntryFactory");
+              assertSourceMatchesGolden(subject, "test/ChildNumberModule_ProvideNumberFactory");
+              assertSourceMatchesGolden(subject, "test/ChildIntegerModule_ProvideIntegerFactory");
             });
   }
 
@@ -908,20 +927,476 @@ public class ModuleFactoryGeneratorTest {
             "    return o.toString();",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(moduleFile)
+    daggerCompiler(moduleFile)
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource(
-                      "test/ParameterizedModule_ProvideMapStringNumberFactory"));
-              subject.generatedSource(
-                  goldenFileRule.goldenSource(
-                      "test/ParameterizedModule_ProvideNonGenericTypeFactory"));
-              subject.generatedSource(
-                  goldenFileRule.goldenSource(
-                      "test/ParameterizedModule_ProvideNonGenericTypeWithDepsFactory"));
+              assertSourceMatchesGolden(
+                  subject, "test/ParameterizedModule_ProvideMapStringNumberFactory");
+              assertSourceMatchesGolden(
+                  subject, "test/ParameterizedModule_ProvideNonGenericTypeFactory");
+              assertSourceMatchesGolden(
+                  subject, "test/ParameterizedModule_ProvideNonGenericTypeWithDepsFactory");
             });
+  }
+
+  @Test
+  public void parameterizedModule_withPublicTypeArgumentAndPackagePrivateBounds() {
+    Source component =
+        CompilerTests.javaSource(
+            "other.MyComponent",
+            "package other;",
+            "",
+            "import dagger.Component;",
+            "import test.ConcreteModule;",
+            "import test.Usage;",
+            "",
+            "@Component(modules = {ConcreteModule.class})",
+            "interface MyComponent {",
+            "  Usage usage();",
+            "}");
+    Source usage =
+        CompilerTests.javaSource(
+            "test.Usage",
+            "package test;",
+            "",
+            "import java.util.List;",
+            "import javax.inject.Inject;",
+            "",
+            "public class Usage {",
+            "  @Inject Usage(List<Foo> listFoo, Foo foo) {}",
+            "}");
+    Source concreteModule =
+        CompilerTests.javaSource(
+            "test.ConcreteModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "",
+            "@Module",
+            "public final class ConcreteModule extends ParameterizedModule<Foo> {}");
+    Source parameterizedModule =
+        CompilerTests.javaSource(
+            "test.ParameterizedModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import java.util.List;",
+            "",
+            "@Module",
+            "abstract class ParameterizedModule<T extends Bar> {",
+            "  @Provides",
+            "  List<T> provideListT(T t) { return null; }",
+            "}");
+    Source foo =
+        CompilerTests.javaSource(
+            "test.Foo",
+            "package test;",
+            "",
+            "import javax.inject.Inject;",
+            "",
+            "public class Foo implements Bar {",
+            "  @Inject Foo() {}",
+            "}");
+    Source packagePrivateBar =
+        CompilerTests.javaSource(
+            "test.Bar",
+            "package test;",
+            "",
+            "interface Bar {}");
+    daggerCompiler(component, usage, concreteModule, parameterizedModule, foo, packagePrivateBar)
+        .compile(
+            subject -> {
+              if (compilerMode.isKotlinCodegenEnabled()) {
+                // TODO(b/438765237): Currently, this fails at the declaration of the factory
+                // (rather than the call site) because the internal Bar is exposed in the public
+                // factory declaration:  "class ParameterizedModule_ProvideListTFactory<T : Bar>".
+                // See b/438765237 for details on how we can support this case in the future.
+                subject.hasErrorCount(1);
+                subject.hasErrorContaining(
+                    "Bounds for type parameter, T, in class ParameterizedModule<T extends Bar> "
+                        + "must be publicly accessible.");
+              } else {
+                // Note: In this case, when calling the factory the component will use the requested
+                // type, Foo, e.g. "ParameterizedModule_ProvideListTFactory.<Foo>create()" since Foo
+                // is publicly accessible. It doesn't matter that the bound type, Bar, is
+                // package-private.
+                subject.hasErrorCount(0);
+                assertSourceMatchesGolden(subject, "test/ParameterizedModule_ProvideListTFactory");
+                subject.generatedSource(goldenFileRule.goldenSource("other/DaggerMyComponent"));
+              }
+            });
+  }
+
+  @Test
+  public void parameterizedModule_withPackagePrivateTypeArgumentAndPublicBounds() {
+    Source component =
+        CompilerTests.javaSource(
+            "other.MyComponent",
+            "package other;",
+            "",
+            "import dagger.Component;",
+            "import test.ConcreteModule;",
+            "import test.Usage;",
+            "",
+            "@Component(modules = {ConcreteModule.class})",
+            "interface MyComponent {",
+            "  Usage usage();",
+            "}");
+    Source usage =
+        CompilerTests.javaSource(
+            "test.Usage",
+            "package test;",
+            "",
+            "import java.util.List;",
+            "import javax.inject.Inject;",
+            "",
+            "public class Usage {",
+            "  @Inject Usage(List<Foo> listFoo, Foo foo) {}",
+            "}");
+    Source concreteModule =
+        CompilerTests.javaSource(
+            "test.ConcreteModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "",
+            "@Module",
+            "public final class ConcreteModule extends ParameterizedModule<Foo> {}");
+    Source parameterizedModule =
+        CompilerTests.javaSource(
+            "test.ParameterizedModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import java.util.List;",
+            "",
+            "@Module",
+            "abstract class ParameterizedModule<T extends Bar> {",
+            "  @Provides",
+            "  List<T> provideListT(T t) { return null; }",
+            "}");
+    Source packagePrivateFoo =
+        CompilerTests.javaSource(
+            "test.Foo",
+            "package test;",
+            "",
+            "import javax.inject.Inject;",
+            "",
+            "class Foo implements Bar {",
+            "  @Inject Foo() {}",
+            "}");
+    Source bar =
+        CompilerTests.javaSource(
+            "test.Bar",
+            "package test;",
+            "",
+            "public interface Bar {}");
+    daggerCompiler(component, usage, concreteModule, parameterizedModule, packagePrivateFoo, bar)
+        .compile(
+            subject -> {
+              // Note: In this case, the requested type is List<Foo>, but when calling the factory
+              // with Kotlin codegen, the component will use the bound type, Bar, e.g.
+              // "ParameterizedModule_ProvideListTFactory.<Bar>create()" since Foo is not publicly
+              // accessible.
+              subject.hasErrorCount(0);
+              assertSourceMatchesGolden(subject, "test/ParameterizedModule_ProvideListTFactory");
+              subject.generatedSource(goldenFileRule.goldenSource("other/DaggerMyComponent"));
+            });
+  }
+
+  @Test
+  public void parameterizedModule_withPackagePrivateTypeArgumentAndNonCyclicRecursiveBounds() {
+    Source component =
+        CompilerTests.javaSource(
+            "other.MyComponent",
+            "package other;",
+            "",
+            "import dagger.Component;",
+            "import test.ConcreteModule;",
+            "import test.Usage;",
+            "",
+            "@Component(modules = {ConcreteModule.class})",
+            "interface MyComponent {",
+            "  Usage usage();",
+            "}");
+    Source usage =
+        CompilerTests.javaSource(
+            "test.Usage",
+            "package test;",
+            "",
+            "import java.util.Map;",
+            "import javax.inject.Inject;",
+            "",
+            "public class Usage {",
+            "  @Inject Usage(Map<Foo, Bar<Foo>> mapFoo, Foo foo) {}",
+            "}");
+    Source concreteModule =
+        CompilerTests.javaSource(
+            "test.ConcreteModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "",
+            "@Module",
+            "public final class ConcreteModule extends ParameterizedModule<Foo, Bar<Foo>> {}");
+    Source parameterizedModule =
+        CompilerTests.javaSource(
+            "test.ParameterizedModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import java.util.Map;",
+            "",
+            "@Module",
+            "abstract class ParameterizedModule<T1, T2 extends Bar<T1>> {",
+            "  @Provides",
+            "  Map<T1, T2> provideMap(T1 t1) { return null; }",
+            "}");
+    Source packagePrivateFoo =
+        CompilerTests.javaSource(
+            "test.Foo",
+            "package test;",
+            "",
+            "import javax.inject.Inject;",
+            "",
+            "class Foo {",
+            "  @Inject Foo() {}",
+            "}");
+    Source bar =
+        CompilerTests.javaSource(
+            "test.Bar",
+            "package test;",
+            "",
+            "public interface Bar<T> {}");
+    daggerCompiler(component, usage, concreteModule, parameterizedModule, packagePrivateFoo, bar)
+        .compile(
+            subject -> {
+              // Note: In this case, the requested type is Map<Foo, Bar<Foo>, but when calling the
+              // factory with Kotlin codegen, the component will use the type,
+              // "ParameterizedModule_ProvideMapFactory.<Object, Bar<Object>>create()" since Foo is
+              // not publicly accessible.
+              subject.hasErrorCount(0);
+              assertSourceMatchesGolden(subject, "test/ParameterizedModule_ProvideMapFactory");
+              subject.generatedSource(goldenFileRule.goldenSource("other/DaggerMyComponent"));
+            });
+  }
+
+  @Test
+  public void parameterizedModule_withPackagePrivateTypeArgumentAndPackagePrivateBounds() {
+    Source component =
+        CompilerTests.javaSource(
+            "other.MyComponent",
+            "package other;",
+            "",
+            "import dagger.Component;",
+            "import test.ConcreteModule;",
+            "import test.Usage;",
+            "",
+            "@Component(modules = {ConcreteModule.class})",
+            "interface MyComponent {",
+            "  Usage usage();",
+            "}");
+    Source usage =
+        CompilerTests.javaSource(
+            "test.Usage",
+            "package test;",
+            "",
+            "import java.util.List;",
+            "import javax.inject.Inject;",
+            "",
+            "public class Usage {",
+            "  @Inject Usage(List<Foo> listFoo, Foo foo) {}",
+            "}");
+    Source concreteModule =
+        CompilerTests.javaSource(
+            "test.ConcreteModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "",
+            "@Module",
+            "public final class ConcreteModule extends ParameterizedModule<Foo> {}");
+    Source parameterizedModule =
+        CompilerTests.javaSource(
+            "test.ParameterizedModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import java.util.List;",
+            "",
+            "@Module",
+            "abstract class ParameterizedModule<T extends Bar> {",
+            "  @Provides",
+            "  List<T> provideListT(T t) { return null; }",
+            "}");
+    Source packagePrivateFoo =
+        CompilerTests.javaSource(
+            "test.Foo",
+            "package test;",
+            "",
+            "import javax.inject.Inject;",
+            "",
+            "class Foo implements Bar {",
+            "  @Inject Foo() {}",
+            "}");
+    Source packagePrivateBar =
+        CompilerTests.javaSource(
+            "test.Bar",
+            "package test;",
+            "",
+            "interface Bar {}");
+    daggerCompiler(component, usage, concreteModule, parameterizedModule, packagePrivateFoo, packagePrivateBar)
+        .compile(subject -> subject.hasErrorCount(0));
+  }
+
+  @Test
+  public void parameterizedModule_withPackagePrivateTypeArgumentAndIntersectionBounds() {
+    Source component =
+        CompilerTests.javaSource(
+            "other.MyComponent",
+            "package other;",
+            "",
+            "import dagger.Component;",
+            "import test.ConcreteModule;",
+            "import test.Usage;",
+            "",
+            "@Component(modules = {ConcreteModule.class})",
+            "interface MyComponent {",
+            "  Usage usage();",
+            "}");
+    Source usage =
+        CompilerTests.javaSource(
+            "test.Usage",
+            "package test;",
+            "",
+            "import java.util.List;",
+            "import javax.inject.Inject;",
+            "",
+            "public class Usage {",
+            "  @Inject Usage(List<Foo> listFoo, Foo foo) {}",
+            "}");
+    Source concreteModule =
+        CompilerTests.javaSource(
+            "test.ConcreteModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "",
+            "@Module",
+            "public final class ConcreteModule extends ParameterizedModule<Foo> {}");
+    Source parameterizedModule =
+        CompilerTests.javaSource(
+            "test.ParameterizedModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import java.util.List;",
+            "",
+            "@Module",
+            "abstract class ParameterizedModule<T extends Bar & Baz> {",
+            "  @Provides",
+            "  List<T> provideListT(T t) { return null; }",
+            "}");
+    Source packagePrivateFoo =
+        CompilerTests.javaSource(
+            "test.Foo",
+            "package test;",
+            "",
+            "import javax.inject.Inject;",
+            "",
+            "class Foo implements Bar, Baz {",
+            "  @Inject Foo() {}",
+            "}");
+    Source bar =
+        CompilerTests.javaSource(
+            "test.Bar",
+            "package test;",
+            "",
+            "public interface Bar {}");
+    Source baz =
+        CompilerTests.javaSource(
+            "test.Baz",
+            "package test;",
+            "",
+            "public interface Baz {}");
+    daggerCompiler(
+            component, usage, concreteModule, parameterizedModule, packagePrivateFoo, bar, baz)
+        .compile(subject -> subject.hasErrorCount(0));
+  }
+
+  @Test
+  public void parameterizedModule_withPackagePrivateTypeArgumentAndCyclicRecursiveBounds() {
+    Source component =
+        CompilerTests.javaSource(
+            "other.MyComponent",
+            "package other;",
+            "",
+            "import dagger.Component;",
+            "import test.ConcreteModule;",
+            "import test.Usage;",
+            "",
+            "@Component(modules = {ConcreteModule.class})",
+            "interface MyComponent {",
+            "  Usage usage();",
+            "}");
+    Source usage =
+        CompilerTests.javaSource(
+            "test.Usage",
+            "package test;",
+            "",
+            "import java.util.List;",
+            "import javax.inject.Inject;",
+            "",
+            "public class Usage {",
+            "  @Inject Usage(List<Foo> listFoo, Foo foo) {}",
+            "}");
+    Source concreteModule =
+        CompilerTests.javaSource(
+            "test.ConcreteModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "",
+            "@Module",
+            "public final class ConcreteModule extends ParameterizedModule<Foo> {}");
+    Source parameterizedModule =
+        CompilerTests.javaSource(
+            "test.ParameterizedModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import java.util.List;",
+            "",
+            "@Module",
+            "abstract class ParameterizedModule<T extends Bar<T>> {",
+            "  @Provides",
+            "  List<T> provideListT(T t) { return null; }",
+            "}");
+    Source packagePrivateFoo =
+        CompilerTests.javaSource(
+            "test.Foo",
+            "package test;",
+            "",
+            "import javax.inject.Inject;",
+            "",
+            "class Foo implements Bar<Foo> {",
+            "  @Inject Foo() {}",
+            "}");
+    Source bar =
+        CompilerTests.javaSource(
+            "test.Bar",
+            "package test;",
+            "",
+            "public interface Bar<T> {}");
+    daggerCompiler(component, usage, concreteModule, parameterizedModule, packagePrivateFoo, bar)
+        .compile(subject -> subject.hasErrorCount(0));
   }
 
   private static final Source QUALIFIER_A =
@@ -960,7 +1435,7 @@ public class ModuleFactoryGeneratorTest {
         "    return \"foo\";",
         "  }",
         "}");
-    CompilerTests.daggerCompiler(moduleFile, QUALIFIER_A, QUALIFIER_B)
+    daggerCompiler(moduleFile, QUALIFIER_A, QUALIFIER_B)
         .compile(
             subject -> {
               // There are 2 errors -- 1 per qualifier.
@@ -994,17 +1469,25 @@ public class ModuleFactoryGeneratorTest {
             "    return \"foo\";",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(moduleFile, QUALIFIER_A, QUALIFIER_B)
+    daggerCompiler(moduleFile, QUALIFIER_A, QUALIFIER_B)
         .compile(
             subject -> {
               // There are two errors -- 1 per qualifier.
               subject.hasErrorCount(2);
-              subject.hasErrorContaining("may not use more than one @Qualifier")
-                  .onSource(moduleFile)
-                  .onLine(10);
-              subject.hasErrorContaining("may not use more than one @Qualifier")
-                  .onSource(moduleFile)
-                  .onLine(11);
+              if (CompilerTests.backend(subject) == XProcessingEnv.Backend.KSP) {
+                // TODO(b/381557487): KSP2 reports the error on the parameter instead of the
+                // the annotation.
+                subject.hasErrorContaining("may not use more than one @Qualifier")
+                    .onSource(moduleFile)
+                    .onLine(12);
+              } else {
+                subject.hasErrorContaining("may not use more than one @Qualifier")
+                    .onSource(moduleFile)
+                    .onLine(10);
+                subject.hasErrorContaining("may not use more than one @Qualifier")
+                    .onSource(moduleFile)
+                    .onLine(11);
+              }
             });
   }
 
@@ -1025,7 +1508,7 @@ public class ModuleFactoryGeneratorTest {
             "    return \"foo\";",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(moduleFile, QUALIFIER_A, QUALIFIER_B)
+    daggerCompiler(moduleFile, QUALIFIER_A, QUALIFIER_B)
         .compile(
             subject -> {
               subject.hasErrorCount(1);
@@ -1072,7 +1555,7 @@ public class ModuleFactoryGeneratorTest {
             "    return \"foo\";",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(moduleFile, SCOPE_A, SCOPE_B)
+    daggerCompiler(moduleFile, SCOPE_A, SCOPE_B)
         .compile(
             subject -> {
               subject.hasErrorCount(2);
@@ -1101,7 +1584,7 @@ public class ModuleFactoryGeneratorTest {
             "    return \"foo\";",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(moduleFile)
+    daggerCompiler(moduleFile)
         .compile(
             subject -> {
               subject.hasErrorCount(1);
@@ -1125,7 +1608,7 @@ public class ModuleFactoryGeneratorTest {
             "    return \"foo\";",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(moduleFile)
+    daggerCompiler(moduleFile)
         .compile(
             subject -> {
               subject.hasErrorCount(1);
@@ -1152,12 +1635,12 @@ public class ModuleFactoryGeneratorTest {
             "  static boolean create() { return true; }",
             "}");
 
-    CompilerTests.daggerCompiler(module)
+    daggerCompiler(module)
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/TestModule_GetFactory"));
-              subject.generatedSource(goldenFileRule.goldenSource("test/TestModule_CreateFactory"));
+              assertSourceMatchesGolden(subject, "test/TestModule_GetFactory");
+              assertSourceMatchesGolden(subject, "test/TestModule_CreateFactory");
             });
   }
 
@@ -1165,7 +1648,7 @@ public class ModuleFactoryGeneratorTest {
   public void testScopedMetadataOnStaticProvides() throws Exception {
     Source module =
         CompilerTests.javaSource(
-            "test.ScopedBinding",
+            "test.MyModule",
             "package test;",
             "",
             "import dagger.Module;",
@@ -1188,12 +1671,11 @@ public class ModuleFactoryGeneratorTest {
             "",
             "@interface NonScope {}");
 
-    CompilerTests.daggerCompiler(module, nonScope)
+    daggerCompiler(module, nonScope)
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/MyModule_ProvideStringFactory"));
+              assertSourceMatchesGolden(subject, "test/MyModule_ProvideStringFactory");
             });
   }
 
@@ -1201,7 +1683,7 @@ public class ModuleFactoryGeneratorTest {
   public void testScopedMetadataOnNonStaticProvides() throws Exception {
     Source module =
         CompilerTests.javaSource(
-            "test.ScopedBinding",
+            "test.MyModule",
             "package test;",
             "",
             "import dagger.Module;",
@@ -1224,12 +1706,11 @@ public class ModuleFactoryGeneratorTest {
             "",
             "@interface NonScope {}");
 
-    CompilerTests.daggerCompiler(module, nonScope)
+    daggerCompiler(module, nonScope)
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/MyModule_ProvideStringFactory"));
+              assertSourceMatchesGolden(subject, "test/MyModule_ProvideStringFactory");
             });
   }
 
@@ -1237,7 +1718,7 @@ public class ModuleFactoryGeneratorTest {
   public void testScopeMetadataWithCustomScope() throws Exception {
     Source module =
         CompilerTests.javaSource(
-            "test.ScopedBinding",
+            "test.MyModule",
             "package test;",
             "",
             "import dagger.Module;",
@@ -1273,12 +1754,11 @@ public class ModuleFactoryGeneratorTest {
             "  String value();",
             "}");
 
-    CompilerTests.daggerCompiler(module, customScope, nonScope)
+    daggerCompiler(module, customScope, nonScope)
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/MyModule_ProvideStringFactory"));
+              assertSourceMatchesGolden(subject, "test/MyModule_ProvideStringFactory");
             });
   }
 
@@ -1286,7 +1766,7 @@ public class ModuleFactoryGeneratorTest {
   public void testQualifierMetadataOnProvides() throws Exception {
     Source module =
         CompilerTests.javaSource(
-            "test.ScopedBinding",
+            "test.MyModule",
             "package test;",
             "",
             "import dagger.Module;",
@@ -1327,12 +1807,11 @@ public class ModuleFactoryGeneratorTest {
             "",
             "@interface NonQualifier {}");
 
-    CompilerTests.daggerCompiler(module, methodQualifier, paramQualifier, nonQualifier)
+    daggerCompiler(module, methodQualifier, paramQualifier, nonQualifier)
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/MyModule_ProvideStringFactory"));
+              assertSourceMatchesGolden(subject, "test/MyModule_ProvideStringFactory");
             });
   }
 
@@ -1438,7 +1917,12 @@ public class ModuleFactoryGeneratorTest {
 
     Source bindsMethodAndInstanceProvidesMethodModuleFile =
         CompilerTests.javaSource("test.TestModule", moduleLines);
-    return CompilerTests.daggerCompiler(
+    return daggerCompiler(
         fooFile, fooImplFile, barFile, bazFile, bindsMethodAndInstanceProvidesMethodModuleFile);
+  }
+
+  private void assertSourceMatchesGolden(CompilationResultSubject subject, String goldenName) {
+    Source source = goldenFileRule.goldenSource(goldenName);
+    subject.generatedSource(source);
   }
 }

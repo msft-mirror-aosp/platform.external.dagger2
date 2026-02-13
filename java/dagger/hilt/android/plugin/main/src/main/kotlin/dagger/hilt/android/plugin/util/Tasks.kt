@@ -40,7 +40,7 @@ internal fun addKaptTaskProcessorOptions(
   project: Project,
   variantIdentity: ComponentIdentity,
   produceArgProvider: (Task) -> CommandLineArgumentProvider
-) = project.plugins.withId("kotlin-kapt") {
+) = project.plugins.withId("com.android.legacy-kapt") {
   checkClass("org.jetbrains.kotlin.gradle.internal.KaptTask") {
     """
     The KAPT plugin was detected to be applied but its task class could not be found.
@@ -60,10 +60,12 @@ internal fun addKaptTaskProcessorOptions(
       try {
         // Because of KT-58009, we need to add a `listOf(argProvider)` instead
         // of `argProvider`.
+        @Suppress("DEPRECATION") // b/418799397
         task.annotationProcessorOptionProviders.add(listOf(argProvider))
       } catch (e: Throwable) {
         // Once KT-58009 is fixed, adding `listOf(argProvider)` will fail, we will
         // pass `argProvider` instead, which is the correct way.
+        @Suppress("DEPRECATION") // b/418799397
         task.annotationProcessorOptionProviders.add(argProvider)
       }
     }
@@ -133,4 +135,3 @@ private val kspTwoTaskClass =
 internal fun Task.isKspTask() =
   kspOneTaskClass?.isAssignableFrom(this::class.java) == true ||
     kspTwoTaskClass?.isAssignableFrom(this::class.java) == true
-

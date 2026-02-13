@@ -4,12 +4,12 @@ plugins {
 }
 
 android {
-    compileSdkVersion 33
-    buildToolsVersion "33.0.1"
+    compileSdkVersion 36
+    buildToolsVersion "36.0.0"
 
     defaultConfig {
         minSdkVersion 16
-        targetSdkVersion 33
+        targetSdkVersion 36
         versionCode 1
         versionName "1.0"
     }
@@ -34,18 +34,18 @@ hilt {
 // test-specific bindings the EarlyEntryPoints will use the component for that
 // test instead of generating a component just for the EarlyEntryPoints, which
 // causes this issue.
-task checkSourceSetTask(){
-    sourceSets {
-        test {
-            def actualSrcs = allSource.files.name as Set
-            def expectedSrcs = [
-                'EarlyEntryPointWithBindValueTest.java',
-                'EarlyEntryPointWithBindValueObjects.java'
-            ] as Set
-            if (!actualSrcs.equals(expectedSrcs)) {
-                throw new StopExecutionException(
-                    'Unexpected test sources: ' + allSource.files.name)
-            }
+task checkSourceSetTask() {
+    def testSourceSet = android.sourceSets.getByName("test")
+    inputs.files(testSourceSet.java.srcDirs)
+    doLast {
+        def actualSrcs = (inputs.files as FileCollection).files.name as Set
+        def expectedSrcs = [
+            'EarlyEntryPointWithBindValueTest.java',
+            'EarlyEntryPointWithBindValueObjects.java'
+        ] as Set
+        if (!actualSrcs.equals(expectedSrcs)) {
+            throw new StopExecutionException(
+                'Unexpected test sources: ' + (inputs.files as FileCollection).files.name)
         }
     }
 }
@@ -66,4 +66,6 @@ dependencies {
     testImplementation 'androidx.test:runner:1.4.0'
     testImplementation "com.google.dagger:hilt-android-testing:$dagger_version"
     testAnnotationProcessor "com.google.dagger:hilt-compiler:$dagger_version"
+
+    androidTestImplementation 'androidx.test:runner:1.4.0'
 }

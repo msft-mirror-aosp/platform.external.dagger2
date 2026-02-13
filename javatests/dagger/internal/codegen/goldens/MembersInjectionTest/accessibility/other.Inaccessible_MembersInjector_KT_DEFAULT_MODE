@@ -1,0 +1,54 @@
+package other
+
+import dagger.MembersInjector
+import dagger.`internal`.DaggerGenerated
+import dagger.`internal`.InjectedFieldSignature
+import dagger.`internal`.Provider
+import dagger.`internal`.QualifierMetadata
+import javax.`annotation`.processing.Generated
+import kotlin.Any
+import kotlin.Suppress
+import kotlin.jvm.JvmStatic
+
+@QualifierMetadata
+@DaggerGenerated
+@Generated(
+  value = ["dagger.internal.codegen.ComponentProcessor"],
+  comments = "https://dagger.dev",
+)
+@Suppress(names = [
+    "UNCHECKED_CAST",
+    "USELESS_CAST",
+    "DEPRECATION"
+])
+public class Inaccessible_MembersInjector : MembersInjector<Any> {
+  private val fooProvider: Provider<Foo?>
+
+  private val fooProvider2: Provider<Foo?>
+
+  private constructor(fooProvider: Provider<Foo?>, fooProvider2: Provider<Foo?>) {
+    this.fooProvider = fooProvider;
+    this.fooProvider2 = fooProvider2;
+  }
+
+  public override fun injectMembers(instance: Any) {
+    injectFoo(instance, fooProvider.get());
+    injectMethod(instance, fooProvider2.get());
+  }
+
+  public companion object {
+    @JvmStatic
+    public fun create(fooProvider: Provider<*>, fooProvider2: Provider<*>): MembersInjector<Any> = Inaccessible_MembersInjector((fooProvider) as Provider<Foo?>, (fooProvider2) as Provider<Foo?>)
+
+    @InjectedFieldSignature(value = "other.Inaccessible.foo")
+    @JvmStatic
+    public fun injectFoo(instance: Any?, foo: Any?) {
+      ((instance) as Inaccessible).foo = (foo) as Foo?
+    }
+
+    @JvmStatic
+    public fun injectMethod(instance: Any?, foo: Any?) {
+      ((instance) as Inaccessible).method((foo) as Foo?)
+    }
+  }
+}

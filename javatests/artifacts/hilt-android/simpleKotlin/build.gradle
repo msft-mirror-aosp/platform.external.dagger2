@@ -16,9 +16,9 @@
 
 buildscript {
     ext {
-        kotlin_version = '2.0.21'
-        ksp_version = "$kotlin_version-1.0.28"
-        agp_version = System.getenv('AGP_VERSION') ?: "8.1.1"
+        kotlin_version = "2.2.0"
+        ksp_version = "$kotlin_version-2.0.2"
+        agp_version = System.getenv('AGP_VERSION')
     }
     repositories {
         google()
@@ -27,6 +27,7 @@ buildscript {
     }
     dependencies {
         classpath "com.android.tools.build:gradle:$agp_version"
+        classpath "com.android.legacy-kapt:com.android.legacy-kapt.gradle.plugin:$agp_version"
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
         classpath "com.google.devtools.ksp:symbol-processing-gradle-plugin:$ksp_version"
         classpath 'com.google.dagger:hilt-android-gradle-plugin:LOCAL-SNAPSHOT'

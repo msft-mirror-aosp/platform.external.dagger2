@@ -1,0 +1,63 @@
+package test
+
+import dagger.`internal`.DaggerGenerated
+import dagger.`internal`.Factory
+import dagger.`internal`.Provider
+import dagger.`internal`.QualifierMetadata
+import dagger.`internal`.ScopeMetadata
+import javax.`annotation`.processing.Generated
+import kotlin.Any
+import kotlin.Float
+import kotlin.Int
+import kotlin.String
+import kotlin.Suppress
+import kotlin.jvm.JvmStatic
+
+@ScopeMetadata
+@QualifierMetadata(value = ["test.FooBaseConstructorQualifier"])
+@DaggerGenerated
+@Generated(
+  value = ["dagger.internal.codegen.ComponentProcessor"],
+  comments = "https://dagger.dev",
+)
+@Suppress(names = [
+    "UNCHECKED_CAST",
+    "USELESS_CAST",
+    "DEPRECATION"
+])
+public class FooBase_Factory : Factory<Any?> {
+  private val iProvider: Provider<Int>
+
+  private val injectFieldProvider: Provider<String?>
+
+  private val fProvider: Provider<Float>
+
+  private constructor(
+    iProvider: Provider<Int>,
+    injectFieldProvider: Provider<String?>,
+    fProvider: Provider<Float>,
+  ) {
+    this.iProvider = iProvider
+    this.injectFieldProvider = injectFieldProvider
+    this.fProvider = fProvider
+  }
+
+  public override fun `get`(): Any? {
+    var instance: Any? = newInstance(iProvider.get())
+    FooBase_MembersInjector.injectInjectField(instance, injectFieldProvider.get());
+    FooBase_MembersInjector.injectInjectMethod(instance, fProvider.get());
+    return instance
+  }
+
+  public companion object {
+    @JvmStatic
+    public fun create(
+      iProvider: Provider<*>,
+      injectFieldProvider: Provider<*>,
+      fProvider: Provider<*>,
+    ): FooBase_Factory = FooBase_Factory((iProvider) as Provider<Int>, (injectFieldProvider) as Provider<String?>, (fProvider) as Provider<Float>)
+
+    @JvmStatic
+    public fun newInstance(i: Any?): Any? = FooBase((i) as Int)
+  }
+}

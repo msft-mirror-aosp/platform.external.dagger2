@@ -17,26 +17,54 @@
 // TODO(beder): Merge the error-handling tests with the ModuleFactoryGeneratorTest.
 package dagger.internal.codegen;
 
-import static dagger.internal.codegen.DaggerModuleMethodSubject.Factory.assertThatMethodInUnannotatedClass;
-import static dagger.internal.codegen.DaggerModuleMethodSubject.Factory.assertThatProductionModuleMethod;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import androidx.room.compiler.processing.util.Source;
+import androidx.room3.compiler.processing.util.CompilationResultSubject;
+import androidx.room3.compiler.processing.util.Source;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ListenableFuture;
 import dagger.testing.compile.CompilerTests;
+import dagger.testing.compile.CompilerTests.DaggerCompiler;
 import dagger.testing.golden.GoldenFileRule;
 import java.lang.annotation.Retention;
 import javax.inject.Qualifier;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class ProducerModuleFactoryGeneratorTest {
 
   @Rule public GoldenFileRule goldenFileRule = new GoldenFileRule();
+
+  @Parameters(name = "{0}")
+  public static ImmutableList<Object[]> parameters() {
+    return CompilerMode.TEST_PARAMETERS;
+  }
+
+  private final CompilerMode compilerMode;
+
+  public ProducerModuleFactoryGeneratorTest(CompilerMode compilerMode) {
+    this.compilerMode = compilerMode;
+  }
+
+  private DaggerModuleMethodSubject assertThatMethodInUnannotatedClass(String method) {
+    return DaggerModuleMethodSubject.Factory.assertThatMethodInUnannotatedClass(method)
+        .withProcessorOptions(compilerMode.processorOptions());
+  }
+
+  private DaggerModuleMethodSubject assertThatProductionModuleMethod(String method) {
+    return DaggerModuleMethodSubject.Factory.assertThatProductionModuleMethod(method)
+        .withProcessorOptions(compilerMode.processorOptions());
+  }
+
+  private DaggerCompiler daggerCompiler(Source... sources) {
+    return CompilerTests.daggerCompiler(sources)
+        .withProcessingOptions(compilerMode.processorOptions());
+  }
 
   @Test public void producesMethodNotInModule() {
     assertThatMethodInUnannotatedClass("@Produces String produceString() { return null; }")
@@ -176,7 +204,7 @@ public class ProducerModuleFactoryGeneratorTest {
             "}");
     String errorMessage =
         "Cannot have more than one binding method with the same name in a single module";
-    CompilerTests.daggerCompiler(moduleFile)
+    daggerCompiler(moduleFile)
         .compile(
             subject -> {
               subject.hasErrorCount(2);
@@ -210,7 +238,7 @@ public class ProducerModuleFactoryGeneratorTest {
         "  @ProducerModule private static final class PrivateModule {",
         "  }",
         "}");
-    CompilerTests.daggerCompiler(moduleFile)
+    daggerCompiler(moduleFile)
         .compile(
             subject -> {
               subject.hasErrorCount(1);
@@ -236,7 +264,7 @@ public class ProducerModuleFactoryGeneratorTest {
             "    }",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(moduleFile)
+    daggerCompiler(moduleFile)
         .compile(
             subject -> {
               subject.hasErrorCount(1);
@@ -264,7 +292,7 @@ public class ProducerModuleFactoryGeneratorTest {
             "@ProducerModule(includes = X.class)",
             "public final class FooModule {",
             "}");
-    CompilerTests.daggerCompiler(xFile, moduleFile)
+    daggerCompiler(xFile, moduleFile)
         .compile(
             subject -> {
               subject.hasErrorCount(1);
@@ -329,7 +357,7 @@ public class ProducerModuleFactoryGeneratorTest {
             "@ProducerModule",
             "public final class OtherPublicModule {",
             "}");
-    CompilerTests.daggerCompiler(
+    daggerCompiler(
             publicModuleFile,
             badNonPublicModuleFile,
             okNonPublicModuleFile,
@@ -363,7 +391,7 @@ public class ProducerModuleFactoryGeneratorTest {
             "    return null;",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(moduleFile)
+    daggerCompiler(moduleFile)
         .compile(subject -> subject.hasErrorCount(0));
   }
 
@@ -383,12 +411,71 @@ public class ProducerModuleFactoryGeneratorTest {
             "    return null;",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(moduleFile)
+    daggerCompiler(moduleFile)
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/TestModule_ProduceStringFactory"));
+              assertSourceMatchesGolden(subject, "test/TestModule_ProduceStringFactory");
+            });
+  }
+
+  @Test public void singleProducesMethodSingleArgsFuture() {
+    Source moduleFile =
+        CompilerTests.javaSource(
+            "test.TestModule",
+            "package test;",
+            "",
+            "import com.google.common.util.concurrent.ListenableFuture;",
+            "import dagger.producers.ProducerModule;",
+            "import dagger.producers.Produces;",
+            "",
+            "@ProducerModule",
+            "final class TestModule {",
+            "  @Produces ListenableFuture<String> produceString(Integer i) {",
+            "    return null;",
+            "  }",
+            "",
+            "  @Produces ListenableFuture<Integer> produceInt() {",
+            "    return null;",
+            "  }",
+            "}");
+    daggerCompiler(moduleFile)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(0);
+              assertSourceMatchesGolden(subject, "test/TestModule_ProduceStringFactory");
+            });
+  }
+
+  @Test public void singleProducesMethodMultipleArgsFuture() {
+    Source moduleFile =
+        CompilerTests.javaSource(
+            "test.TestModule",
+            "package test;",
+            "",
+            "import com.google.common.util.concurrent.ListenableFuture;",
+            "import dagger.producers.ProducerModule;",
+            "import dagger.producers.Produces;",
+            "",
+            "@ProducerModule",
+            "final class TestModule {",
+            "  @Produces ListenableFuture<String> produceString(Integer i, Long l) {",
+            "    return null;",
+            "  }",
+            "",
+            "  @Produces ListenableFuture<Integer> produceInt() {",
+            "    return null;",
+            "  }",
+            "",
+            "  @Produces ListenableFuture<Long> produceLong() {",
+            "    return null;",
+            "  }",
+            "}");
+    daggerCompiler(moduleFile)
+        .compile(
+            subject -> {
+              subject.hasErrorCount(0);
+              assertSourceMatchesGolden(subject, "test/TestModule_ProduceStringFactory");
             });
   }
 
@@ -410,13 +497,16 @@ public class ProducerModuleFactoryGeneratorTest {
             "    return Futures.immediateFuture(\"\");",
             "  }",
             "}");
-    CompilerTests.daggerCompiler(moduleFile)
-        .withProcessingOptions(ImmutableMap.of("dagger.writeProducerNameInToken", "ENABLED"))
+    daggerCompiler(moduleFile)
+        .withProcessingOptions(
+            ImmutableMap.<String, String>builder()
+                .putAll(compilerMode.processorOptions())
+                .put("dagger.writeProducerNameInToken", "ENABLED")
+                .buildOrThrow())
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/TestModule_ProduceStringFactory"));
+              assertSourceMatchesGolden(subject, "test/TestModule_ProduceStringFactory");
             });
   }
 
@@ -446,6 +536,11 @@ public class ProducerModuleFactoryGeneratorTest {
         .hasError(
             "Dagger does not support injecting Provider<T>, Lazy<T>, Producer<T>, or Produced<T> "
                 + "when T is a wildcard type such as ? extends java.lang.Number");
+  }
+
+  private void assertSourceMatchesGolden(CompilationResultSubject subject, String goldenName) {
+    Source source = goldenFileRule.goldenSource(goldenName);
+    subject.generatedSource(source);
   }
 
   @Qualifier

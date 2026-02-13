@@ -22,7 +22,14 @@ load(":pom_file.bzl", "pom_file")
 
 SHADED_MAVEN_DEPS = [
     "com.google.auto:auto-common",
-    "org.jetbrains.kotlin:kotlin-metadata-jvm",
+    "com.squareup:kotlinpoet-javapoet",
+]
+
+EXCLUDED_MAVEN_DEPS = SHADED_MAVEN_DEPS + [
+    # Due to androidx.annotation:annotation being a redirtect to androidx.annotation:annotation-jvm,
+    # we exclude the transitive dep during validation as it will be required because the alias in
+    # third_party/java/androidx/annotation/BUILD.oss exports both.
+    "androidx.annotation:annotation-jvm",
 ]
 
 def dagger_pom_file(name, targets, artifact_name, artifact_id, packaging = None, **kwargs):
@@ -44,7 +51,7 @@ def dagger_pom_file(name, targets, artifact_name, artifact_id, packaging = None,
         # into the artifact itself using the gen_maven_artifact.shaded_deps or get it from
         # a transitive Dagger artifact as a dependency. In addition, the artifact must add
         # the shade rules in the deploy scripts, e.g. deploy-dagger.sh.
-        excluded_artifacts = SHADED_MAVEN_DEPS,
+        excluded_artifacts = EXCLUDED_MAVEN_DEPS,
         **kwargs
     )
 
@@ -292,6 +299,7 @@ def _gen_maven_artifact(
         # https://central.sonatype.org/pages/requirements.html#supply-javadoc-and-sources
         java_binary(
             name = name + "-javadoc",
+            create_executable = False,
         )
 
 def _src_jar(target):
@@ -336,8 +344,8 @@ def _validate_maven_deps_impl(ctx):
     actual_maven_deps = [_strip_artifact_version(artifact) for artifact in maven_nearest_artifacts]
     _validate_list(
         "artifact_target_maven_deps",
-        # Exclude shaded maven deps from this list since they're not actual dependencies.
-        [dep for dep in actual_maven_deps if dep not in SHADED_MAVEN_DEPS],
+        # Exclude certain maven deps (such as shaded deps since they're not actual dependencies).
+        [dep for dep in actual_maven_deps if dep not in EXCLUDED_MAVEN_DEPS],
         expected_maven_deps,
         ctx.attr.banned_maven_deps,
     )
@@ -420,6 +428,7 @@ def _package_android_library_impl(ctx):
             proguardSpec = ctx.file.proguardSpec.path if ctx.file.proguardSpec else "none",
             outputFile = ctx.outputs.aar.path,
         ),
+        mnemonic = "DaggerPackageAndroidLib",
     )
 
 _package_android_library = rule(
@@ -480,6 +489,7 @@ def _package_r8_and_proguard_rule_impl(ctx):
             proguardSpec = ctx.file.proguardSpec.path if ctx.file.proguardSpec else "none",
             outputFile = ctx.outputs.jar.path,
         ),
+        mnemonic = "DaggerPackageR8AndProguard",
     )
 
 _package_r8_and_proguard_rule = rule(

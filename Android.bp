@@ -50,14 +50,17 @@ license {
 
 java_import_host {
     name: "dagger2-bootstrap-compiler-jar",
-    jars: ["java/dagger/internal/codegen/bootstrap/bootstrap_compiler_deploy.jar"],
+    jars: ["dagger-compiler/main/java/dagger/internal/codegen/bootstrap/bootstrap_compiler_deploy.jar"],
 }
 
 java_plugin {
     name: "dagger2-bootstrap-compiler",
-    processor_class: "dagger.internal.codegen.ComponentProcessor",
+    processor_class: "dagger.internal.codegen.BootstrapProcessor",
     generates_api: true,
-    static_libs: ["dagger2-bootstrap-compiler-jar"],
+    static_libs: [
+        "dagger2-bootstrap-compiler-jar",
+        "google_java_format",
+    ],
     jarjar_rules: "jarjar-rules.txt",
 }
 
@@ -67,13 +70,11 @@ java_library {
     host_supported: true,
 
     srcs: [
-        "java/dagger/*.java",
-        "java/dagger/assisted/*.java",
-        "java/dagger/internal/*.java",
-        "java/dagger/multibindings/*.java",
-        "java/dagger/releasablereferences/*.java",
+        "dagger-runtime/main/java/dagger/*.java",
+        "dagger-runtime/main/java/dagger/assisted/*.java",
+        "dagger-runtime/main/java/dagger/internal/*.java",
+        "dagger-runtime/main/java/dagger/multibindings/*.java",
     ],
-    exclude_srcs: ["java/dagger/android/**/*.java"],
 
     libs: [
         "guava",
@@ -110,7 +111,7 @@ java_library {
     name: "dagger2-producers",
     host_supported: true,
 
-    srcs: ["java/dagger/producers/**/*.java"],
+    srcs: ["dagger-producers/main/java/dagger/producers/**/*.java"],
 
     static_libs: [
         "error_prone_annotations",
@@ -146,7 +147,7 @@ java_plugin {
 // removed.
 java_import_host {
     name: "dagger2-room-compiler-processing",
-    jars: ["java/dagger/internal/codegen/xprocessing/xprocessing.jar"],
+    jars: ["dagger-compiler/main/java/dagger/internal/codegen/xprocessing/xprocessing-internal.jar"],
 }
 
 java_library_host {
@@ -155,19 +156,16 @@ java_library_host {
     visibility: ["//visibility:public"],
 
     srcs: [
-        "java/dagger/internal/codegen/**/*.java",
-        "java/dagger/internal/codegen/**/*.kt",
-        "java/dagger/internal/codegen/**/*.proto",
+        "dagger-compiler/main/java/dagger/internal/codegen/**/*.java",
+        "dagger-compiler/main/java/dagger/internal/codegen/**/*.kt",
+        "dagger-compiler/main/java/dagger/internal/codegen/**/*.proto",
 
-        "java/dagger/model/*.java",
-        "java/dagger/spi/*.java",
-        "java/dagger/spi/model/*.java",
-        "java/dagger/spi/model/*.kt",
-    ],
+        "dagger-spi/main/java/dagger/internal/codegen/**/*.java",
 
-    exclude_srcs: [
-        "java/dagger/internal/codegen/BindingGraphStatisticsCollector.java",
-        "java/dagger/internal/codegen/kythe/DaggerKythePlugin.java",
+        "dagger-spi/main/java/dagger/model/*.java",
+        "dagger-spi/main/java/dagger/spi/*.java",
+        "dagger-spi/main/java/dagger/spi/model/*.java",
+        "dagger-spi/main/java/dagger/spi/model/*.kt",
     ],
 
     static_libs: [
@@ -185,6 +183,7 @@ java_library_host {
         "kotlin-stdlib",
         "kotlin-stdlib-jdk8",
         "kotlinpoet",
+        "kotlinpoet-javapoet",
     ],
 
     libs: [
@@ -193,6 +192,7 @@ java_library_host {
         "auto_value_annotations",
         "auto_value_memoized_extension_annotations",
         "dagger2-android-annotation-stubs",
+        "google_java_format",
     ],
 
     plugins: [
@@ -244,15 +244,15 @@ java_library {
     name: "hilt_core",
     visibility: ["//prebuilts/sdk/current/androidx/m2repository/androidx/hilt/hilt-common:__subpackages__"],
     srcs: [
-        "java/dagger/hilt/*.java",
-        "java/dagger/hilt/codegen/*.java",
-        "java/dagger/hilt/components/*.java",
-        "java/dagger/hilt/internal/*.java",
-        "java/dagger/hilt/internal/aliasof/*.java",
-        "java/dagger/hilt/internal/definecomponent/*.java",
-        "java/dagger/hilt/internal/generatesrootinput/*.java",
-        "java/dagger/hilt/migration/*.java",
-        "java/dagger/hilt/processor/internal/aggregateddeps/AggregatedDeps.java",
+        "hilt-core/main/java/dagger/hilt/*.java",
+        "hilt-core/main/java/dagger/hilt/codegen/*.java",
+        "hilt-core/main/java/dagger/hilt/components/*.java",
+        "hilt-core/main/java/dagger/hilt/internal/*.java",
+        "hilt-core/main/java/dagger/hilt/internal/aliasof/*.java",
+        "hilt-core/main/java/dagger/hilt/internal/definecomponent/*.java",
+        "hilt-core/main/java/dagger/hilt/internal/generatesrootinput/*.java",
+        "hilt-core/main/java/dagger/hilt/migration/*.java",
+        "hilt-core/main/java/dagger/hilt/processor/internal/aggregateddeps/AggregatedDeps.java",
     ],
     static_libs: [
         "jsr305",
@@ -279,28 +279,29 @@ android_library {
     visibility: ["//visibility:public"],
 
     srcs: [
-        "java/dagger/hilt/android/*.java",
-        "java/dagger/hilt/android/*.kt",
-        "java/dagger/hilt/android/components/*.java",
-        "java/dagger/hilt/android/flags/*.java",
-        "java/dagger/hilt/android/migration/*.java",
-        "java/dagger/hilt/android/qualifiers/*.java",
-        "java/dagger/hilt/android/scopes/*.java",
-        "java/dagger/hilt/android/internal/*.java",
-        "java/dagger/hilt/android/internal/builders/*.java",
-        "java/dagger/hilt/android/internal/earlyentrypoint/*.java",
-        "java/dagger/hilt/android/internal/legacy/*.java",
-        "java/dagger/hilt/android/internal/lifecycle/*.java",
-        "java/dagger/hilt/android/internal/managers/*.java",
-        "java/dagger/hilt/android/internal/migration/*.java",
-        "java/dagger/hilt/android/internal/modules/*.java",
-        "java/dagger/hilt/android/lifecycle/*.java",
-        "java/dagger/hilt/android/lifecycle/*.kt",
-        "java/dagger/hilt/internal/aggregatedroot/*.java",
-        "java/dagger/hilt/internal/componenttreedeps/*.java",
-        "java/dagger/hilt/internal/processedrootsentinel/*.java",
+        "hilt-android/main/java/dagger/hilt/android/*.java",
+        "hilt-android/main/java/dagger/hilt/android/*.kt",
+        "hilt-android/main/java/dagger/hilt/android/components/*.java",
+        "hilt-android/main/java/dagger/hilt/android/flags/*.java",
+        "hilt-android/main/java/dagger/hilt/android/migration/*.java",
+        "hilt-android/main/java/dagger/hilt/android/qualifiers/*.java",
+        "hilt-android/main/java/dagger/hilt/android/scopes/*.java",
+        "hilt-android/main/java/dagger/hilt/android/internal/*.java",
+        "hilt-android/main/java/dagger/hilt/android/internal/builders/*.java",
+        "hilt-android/main/java/dagger/hilt/android/internal/earlyentrypoint/*.java",
+        "hilt-android/main/java/dagger/hilt/android/internal/legacy/*.java",
+        "hilt-android/main/java/dagger/hilt/android/internal/lifecycle/*.java",
+        "hilt-android/main/java/dagger/hilt/android/internal/managers/*.java",
+        "hilt-android/main/java/dagger/hilt/android/internal/migration/*.java",
+        "hilt-android/main/java/dagger/hilt/android/internal/modules/*.java",
+        "hilt-android/main/java/dagger/hilt/android/lifecycle/*.java",
+        "hilt-android/main/java/dagger/hilt/android/lifecycle/*.kt",
+        "hilt-android/main/java/dagger/hilt/internal/*.java",
+        "hilt-android/main/java/dagger/hilt/internal/aggregatedroot/*.java",
+        "hilt-android/main/java/dagger/hilt/internal/componenttreedeps/*.java",
+        "hilt-android/main/java/dagger/hilt/internal/processedrootsentinel/*.java",
     ],
-    manifest: "java/dagger/hilt/android/AndroidManifest.xml",
+    manifest: "hilt-android/main/java/dagger/hilt/android/AndroidManifest.xml",
     static_libs: [
         "androidx.activity_activity",
         "androidx.annotation_annotation",
@@ -351,13 +352,13 @@ android_library {
     visibility: ["//visibility:public"],
 
     srcs: [
-        "java/dagger/hilt/android/internal/testing/*.java",
-        "java/dagger/hilt/android/internal/testing/root/*.java",
-        "java/dagger/hilt/android/internal/uninstallmodules/*.java",
-        "java/dagger/hilt/android/testing/*.java",
-        "java/dagger/hilt/testing/*.java",
+        "hilt-android-testing/main/java/dagger/hilt/android/internal/testing/*.java",
+        "hilt-android-testing/main/java/dagger/hilt/android/internal/testing/root/*.java",
+        "hilt-android-testing/main/java/dagger/hilt/android/internal/uninstallmodules/*.java",
+        "hilt-android-testing/main/java/dagger/hilt/android/testing/*.java",
+        "hilt-android-testing/main/java/dagger/hilt/testing/*.java",
     ],
-    manifest: "java/dagger/hilt/android/testing/AndroidManifest.xml",
+    manifest: "hilt-android-testing/main/java/dagger/hilt/android/testing/AndroidManifest.xml",
     static_libs: [
         "auto_value_annotations",
         "androidx.annotation_annotation",
@@ -487,15 +488,15 @@ java_library_host {
     name: "hilt_android_processors",
     use_tools_jar: true,
     srcs: [
-        "java/dagger/hilt/android/processor/**/*.java",
-        "java/dagger/hilt/android/processor/**/*.kt",
-        "java/dagger/hilt/codegen/*.java",
-        "java/dagger/hilt/processor/internal/**/*.java",
-        "java/dagger/hilt/processor/internal/**/*.kt",
+        "hilt-compiler/main/java/dagger/hilt/android/processor/**/*.java",
+        "hilt-compiler/main/java/dagger/hilt/android/processor/**/*.kt",
+        "hilt-core/main/java/dagger/hilt/codegen/*.java",
+        "hilt-compiler/main/java/dagger/hilt/processor/internal/**/*.java",
+        "hilt-compiler/main/java/dagger/hilt/processor/internal/**/*.kt",
     ],
     exclude_srcs: [
         // Depends on DefineComponentValidationProcessingStep which is not present in github.
-        "java/dagger/hilt/processor/internal/definecomponent/KspDefineComponentValidationProcessor.java",
+        "hilt-compiler/main/java/dagger/hilt/processor/internal/definecomponent/KspDefineComponentValidationProcessor.java",
     ],
     plugins: [
         "auto_service_plugin",
@@ -508,6 +509,7 @@ java_library_host {
         "auto_service_annotations",
         "auto_value_annotations",
         "auto_value_memoized_extension_annotations",
+        "google_java_format",
         "guava",
         "jsr305",
         "dagger2-compiler-lib",

@@ -17,23 +17,22 @@
 
 load("//java/dagger/testing/compile:macros.bzl", "compiler_test")
 
-package(default_visibility = ["//:src"])
-
 compiler_test(
     name = "GeneratesRootInputProcessorTest",
     srcs = ["GeneratesRootInputProcessorTest.java"],
     compiler_deps = [
-        "//java/dagger/hilt:generates_root_input",
-        "@androidsdk//:platforms/android-34/android.jar",
-        "@maven//:androidx_annotation_annotation",
+        "//hilt-core/main/java/dagger/hilt:generates_root_input",
+        "//third_party/java/android/android_sdk_linux:android_runtime",
+        "//third_party/java/androidx/annotation",
     ],
     deps = [
-        "//java/dagger/hilt:generates_root_input",
-        "//java/dagger/hilt/android/testing/compile",
-        "//java/dagger/hilt/processor/internal:base_processor",
-        "//java/dagger/hilt/processor/internal/generatesrootinput:generates_root_inputs",
-        "//java/dagger/internal/codegen/xprocessing",
-        "//java/dagger/internal/codegen/xprocessing:xprocessing-testing",
+        "//dagger-compiler:xprocessing",
+        "//dagger-compiler/main/java/dagger/internal/codegen/xprocessing:xprocessing-testing",
+        "//dagger-spi",
+        "//hilt-compiler/main/java/dagger/hilt/processor/internal:base_processor",
+        "//hilt-compiler/main/java/dagger/hilt/processor/internal/generatesrootinput:generates_root_inputs",
+        "//hilt-core/main/java/dagger/hilt:generates_root_input",
+        "//hilt-testing/main/java/dagger/hilt/android/testing/compile",
         "//third_party/java/javapoet",
         "//third_party/java/junit",
         "//third_party/java/truth",

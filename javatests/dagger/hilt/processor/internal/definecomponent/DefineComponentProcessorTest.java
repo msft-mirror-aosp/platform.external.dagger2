@@ -16,7 +16,7 @@
 
 package dagger.hilt.processor.internal.definecomponent;
 
-import androidx.room.compiler.processing.util.Source;
+import androidx.room3.compiler.processing.util.Source;
 import dagger.hilt.android.testing.compile.HiltCompilerTests;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -271,7 +271,8 @@ public final class DefineComponentProcessorTest {
             subject -> {
               subject.hasErrorCount(1);
               subject.hasErrorContaining(
-                  "@DefineComponent test.FooComponent is missing a parent declaration.");
+                  "@DefineComponent test.FooComponent is missing a parent "
+                  + "declaration.");
             });
   }
 
