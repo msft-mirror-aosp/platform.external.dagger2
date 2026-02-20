@@ -7,14 +7,14 @@ description: "A fast dependency injector for Android and Java."
 third_party {
   license_type: NOTICE
   last_upgrade_date {
-    year: 2025
-    month: 1
-    day: 10
+    year: 2026
+    month: 2
+    day: 13
   }
   homepage: "https://dagger.dev"
   identifier {
     type: "Git"
     value: "https://github.com/google/dagger"
-    version: "347cfe1352469381f4391091e8bfa242214c68cc"
+    version: "f7e31b8572df4d791816dfb30a875231176e41d5"
   }
 }

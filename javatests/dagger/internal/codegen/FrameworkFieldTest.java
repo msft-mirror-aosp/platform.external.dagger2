@@ -17,16 +17,17 @@
 package dagger.internal.codegen;
 
 import static com.google.common.truth.Truth.assertThat;
+import static dagger.internal.codegen.xprocessing.XTypeNames.JAVAX_PROVIDER;
 import static dagger.internal.codegen.xprocessing.XTypeNames.MEMBERS_INJECTOR;
-import static dagger.internal.codegen.xprocessing.XTypeNames.PROVIDER;
+import static dagger.internal.codegen.xprocessing.XTypeNames.javaxProviderOf;
 import static dagger.internal.codegen.xprocessing.XTypeNames.membersInjectorOf;
-import static dagger.internal.codegen.xprocessing.XTypeNames.providerOf;
 
-import androidx.room.compiler.processing.XProcessingEnv;
-import androidx.room.compiler.processing.XType;
+import androidx.room3.compiler.processing.XProcessingEnv;
+import androidx.room3.compiler.processing.XType;
 import com.google.testing.compile.CompilationRule;
 import dagger.Component;
 import dagger.internal.codegen.binding.FrameworkField;
+import dagger.internal.codegen.compileroption.CompilerOptions;
 import dagger.internal.codegen.javac.JavacPluginModule;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -44,6 +45,7 @@ public class FrameworkFieldTest {
   @Rule public CompilationRule compilationRule = new CompilationRule();
 
   @Inject XProcessingEnv processingEnv;
+  @Inject CompilerOptions compilerOptions;
 
   private XType type;
 
@@ -58,15 +60,16 @@ public class FrameworkFieldTest {
   }
 
   @Test public void frameworkType() {
-    assertThat(FrameworkField.create("test", PROVIDER, type).type())
-        .isEqualTo(providerOf(type.asTypeName()));
-    assertThat(FrameworkField.create("test", MEMBERS_INJECTOR, type).type())
+    assertThat(FrameworkField.create("test", JAVAX_PROVIDER, type, compilerOptions).type())
+        .isEqualTo(javaxProviderOf(type.asTypeName()));
+    assertThat(FrameworkField.create("test", MEMBERS_INJECTOR, type, compilerOptions).type())
         .isEqualTo(membersInjectorOf(type.asTypeName()));
   }
 
   @Test public void nameSuffix() {
-    assertThat(FrameworkField.create("foo", PROVIDER, type).name()).isEqualTo("fooProvider");
-    assertThat(FrameworkField.create("fooProvider", PROVIDER, type).name())
+    assertThat(FrameworkField.create("foo", JAVAX_PROVIDER, type, compilerOptions).name())
+        .isEqualTo("fooProvider");
+    assertThat(FrameworkField.create("fooProvider", JAVAX_PROVIDER, type, compilerOptions).name())
         .isEqualTo("fooProvider");
   }
 

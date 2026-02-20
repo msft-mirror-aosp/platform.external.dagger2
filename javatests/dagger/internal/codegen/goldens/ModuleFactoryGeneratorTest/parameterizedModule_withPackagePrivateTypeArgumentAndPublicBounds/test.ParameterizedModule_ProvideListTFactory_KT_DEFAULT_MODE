@@ -1,0 +1,45 @@
+package test
+
+import dagger.`internal`.DaggerGenerated
+import dagger.`internal`.Factory
+import dagger.`internal`.Preconditions
+import dagger.`internal`.Provider
+import dagger.`internal`.QualifierMetadata
+import dagger.`internal`.ScopeMetadata
+import javax.`annotation`.processing.Generated
+import kotlin.Any
+import kotlin.Suppress
+import kotlin.jvm.JvmStatic
+
+@ScopeMetadata
+@QualifierMetadata
+@DaggerGenerated
+@Generated(
+  value = ["dagger.internal.codegen.ComponentProcessor"],
+  comments = "https://dagger.dev",
+)
+@Suppress(names = [
+    "UNCHECKED_CAST",
+    "USELESS_CAST",
+    "DEPRECATION"
+])
+public class ParameterizedModule_ProvideListTFactory<T : Bar?> : Factory<Any?> {
+  private val module: ParameterizedModule<T>
+
+  private val tProvider: Provider<T>
+
+  private constructor(module: ParameterizedModule<T>, tProvider: Provider<T>) {
+    this.module = module
+    this.tProvider = tProvider
+  }
+
+  public override fun `get`(): Any? = provideListT<T>(module, tProvider.get())
+
+  public companion object {
+    @JvmStatic
+    public fun <T : Bar?> create(module: Any?, tProvider: Provider<*>): ParameterizedModule_ProvideListTFactory<T> = ParameterizedModule_ProvideListTFactory<T>((module) as ParameterizedModule<T>, (tProvider) as Provider<T>)
+
+    @JvmStatic
+    public fun <T : Bar?> provideListT(instance: Any?, t: Any?): Any? = Preconditions.checkNotNullFromProvides(((instance) as ParameterizedModule<T>).provideListT((t) as T))
+  }
+}

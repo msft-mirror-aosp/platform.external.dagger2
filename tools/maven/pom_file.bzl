@@ -151,7 +151,7 @@ DEP_PKG_BLOCK = """
 <dependency>
   <groupId>{0}</groupId>
   <artifactId>{1}</artifactId>
-  <packaging>{2}</packaging>
+  <type>{2}</type>
   <version>{3}</version>
 </dependency>
 """.strip()
@@ -165,6 +165,11 @@ def _pom_file(ctx):
     formatted_deps = []
     for dep in _sort_artifacts(mvn_deps.to_list(), ctx.attr.preferred_group_ids):
         parts = dep.split(":")
+
+        # Only remove '@aar' if it is the ending part.
+        # Format: group:artifact:version@aar -> group:artifact:version
+        if parts[2].endswith("@aar"):
+            parts[2] = parts[2].removesuffix("@aar")
         if ":".join(parts[0:2]) in ctx.attr.excluded_artifacts:
             continue
         if len(parts) == 3:

@@ -1,0 +1,63 @@
+package test
+
+import dagger.`internal`.DaggerGenerated
+import dagger.`internal`.Factory
+import dagger.`internal`.Provider
+import dagger.`internal`.QualifierMetadata
+import dagger.`internal`.ScopeMetadata
+import javax.`annotation`.processing.Generated
+import kotlin.Any
+import kotlin.Comparable
+import kotlin.Number
+import kotlin.String
+import kotlin.Suppress
+import kotlin.collections.MutableList
+import kotlin.jvm.JvmStatic
+
+@ScopeMetadata
+@QualifierMetadata
+@DaggerGenerated
+@Generated(
+  value = ["dagger.internal.codegen.ComponentProcessor"],
+  comments = "https://dagger.dev",
+)
+@Suppress(names = [
+    "UNCHECKED_CAST",
+    "USELESS_CAST",
+    "DEPRECATION"
+])
+public class GenericClass_Factory<A, B : MutableList<out String?>?, C : MutableList<in String?>?> : Factory<Any?> where A : Number?, A : Comparable<A?>? {
+  private val aProvider: Provider<A>
+
+  private val bProvider: Provider<B>
+
+  private val cProvider: Provider<C>
+
+  private constructor(
+    aProvider: Provider<A>,
+    bProvider: Provider<B>,
+    cProvider: Provider<C>,
+  ) {
+    this.aProvider = aProvider
+    this.bProvider = bProvider
+    this.cProvider = cProvider
+  }
+
+  public override fun `get`(): Any? = newInstance<A, B, C>(aProvider.get(), bProvider.get(), cProvider.get())
+
+  public companion object {
+    @JvmStatic
+    public fun <A, B : MutableList<out String?>?, C : MutableList<in String?>?> create(
+      aProvider: Provider<*>,
+      bProvider: Provider<*>,
+      cProvider: Provider<*>,
+    ): GenericClass_Factory<A, B, C> where A : Number?, A : Comparable<A?>? = GenericClass_Factory<A, B, C>((aProvider) as Provider<A>, (bProvider) as Provider<B>, (cProvider) as Provider<C>)
+
+    @JvmStatic
+    public fun <A, B : MutableList<out String?>?, C : MutableList<in String?>?> newInstance(
+      a: Any?,
+      b: Any?,
+      c: Any?,
+    ): Any? where A : Number?, A : Comparable<A?>? = GenericClass<A, B, C>((a) as A, (b) as B, (c) as C)
+  }
+}

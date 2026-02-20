@@ -23,16 +23,16 @@ import static com.google.testing.compile.Compiler.javac;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
 import static java.util.stream.Collectors.toMap;
 
-import androidx.room.compiler.processing.XProcessingEnv;
-import androidx.room.compiler.processing.XProcessingEnvConfig;
-import androidx.room.compiler.processing.XProcessingStep;
-import androidx.room.compiler.processing.util.CompilationResultSubject;
-import androidx.room.compiler.processing.util.ProcessorTestExtKt;
-import androidx.room.compiler.processing.util.Source;
-import androidx.room.compiler.processing.util.XTestInvocation;
-import androidx.room.compiler.processing.util.compiler.TestCompilationArguments;
-import androidx.room.compiler.processing.util.compiler.TestCompilationResult;
-import androidx.room.compiler.processing.util.compiler.TestKotlinCompilerKt;
+import androidx.room3.compiler.processing.XProcessingEnv;
+import androidx.room3.compiler.processing.XProcessingEnvConfig;
+import androidx.room3.compiler.processing.XProcessingStep;
+import androidx.room3.compiler.processing.util.CompilationResultSubject;
+import androidx.room3.compiler.processing.util.ProcessorTestExtKt;
+import androidx.room3.compiler.processing.util.Source;
+import androidx.room3.compiler.processing.util.XTestInvocation;
+import androidx.room3.compiler.processing.util.compiler.TestCompilationArguments;
+import androidx.room3.compiler.processing.util.compiler.TestCompilationResult;
+import androidx.room3.compiler.processing.util.compiler.TestKotlinCompilerKt;
 import com.google.auto.value.AutoValue;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableCollection;
@@ -54,12 +54,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.annotation.processing.Processor;
 import org.junit.rules.TemporaryFolder;
 
 /** A helper class for working with java compiler tests. */
 public final class CompilerTests {
-  // TODO(bcorso): Share this with java/dagger/internal/codegen/DelegateComponentProcessor.java
+  // TODO(bcorso): Share this with
+  // dagger-compiler/main/java/dagger/internal/codegen/DelegateComponentProcessor.java
   static final XProcessingEnvConfig PROCESSING_ENV_CONFIG =
       new XProcessingEnvConfig.Builder().disableAnnotatedElementValidation(true).build();
 
@@ -72,9 +74,10 @@ public final class CompilerTests {
 
   private static final ImmutableList<String> DEFAULT_KOTLINC_OPTIONS =
       ImmutableList.of(
-          "-api-version=1.9",
-          "-language-version=1.9",
-          "-P", "plugin:org.jetbrains.kotlin.kapt3:correctErrorTypes=true");
+          "-jvm-target=11",
+          "-Xjvm-default=all",
+          "-P",
+          "plugin:org.jetbrains.kotlin.kapt3:correctErrorTypes=true");
 
   /** Returns the {@link XProcessingEnv.Backend} for the given {@link CompilationResultSubject}. */
   public static XProcessingEnv.Backend backend(CompilationResultSubject subject) {
@@ -111,6 +114,22 @@ public final class CompilerTests {
     return (Source.JavaSource) Source.Companion.java(fileName, String.join("\n", srcLines));
   }
 
+  /** Returns a new {@link Source} with the content transformed by the given function. */
+  public static Source transformContent(
+      Source source, Function<String, String> contentTransformer) {
+    if (source instanceof Source.KotlinSource) {
+      return Source.Companion.kotlin(
+          source.getRelativePath(),
+          contentTransformer.apply(source.getContents()));
+    } else if (source instanceof Source.JavaSource) {
+      return Source.Companion.java(
+          ((Source.JavaSource) source).getQName(),
+          contentTransformer.apply(source.getContents()));
+    } else {
+      throw new AssertionError("Unexpected source type.");
+    }
+  }
+
   /** Returns a {@link Compiler} instance with the given sources. */
   public static DaggerCompiler daggerCompiler(Source... sources) {
     return daggerCompiler(ImmutableList.copyOf(sources));
@@ -130,7 +149,17 @@ public final class CompilerTests {
         ImmutableList.copyOf(sources), DEFAULT_PROCESSOR_OPTIONS);
   }
 
-  /** */
+  /**
+   * Used to compile regular java or kotlin sources and use its compiled artifacts as inputs for
+   * further compilation or processing.
+   *
+   * @see DaggerCompiler#withAdditionalClasspath(ImmutableList)
+   */
+  public static LibraryCompiler libraryCompiler(Source... sources) {
+    return new AutoValue_CompilerTests_LibraryCompiler(ImmutableList.copyOf(sources));
+  }
+
+  /** Used to compile regular java or kotlin sources and inspect the elements processed. */
   @AutoValue
   public abstract static class InvocationCompiler {
     /** Returns the sources being compiled */
@@ -154,6 +183,28 @@ public final class CompilerTests {
     }
   }
 
+  // TODO(bcorso): Remove this and replace with
+  // DaggerCompiler.compileFilesWithJavac()/compileFilesWithKsp().
+  /** Used to compile regular java or kotlin sources into a library artifact. */
+  @AutoValue
+  public abstract static class LibraryCompiler {
+    /** Returns the sources being compiled */
+    abstract ImmutableList<Source> sources();
+
+    public ImmutableList<File> compile() {
+      return ImmutableList.copyOf(
+          ProcessorTestExtKt.compileFiles(
+              sources(),
+              /* classpath= */ ImmutableList.of(),
+              /* options= */ ImmutableMap.of(),
+              /* annotationProcessors= */ ImmutableList.of(),
+              /* symbolProcessorProviders= */ ImmutableList.of(),
+              /* javacArguments= */ DEFAULT_JAVAC_OPTIONS,
+              /* kotlincArguments= */ DEFAULT_KOTLINC_OPTIONS,
+              /* includeSystemClasspath= */ true));
+    }
+  }
+
   /** Used to compile Dagger sources and inspect the compiled results. */
   @AutoValue
   public abstract static class DaggerCompiler {
@@ -162,6 +213,7 @@ public final class CompilerTests {
       // Set default values
       return builder
           .processorOptions(DEFAULT_PROCESSOR_OPTIONS)
+          .additionalClasspath(ImmutableList.of())
           .additionalJavacProcessors(ImmutableList.of())
           .additionalKspProcessors(ImmutableList.of())
           .processingStepSuppliers(ImmutableSet.of())
@@ -173,6 +225,9 @@ public final class CompilerTests {
 
     /** Returns the annotation processor options */
     abstract ImmutableMap<String, String> processorOptions();
+
+    /** Returns extra files for the classpath. */
+    abstract ImmutableList<File> additionalClasspath();
 
     /** Returns the extra Javac processors. */
     abstract ImmutableCollection<Processor> additionalJavacProcessors();
@@ -196,11 +251,11 @@ public final class CompilerTests {
       return bindingGraphPluginSuppliers().stream().map(Supplier::get).collect(toImmutableList());
     }
 
-    /** Returns a builder with the current values of this {@link Compiler} as default. */
+    /** Returns a builder with the current values of this {@link DaggerCompiler} as default. */
     abstract Builder toBuilder();
 
     /**
-     * Returns a new {@link Compiler} instance with the given processor options.
+     * Returns a new {@link DaggerCompiler} instance with the given processor options.
      *
      * <p>Note that the default processor options are still applied unless they are explicitly
      * overridden by the given processing options.
@@ -212,17 +267,17 @@ public final class CompilerTests {
       return toBuilder().processorOptions(newProcessorOptions).build();
     }
 
-    /** Returns a new {@link HiltCompiler} instance with the additional Javac processors. */
+    /** Returns a new {@link DaggerCompiler} instance with the additional Javac processors. */
     public DaggerCompiler withAdditionalJavacProcessors(Processor... processors) {
       return toBuilder().additionalJavacProcessors(ImmutableList.copyOf(processors)).build();
     }
 
-    /** Returns a new {@link HiltCompiler} instance with the additional KSP processors. */
+    /** Returns a new {@link DaggerCompiler} instance with the additional KSP processors. */
     public DaggerCompiler withAdditionalKspProcessors(SymbolProcessorProvider... processors) {
       return toBuilder().additionalKspProcessors(ImmutableList.copyOf(processors)).build();
     }
 
-    /** Returns a new {@link Compiler} instance with the given processing steps. */
+    /** Returns a new {@link DaggerCompiler} instance with the given processing steps. */
     public DaggerCompiler withProcessingSteps(Supplier<XProcessingStep>... suppliers) {
       return toBuilder().processingStepSuppliers(ImmutableList.copyOf(suppliers)).build();
     }
@@ -231,28 +286,100 @@ public final class CompilerTests {
       return toBuilder().bindingGraphPluginSuppliers(ImmutableList.copyOf(suppliers)).build();
     }
 
+    /** Returns a new {@link DaggerCompiler} instance with the additional files in the classpath. */
+    public DaggerCompiler withAdditionalClasspath(ImmutableList<File> libs) {
+      return toBuilder().additionalClasspath(libs).build();
+    }
+
     public void compile(Consumer<CompilationResultSubject> onCompilationResult) {
       ProcessorTestExtKt.runProcessorTest(
           sources().asList(),
-          /* classpath= */ ImmutableList.of(),
+          additionalClasspath(),
           processorOptions(),
           /* javacArguments= */ DEFAULT_JAVAC_OPTIONS,
           /* kotlincArguments= */ DEFAULT_KOTLINC_OPTIONS,
           /* config= */ PROCESSING_ENV_CONFIG,
-          /* javacProcessors= */ mergeProcessors(
-              ImmutableList.of(
-                  ComponentProcessor.withTestPlugins(bindingGraphPlugins()),
-                  new CompilerProcessors.JavacProcessor(processingSteps())),
-              additionalJavacProcessors()),
-          /* symbolProcessorProviders= */ mergeProcessors(
-              ImmutableList.of(
-                  KspComponentProcessor.Provider.withTestPlugins(bindingGraphPlugins()),
-                  new CompilerProcessors.KspProcessor.Provider(processingSteps())),
-              additionalKspProcessors()),
+          /* javacProcessors= */ mergedJavacProcessors(),
+          /* symbolProcessorProviders= */ mergedKspProcessors(),
           result -> {
             onCompilationResult.accept(result);
             return null;
           });
+    }
+
+    /**
+     * Compiles the sources with Javac/KAPT and returns the list of generated files.
+     *
+     * <p>This is useful for compiling a set of sources in a separate compilation step that can be
+     * passed in as the classpath of a subsequent compilation.
+     */
+    public ImmutableList<File> compileFilesWithJavac() {
+      return compileFiles(XProcessingEnv.Backend.JAVAC);
+    }
+
+    /**
+     * Compiles the sources with KSP and returns the list of generated files.
+     *
+     * <p>This is useful for compiling a set of sources in a separate compilation step that can be
+     * passed in as the classpath of a subsequent compilation.
+     */
+    public ImmutableList<File> compileFilesWithKsp() {
+      return compileFiles(XProcessingEnv.Backend.KSP);
+    }
+
+    public ImmutableList<File> compileFiles(XProcessingEnv.Backend backend) {
+      // TODO(bcorso): We can't run both Javac and KSP processors since any generated sources would
+      // cause a conflict since they would be generated for both Javac and KSP. As a temporary
+      // solution, we only pass the processors that match the backend, but this isn't really correct
+      // since both backends still run and not passing the processors could cause errors. Long term,
+      // we should change the XProcessingTesting API to take the backend as input and only compile
+      // for a single backend.
+      ImmutableList<Processor> javacProcessors;
+      ImmutableList<SymbolProcessorProvider> symbolProcessorProviders;
+      switch (backend) {
+        case JAVAC:
+          javacProcessors = mergedJavacProcessors();
+          symbolProcessorProviders = ImmutableList.of();
+          break;
+        case KSP:
+          javacProcessors = ImmutableList.of();
+          symbolProcessorProviders = mergedKspProcessors();
+          break;
+        default:
+          throw new IllegalArgumentException("Unsupported backend: " + backend);
+      }
+      return ImmutableList.copyOf(
+          ProcessorTestExtKt.compileFiles(
+              /* sources= */ sources().asList(),
+              /* classpath= */ additionalClasspath(),
+              /* options= */ processorOptions(),
+              /* annotationProcessors= */ javacProcessors,
+              // TODO(bcorso): We can't run both Javac and KSP processors since any generated
+              // sources would cause a conflict since they would be generated for both Javac and
+              // KSP. Instead, we should change the XProcessingTesting API to compileFilesWithJavac
+              // and compileFilesWithKsp when compiling to get the class files. As a temporary
+              // solution, we're just not passing in any KSP processors, but that can cause
+              // breakages because KSP will still run just without any processors.
+              /* symbolProcessorProviders= */ symbolProcessorProviders,
+              /* javacArguments= */ DEFAULT_JAVAC_OPTIONS,
+              /* kotlincArguments= */ DEFAULT_KOTLINC_OPTIONS,
+              /* includeSystemClasspath= */ true));
+    }
+
+    private ImmutableList<Processor> mergedJavacProcessors() {
+      return mergeProcessors(
+          ImmutableList.of(
+              ComponentProcessor.withTestPlugins(bindingGraphPlugins()),
+              new CompilerProcessors.JavacProcessor(processingSteps())),
+          additionalJavacProcessors());
+    }
+
+    private ImmutableList<SymbolProcessorProvider> mergedKspProcessors() {
+      return mergeProcessors(
+          ImmutableList.of(
+              KspComponentProcessor.Provider.withTestPlugins(bindingGraphPlugins()),
+              new CompilerProcessors.KspProcessor.Provider(processingSteps())),
+          additionalKspProcessors());
     }
 
     private static <T> ImmutableList<T> mergeProcessors(
@@ -270,6 +397,8 @@ public final class CompilerTests {
     public abstract static class Builder {
       abstract Builder sources(ImmutableCollection<Source> sources);
       abstract Builder processorOptions(Map<String, String> processorOptions);
+
+      abstract Builder additionalClasspath(ImmutableList<File> libs);
 
       abstract Builder additionalJavacProcessors(ImmutableCollection<Processor> processors);
 

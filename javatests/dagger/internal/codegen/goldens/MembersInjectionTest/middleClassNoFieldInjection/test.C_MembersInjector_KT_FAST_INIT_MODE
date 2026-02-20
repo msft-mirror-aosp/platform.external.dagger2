@@ -1,0 +1,46 @@
+package test
+
+import dagger.MembersInjector
+import dagger.`internal`.DaggerGenerated
+import dagger.`internal`.InjectedFieldSignature
+import dagger.`internal`.Provider
+import dagger.`internal`.QualifierMetadata
+import javax.`annotation`.processing.Generated
+import kotlin.Any
+import kotlin.String
+import kotlin.Suppress
+import kotlin.jvm.JvmStatic
+
+@QualifierMetadata
+@DaggerGenerated
+@Generated(
+  value = ["dagger.internal.codegen.ComponentProcessor"],
+  comments = "https://dagger.dev",
+)
+@Suppress(names = [
+    "UNCHECKED_CAST",
+    "USELESS_CAST",
+    "DEPRECATION"
+])
+public class C_MembersInjector : MembersInjector<Any> {
+  private val valueCProvider: Provider<String?>
+
+  private constructor(valueCProvider: Provider<String?>) {
+    this.valueCProvider = valueCProvider;
+  }
+
+  public override fun injectMembers(instance: Any) {
+    injectValueC(instance, valueCProvider.get());
+  }
+
+  public companion object {
+    @JvmStatic
+    public fun create(valueCProvider: Provider<*>): MembersInjector<Any> = C_MembersInjector((valueCProvider) as Provider<String?>)
+
+    @InjectedFieldSignature(value = "test.C.valueC")
+    @JvmStatic
+    public fun injectValueC(instance: Any?, valueC: Any?) {
+      ((instance) as C).valueC = (valueC) as String?
+    }
+  }
+}

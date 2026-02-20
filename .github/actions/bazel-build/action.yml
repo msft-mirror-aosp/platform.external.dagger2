@@ -4,23 +4,20 @@ description: 'Builds artifacts and creates the Dagger local snapshots.'
 runs:
   using: "composite"
   steps:
-    - name: 'Install Java ${{ env.USE_JAVA_VERSION }}'
+    - name: 'Install Java ${{ env.USE_JAVA_VERSION_FOR_BAZEL }}'
       uses: actions/setup-java@v4
       with:
         distribution: '${{ env.USE_JAVA_DISTRIBUTION }}'
-        java-version: '${{ env.USE_JAVA_VERSION }}'
+        java-version: '${{ env.USE_JAVA_VERSION_FOR_BAZEL }}'
     - name: 'Check out repository'
       uses: actions/checkout@v4
     - name: 'Cache Bazel files'
       uses: actions/cache@v4
       with:
-        path: ~/.cache/bazel
+        path: ~/.cache/bazel_github # The bazel cache path set in .bazelrc.
         key: ${{ runner.os }}-bazel-build-${{ github.sha }}
         restore-keys: |
           ${{ runner.os }}-bazel-build-
-    - name: 'Java build'
-      run: bazel build //java/...
-      shell: bash
     - name: 'Install maven version'
       run: ./util/install-maven.sh ${{ env.USE_MAVEN_VERSION }}
       shell: bash
@@ -33,10 +30,5 @@ runs:
         name: local-snapshot
         path: ~/.m2/repository/com/google/dagger
     - name: 'Clean bazel cache'
-      # According to the documentation, we should be able to exclude these via
-      # the actions/cache path, e.g. "!~/.cache/bazel/*/*/external/" but that
-      # doesn't seem to work.
-      run: |
-        rm -rf $(bazel info repository_cache)
-        rm -rf ~/.cache/bazel/*/*/external/
+      run: rm -rf $(bazel info repository_cache)
       shell: bash

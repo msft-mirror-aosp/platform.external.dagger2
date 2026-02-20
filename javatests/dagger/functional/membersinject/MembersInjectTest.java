@@ -80,6 +80,9 @@ public class MembersInjectTest {
     assertThat(aGrandchild.aGrandchildMethod()).isNotNull();
   }
 
+  // Note: This test verifies that a valid MembersInjector is generated even when the injector is
+  // never requested by a component. Thus, we have to access the generated injector implementation
+  // directly rather than via the component.
   @Test
   public void testNonRequestedMembersInjector() {
     NonRequestedChild child = new NonRequestedChild();
@@ -90,7 +93,8 @@ public class MembersInjectTest {
             return "field!";
           }
         };
-    MembersInjector<NonRequestedChild> injector = new NonRequestedChild_MembersInjector(provider);
+    MembersInjector<NonRequestedChild> injector =
+        NonRequestedChild_MembersInjector.create(provider);
     injector.injectMembers(child);
     assertThat(child.t).isEqualTo("field!");
   }

@@ -1,0 +1,70 @@
+package test
+
+import dagger.`internal`.DaggerGenerated
+import dagger.`internal`.Factory
+import dagger.`internal`.Provider
+import dagger.`internal`.QualifierMetadata
+import dagger.`internal`.ScopeMetadata
+import javax.`annotation`.processing.Generated
+import kotlin.Any
+import kotlin.Float
+import kotlin.String
+import kotlin.Suppress
+import kotlin.jvm.JvmStatic
+
+@ScopeMetadata
+@QualifierMetadata(value = [
+    "pkg1.SameNameQualifier",
+    "pkg2.SameNameQualifier"
+])
+@DaggerGenerated
+@Generated(
+  value = ["dagger.internal.codegen.ComponentProcessor"],
+  comments = "https://dagger.dev",
+)
+@Suppress(names = [
+    "UNCHECKED_CAST",
+    "USELESS_CAST",
+    "DEPRECATION"
+])
+public class SomeBinding_Factory : Factory<Any?> {
+  private val str1Provider: Provider<String?>
+
+  private val str2Provider: Provider<String?>
+
+  private val injectFieldProvider: Provider<String?>
+
+  private val fProvider: Provider<Float?>
+
+  private constructor(
+    str1Provider: Provider<String?>,
+    str2Provider: Provider<String?>,
+    injectFieldProvider: Provider<String?>,
+    fProvider: Provider<Float?>,
+  ) {
+    this.str1Provider = str1Provider
+    this.str2Provider = str2Provider
+    this.injectFieldProvider = injectFieldProvider
+    this.fProvider = fProvider
+  }
+
+  public override fun `get`(): Any? {
+    var instance: Any? = newInstance(str1Provider.get(), str2Provider.get())
+    SomeBinding_MembersInjector.injectInjectField(instance, injectFieldProvider.get());
+    SomeBinding_MembersInjector.injectInjectMethod(instance, fProvider.get());
+    return instance
+  }
+
+  public companion object {
+    @JvmStatic
+    public fun create(
+      str1Provider: Provider<*>,
+      str2Provider: Provider<*>,
+      injectFieldProvider: Provider<*>,
+      fProvider: Provider<*>,
+    ): SomeBinding_Factory = SomeBinding_Factory((str1Provider) as Provider<String?>, (str2Provider) as Provider<String?>, (injectFieldProvider) as Provider<String?>, (fProvider) as Provider<Float?>)
+
+    @JvmStatic
+    public fun newInstance(str1: Any?, str2: Any?): Any? = SomeBinding((str1) as String?, (str2) as String?)
+  }
+}

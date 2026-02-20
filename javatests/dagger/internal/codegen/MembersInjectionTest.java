@@ -16,13 +16,16 @@
 
 package dagger.internal.codegen;
 
-import androidx.room.compiler.processing.XProcessingEnv;
-import androidx.room.compiler.processing.util.Source;
+import static dagger.internal.codegen.xprocessing.XFunSpecs.constructorBuilder;
+
+import androidx.room3.compiler.codegen.XClassName;
+import androidx.room3.compiler.codegen.XTypeSpec;
+import androidx.room3.compiler.processing.XProcessingEnv;
+import androidx.room3.compiler.processing.util.CompilationResultSubject;
+import androidx.room3.compiler.processing.util.Source;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.squareup.javapoet.MethodSpec;
-import com.squareup.javapoet.TypeSpec;
-import dagger.internal.codegen.javapoet.TypeNames;
+import dagger.internal.codegen.xprocessing.XTypeSpecs;
 import dagger.testing.compile.CompilerTests;
 import dagger.testing.golden.GoldenFileRule;
 import org.junit.Rule;
@@ -34,15 +37,6 @@ import org.junit.runners.Parameterized.Parameters;
 @RunWith(Parameterized.class)
 public class MembersInjectionTest {
 
-  private static final Source TYPE_USE_NULLABLE =
-      CompilerTests.javaSource(
-          "test.Nullable", // force one-string-per-line format
-          "package test;",
-          "import static java.lang.annotation.ElementType.TYPE_USE;",
-          "import java.lang.annotation.Target;",
-          "",
-          "@Target(TYPE_USE)",
-          "public @interface Nullable {}");
   private static final Source NON_TYPE_USE_NULLABLE =
       CompilerTests.javaSource(
           "test.Nullable", // force one-string-per-line format
@@ -259,8 +253,7 @@ public class MembersInjectionTest {
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/GenericClass_MembersInjector"));
+              assertSourceMatchesGolden(subject, "test/GenericClass_MembersInjector");
             });
   }
 
@@ -317,7 +310,7 @@ public class MembersInjectionTest {
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/Child_MembersInjector"));
+              assertSourceMatchesGolden(subject, "test/Child_MembersInjector");
             });
   }
 
@@ -341,32 +334,7 @@ public class MembersInjectionTest {
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/FieldInjection_MembersInjector"));
-            });
-  }
-
-  @Test
-  public void typeUseNullableFieldInjection() {
-    Source file =
-        CompilerTests.javaSource(
-            "test.FieldInjection",
-            "package test;",
-            "",
-            "import dagger.Lazy;",
-            "import javax.inject.Inject;",
-            "import javax.inject.Provider;",
-            "",
-            "class FieldInjection {",
-            "  @Inject @Nullable String string;",
-            "}");
-    CompilerTests.daggerCompiler(file, TYPE_USE_NULLABLE)
-        .withProcessingOptions(compilerMode.processorOptions())
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/FieldInjection_MembersInjector"));
+              assertSourceMatchesGolden(subject, "test/FieldInjection_MembersInjector");
             });
   }
 
@@ -389,8 +357,7 @@ public class MembersInjectionTest {
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/FieldInjection_MembersInjector"));
+              assertSourceMatchesGolden(subject, "test/FieldInjection_MembersInjector");
             });
   }
 
@@ -415,8 +382,8 @@ public class MembersInjectionTest {
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/FieldInjectionWithQualifier_MembersInjector"));
+              assertSourceMatchesGolden(
+                  subject, "test/FieldInjectionWithQualifier_MembersInjector");
             });
   }
 
@@ -441,8 +408,7 @@ public class MembersInjectionTest {
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/MethodInjection_MembersInjector"));
+              assertSourceMatchesGolden(subject, "test/MethodInjection_MembersInjector");
             });
   }
 
@@ -468,8 +434,7 @@ public class MembersInjectionTest {
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/MixedMemberInjection_MembersInjector"));
+              assertSourceMatchesGolden(subject, "test/MixedMemberInjection_MembersInjector");
             });
   }
 
@@ -491,8 +456,7 @@ public class MembersInjectionTest {
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/AllInjections_MembersInjector"));
+              assertSourceMatchesGolden(subject, "test/AllInjections_MembersInjector");
             });
   }
 
@@ -518,7 +482,7 @@ public class MembersInjectionTest {
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/B_MembersInjector"));
+              assertSourceMatchesGolden(subject, "test/B_MembersInjector");
             });
   }
 
@@ -549,8 +513,7 @@ public class MembersInjectionTest {
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/OuterType_B_MembersInjector"));
+              assertSourceMatchesGolden(subject, "test/OuterType_B_MembersInjector");
             });
   }
 
@@ -577,11 +540,11 @@ public class MembersInjectionTest {
             "    void inject(B b);",
             "  }",
             "}");
-    TypeSpec generatedInjectType =
-        TypeSpec.classBuilder("GeneratedInjectType")
-            .addMethod(
-                MethodSpec.constructorBuilder()
-                    .addAnnotation(TypeNames.INJECT_JAVAX)
+    XTypeSpec generatedInjectType =
+        XTypeSpecs.classBuilder("GeneratedInjectType")
+            .addFunction(
+                constructorBuilder()
+                    .addAnnotation(XClassName.get("javax.inject", "Inject"))
                     .build())
             .build();
 
@@ -591,8 +554,7 @@ public class MembersInjectionTest {
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/OuterType_B_MembersInjector"));
+              assertSourceMatchesGolden(subject, "test/OuterType_B_MembersInjector");
             });
   }
 
@@ -637,7 +599,7 @@ public class MembersInjectionTest {
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSourceFileWithPath("test/foo_MembersInjector.java");
+              assertGeneratedSourceFileWithPath(subject, "test/foo_MembersInjector");
             });
   }
 
@@ -700,8 +662,7 @@ public class MembersInjectionTest {
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/Child_MembersInjector"));
+              assertSourceMatchesGolden(subject, "test/Child_MembersInjector");
             });
   }
 
@@ -1176,10 +1137,8 @@ public class MembersInjectionTest {
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/InjectedType_MembersInjector"));
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("test/InjectedType_Factory"));
+              assertSourceMatchesGolden(subject, "test/InjectedType_MembersInjector");
+              assertSourceMatchesGolden(subject, "test/InjectedType_Factory");
             });
   }
 
@@ -1235,8 +1194,7 @@ public class MembersInjectionTest {
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(
-                  goldenFileRule.goldenSource("other/Inaccessible_MembersInjector"));
+              assertSourceMatchesGolden(subject, "other/Inaccessible_MembersInjector");
               subject.generatedSource(
                   goldenFileRule.goldenSource("test/DaggerTestComponent"));
             });
@@ -1405,11 +1363,11 @@ public class MembersInjectionTest {
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/A_MembersInjector"));
-              subject.generatedSource(goldenFileRule.goldenSource("test/C_MembersInjector"));
+              assertSourceMatchesGolden(subject, "test/A_MembersInjector");
+              assertSourceMatchesGolden(subject, "test/C_MembersInjector");
 
               try {
-                subject.generatedSourceFileWithPath("test/B_MembersInjector");
+                assertGeneratedSourceFileWithPath(subject, "test/B_MembersInjector");
                 // Can't throw an assertion error since it would be caught.
                 throw new IllegalStateException("Test generated a B_MembersInjector");
               } catch (AssertionError expected) {}
@@ -1448,8 +1406,8 @@ public class MembersInjectionTest {
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              subject.generatedSource(goldenFileRule.goldenSource("test/A_MembersInjector"));
-              subject.generatedSource(goldenFileRule.goldenSource("test/B_MembersInjector"));
+              assertSourceMatchesGolden(subject, "test/A_MembersInjector");
+              assertSourceMatchesGolden(subject, "test/B_MembersInjector");
             });
   }
 
@@ -1624,7 +1582,7 @@ public class MembersInjectionTest {
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              Source expectedSource = goldenFileRule.goldenSource("test/MyClass_MembersInjector");
+              Source expectedSource = goldenSource("test/MyClass_MembersInjector");
               subject.generatedSource(
                   CompilerTests.backend(subject) == XProcessingEnv.Backend.KSP
                       ? stripJetbrainsNullable(expectedSource)
@@ -1664,12 +1622,122 @@ public class MembersInjectionTest {
             });
   }
 
+  @Test
+  public void membersInjectorSuperTypeWithInaccessibleTypeArgument() throws Exception {
+    Source superType =
+        CompilerTests.javaSource(
+            "other.SuperType",
+            "package other;",
+            "",
+            "import javax.inject.Inject;",
+            "import java.util.List;",
+            "",
+            "public class SuperType<T> {",
+            "  @Inject T t;",
+            "  @Inject List<T> listT;",
+            "  @Inject List<? extends T> listExtendsT;",
+            "  @Inject List<? extends T>[] arrayListExtendsT;",
+            "",
+            "  @Inject",
+            "  void method(",
+            "      T t,",
+            "      List<T> listT,",
+            "      List<? extends T> listExtendsT,",
+            "      List<? extends T>[] arrayListExtendsT) {}",
+            "}");
+    CompilerTests.daggerCompiler(superType)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(0);
+              assertSourceMatchesGolden(subject, "other/SuperType_MembersInjector");
+            });
+    Source inaccessibleType =
+        CompilerTests.javaSource(
+            "other.InaccessibleType",
+            "package other;",
+            "interface InaccessibleType {}");
+    Source intermediateType =
+        CompilerTests.javaSource(
+            "other.IntermediateType",
+            "package other;",
+            "public class IntermediateType extends SuperType<InaccessibleType> {}");
+    Source subType =
+        CompilerTests.javaSource(
+            "test.SubType",
+            "package test;",
+            "",
+            "import javax.inject.Inject;",
+            "import other.IntermediateType;",
+            "",
+            "public class SubType extends IntermediateType {",
+            "  @Inject Integer i;",
+            "}");
+    CompilerTests.daggerCompiler(superType, inaccessibleType, intermediateType, subType)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              // TODO(b/424791197): Once this bug is fixed, there should be no errors.
+              subject.hasErrorCount(5);
+              assertSourceMatchesGolden(subject, "test/SubType_MembersInjector");
+              subject.hasErrorContaining(
+                      "method injectT in class other.SuperType_MembersInjector<T> cannot be"
+                          + " applied to given types")
+                  .onSource(goldenSource("test/SubType_MembersInjector"))
+                  .onLineContaining("SuperType_MembersInjector.injectT(instance, tProvider.get())");
+              subject.hasErrorContaining(
+                      "method injectListT in class other.SuperType_MembersInjector<T> cannot be"
+                          + " applied to given types")
+                  .onSource(goldenSource("test/SubType_MembersInjector"))
+                  .onLineContaining(
+                      "SuperType_MembersInjector.injectListT(instance, listTProvider.get())");
+              subject.hasErrorContaining(
+                      "method injectListExtendsT in class other.SuperType_MembersInjector<T> cannot"
+                          + " be applied to given types")
+                  .onSource(goldenSource("test/SubType_MembersInjector"))
+                  .onLineContaining(
+                      "SuperType_MembersInjector.injectListExtendsT("
+                          + "instance, listExtendsTProvider.get())");
+              subject.hasErrorContaining(
+                      "method injectArrayListExtendsT in class other.SuperType_MembersInjector<T>"
+                          + " cannot be applied to given types")
+                  .onSource(goldenSource("test/SubType_MembersInjector"))
+                  .onLineContaining(
+                      "SuperType_MembersInjector.injectArrayListExtendsT("
+                          + "instance, arrayListExtendsTProvider.get())");
+              subject.hasErrorContaining(
+                      "method injectMethod in class other.SuperType_MembersInjector<T> cannot"
+                          + " be applied to given types")
+                  .onSource(goldenSource("test/SubType_MembersInjector"))
+                  .onLineContaining(
+                      "SuperType_MembersInjector.injectMethod("
+                          + "instance, "
+                          + "tProvider2.get(), "
+                          + "listTProvider2.get(), "
+                          + "listExtendsTProvider2.get(), "
+                          + "arrayListExtendsTProvider2.get())");
+            });
+  }
+
   private Source stripJetbrainsNullable(Source source) {
-    return CompilerTests.javaSource(
-        ((Source.JavaSource) source).getQName(),
-        source
-            .getContents()
-            .replace("@Nullable ", "")
-            .replace("import org.jetbrains.annotations.Nullable;\n", ""));
+    return CompilerTests.transformContent(
+        source,
+        content ->
+            content
+                .replace("@Nullable ", "")
+                .replaceAll("import org.jetbrains.annotations.Nullable;?\n", ""));
+  }
+
+  private void assertGeneratedSourceFileWithPath(
+      CompilationResultSubject subject, String goldenName) {
+    subject.generatedSourceFileWithPath(goldenName + ".java");
+  }
+
+  private void assertSourceMatchesGolden(CompilationResultSubject subject, String goldenName) {
+    subject.generatedSource(goldenSource(goldenName));
+  }
+
+  private Source goldenSource(String goldenName) {
+    return goldenFileRule.goldenSource(goldenName);
   }
 }

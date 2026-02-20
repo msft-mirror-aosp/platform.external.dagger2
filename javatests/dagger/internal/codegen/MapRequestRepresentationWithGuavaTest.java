@@ -16,7 +16,7 @@
 
 package dagger.internal.codegen;
 
-import androidx.room.compiler.processing.util.Source;
+import androidx.room3.compiler.processing.util.Source;
 import com.google.common.collect.ImmutableList;
 import dagger.testing.compile.CompilerTests;
 import dagger.testing.golden.GoldenFileRule;
@@ -263,6 +263,157 @@ public class MapRequestRepresentationWithGuavaTest {
             "}");
 
     CompilerTests.daggerCompiler(mapModuleFile, componentFile)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(0);
+              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
+            });
+  }
+
+  @Test
+  public void setAndMapBindings() throws Exception {
+    Source moduleFile =
+        CompilerTests.javaSource(
+            "test.MapModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import dagger.multibindings.IntoMap;",
+            "import dagger.multibindings.IntoSet;",
+            "import dagger.multibindings.IntKey;",
+            "import java.util.Map;",
+            "import java.util.Set;",
+            "",
+            "@Module",
+            "interface MapModule {",
+            "  @Provides @IntoMap @IntKey(0) static Integer provideInt0() { return 0; }",
+            "  @Provides @IntoMap @IntKey(1) static Integer provideInt1() { return 1; }",
+            "  @Provides @IntoMap @IntKey(2) static Integer provideInt2() { return 2; }",
+            "  @Provides @IntoMap @IntKey(3) static Integer provideInt3() { return 3; }",
+            "  @Provides @IntoSet static Integer provideIntSet0() { return 0; }",
+            "  @Provides @IntoSet static Integer provideIntSet1() { return 1; }",
+            "  @Provides @IntoSet static Integer provideIntSet2() { return 2; }",
+            "  @Provides @IntoSet static Integer provideIntSet3() { return 3; }",
+            "}");
+    Source subcomponentModuleFile =
+        CompilerTests.javaSource(
+            "test.SubcomponentModule",
+            "package test;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import dagger.multibindings.IntoMap;",
+            "import dagger.multibindings.IntoSet;",
+            "import dagger.multibindings.IntKey;",
+            "import java.util.Map;",
+            "import java.util.Set;",
+            "",
+            "@Module",
+            "interface SubcomponentModule {",
+            "  @Provides @IntoMap @IntKey(4) static Integer provideInt4() { return 4; }",
+            "  @Provides @IntoMap @IntKey(5) static Integer provideInt5() { return 5; }",
+            "  @Provides @IntoSet static Integer provideIntSet4() { return 4; }",
+            "  @Provides @IntoSet static Integer provideIntSet5() { return 5; }",
+            "}");
+    Source componentFile =
+        CompilerTests.javaSource(
+            "test.TestComponent",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "import java.util.Map;",
+            "import java.util.Set;",
+            "import javax.inject.Provider;",
+            "",
+            "@Component(modules = MapModule.class)",
+            "interface TestComponent {",
+            "  Map<Integer, Integer> intMap();",
+            "  Set<Integer> intSet();",
+            "  TestSubcomponent testSubcomponent();",
+            "}");
+    Source subcomponent =
+        CompilerTests.javaSource(
+            "test.TestSubcomponent",
+            "package test;",
+            "",
+            "import dagger.Subcomponent;",
+            "import java.util.Map;",
+            "import java.util.Set;",
+            "",
+            "@Subcomponent(modules = SubcomponentModule.class)",
+            "interface TestSubcomponent {",
+            "  Map<Integer, Integer> intMap();",
+            "  Set<Integer> intSet();",
+            "}");
+    CompilerTests.daggerCompiler(moduleFile, componentFile, subcomponentModuleFile, subcomponent)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(0);
+              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
+            });
+  }
+
+  @Test
+  public void lazyMaps() throws Exception {
+    Source module =
+        CompilerTests.javaSource(
+            "test.LazyMaps",
+            "package test;",
+            "import dagger.Module;",
+            "import dagger.Lazy;",
+            "import dagger.internal.DoubleCheck;",
+            "import dagger.Provides;",
+            "import dagger.multibindings.IntoMap;",
+            "import dagger.multibindings.StringKey;",
+            "import java.util.concurrent.atomic.AtomicInteger;",
+            "import javax.inject.Singleton;",
+            "",
+            "class LazyMaps {",
+            "  @Module",
+            "  abstract static class TestModule {",
+            "    @Provides",
+            "    @Singleton",
+            "    static AtomicInteger provideAtomicInteger() {",
+            "      return new AtomicInteger();",
+            "    }",
+            "",
+            "    @Provides static String provideString(AtomicInteger atomicInteger) {",
+            "      return \"value-\" + atomicInteger.incrementAndGet();",
+            "    }",
+            "",
+            "    @Provides @IntoMap @StringKey(\"key0\") static String string0(String string) {"
+                + " return string; };",
+            "    @Provides @IntoMap @StringKey(\"key1\") static String string1(String string) {"
+                + " return string; };",
+            "    @Provides @IntoMap @StringKey(\"key2\") static String string2(String string) {"
+                + " return string; };",
+            "  }",
+            "}");
+    Source component =
+        CompilerTests.javaSource(
+            "test.TestComponent",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "import dagger.Lazy;",
+            "import dagger.Module;",
+            "import java.util.Map;",
+            "import javax.inject.Provider;",
+            "import javax.inject.Singleton;",
+            "",
+            "@Singleton",
+            "@Component(modules = LazyMaps.TestModule.class)",
+            "interface TestComponent {",
+            "  Map<String, String> mapOfString();",
+            "  Map<String, Lazy<String>> mapOfLazy();",
+            "  Map<String, Provider<Lazy<String>>> mapOfProviderOfLazy();",
+            "  Provider<Map<String, Lazy<String>>> providerOfMapOfLazy();",
+            "  Provider<Map<String, Provider<Lazy<String>>>> providerOfMapOfProviderOfLazy();",
+            "}");
+    CompilerTests.daggerCompiler(module, component)
         .withProcessingOptions(compilerMode.processorOptions())
         .compile(
             subject -> {

@@ -18,8 +18,8 @@ package dagger.internal.codegen;
 
 import static dagger.internal.codegen.DaggerModuleMethodSubject.Factory.assertThatModuleMethod;
 
-import androidx.room.compiler.processing.XProcessingEnv;
-import androidx.room.compiler.processing.util.Source;
+import androidx.room3.compiler.processing.XProcessingEnv;
+import androidx.room3.compiler.processing.util.Source;
 import dagger.Module;
 import dagger.producers.ProducerModule;
 import dagger.testing.compile.CompilerTests;
@@ -455,11 +455,10 @@ public final class ModuleValidationTest {
                   subject.hasErrorContaining(error).onSource(module).onLineContaining("// second");
                   break;
                 case KSP:
-                  // KSP doesn't support reporting errors on individual annotation values, so both
-                  // errors will be reported on the annotation itself.
+                  // TODO(b/381557487): KSP2 reports the error on the wrong line.
                   subject.hasErrorContaining(error)
                       .onSource(module)
-                      .onLineContaining("@" + moduleType.simpleName());
+                      .onLineContaining("includes = {");
                   break;
               }
             });

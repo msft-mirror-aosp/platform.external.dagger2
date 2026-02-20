@@ -16,21 +16,14 @@
 
 package dagger.internal.codegen;
 
-import static com.google.common.truth.Truth.assertThat;
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static java.nio.charset.StandardCharsets.UTF_8;
+import static com.google.common.truth.TruthJUnit.assume;
 
-import androidx.room.compiler.processing.util.Source;
-import com.google.common.truth.PrimitiveByteArraySubject;
-import com.google.common.truth.StringSubject;
-import com.google.common.truth.Subject;
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
+import androidx.room3.compiler.processing.XProcessingEnv.Backend;
+import androidx.room3.compiler.processing.util.Source;
+import com.google.auto.value.processor.AutoAnnotationProcessor;
 import dagger.testing.compile.CompilerTests;
 import dagger.testing.golden.GoldenFileRule;
-import java.lang.reflect.Method;
 import java.util.Collection;
-import javax.tools.JavaFileObject;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -52,11 +45,10 @@ public class LazyClassKeyMapBindingComponentProcessorTest {
     this.compilerMode = compilerMode;
   }
 
-  // Cannot convert to use ksp as this test relies on AutoAnnotationProcessor.
   @Test
   public void mapBindingsWithInaccessibleKeys() throws Exception {
-    JavaFileObject mapKeys =
-        JavaFileObjects.forSourceLines(
+    Source mapKeys =
+        CompilerTests.javaSource(
             "mapkeys.MapKeys",
             "package mapkeys;",
             "",
@@ -73,8 +65,8 @@ public class LazyClassKeyMapBindingComponentProcessorTest {
             "",
             "  interface Inaccessible {}",
             "}");
-    JavaFileObject moduleFile =
-        JavaFileObjects.forSourceLines(
+    Source moduleFile =
+        CompilerTests.javaSource(
             "mapkeys.MapModule",
             "package mapkeys;",
             "",
@@ -115,8 +107,8 @@ public class LazyClassKeyMapBindingComponentProcessorTest {
             "  )",
             "  static int complexKeyWithInaccessibleAnnotationValue() { return 1; }",
             "}");
-    JavaFileObject componentFile =
-        JavaFileObjects.forSourceLines(
+    Source componentFile =
+        CompilerTests.javaSource(
             "test.TestComponent",
             "package test;",
             "",
@@ -134,22 +126,22 @@ public class LazyClassKeyMapBindingComponentProcessorTest {
             "  Map<MapKeys.ComplexKey, Integer> complexKey();",
             "  Provider<Map<MapKeys.ComplexKey, Integer>> complexKeyProvider();",
             "}");
-    Compilation compilation =
-        Compilers.compilerWithOptions(compilerMode.javacopts())
-            .compile(mapKeys, moduleFile, componentFile);
-    assertThat(compilation).succeeded();
-    assertThat(compilation)
-        .generatedSourceFile("test.DaggerTestComponent")
-        .hasSourceEquivalentTo(goldenFileRule.goldenFile("test.DaggerTestComponent"));
-    assertThat(compilation)
-        .generatedSourceFile(
-            "mapkeys.MapModule_ComplexKeyWithInaccessibleAnnotationValueMapKey")
-        .hasSourceEquivalentTo(
-            goldenFileRule.goldenFile(
-                "mapkeys.MapModule_ComplexKeyWithInaccessibleAnnotationValueMapKey"));
-    assertThat(compilation)
-        .generatedSourceFile("mapkeys.MapModule_ClassKeyMapKey")
-        .hasSourceEquivalentTo(goldenFileRule.goldenFile("mapkeys.MapModule_ClassKeyMapKey"));
+    CompilerTests.daggerCompiler(mapKeys, moduleFile, componentFile)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .withAdditionalJavacProcessors(new AutoAnnotationProcessor())
+        .compile(
+          subject -> {
+              // TODO(b/264464791): There is no AutoAnnotationProcessor for KSP.
+              assume().that(CompilerTests.backend(subject)).isNotEqualTo(Backend.KSP);
+              subject.hasErrorCount(0);
+              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
+              subject.generatedSource(
+                  goldenFileRule.goldenSource(
+                      "mapkeys.MapModule_ComplexKeyWithInaccessibleAnnotationValueMapKey"));
+              subject.generatedSource(
+                  goldenFileRule.goldenSource("mapkeys.MapModule_ClassKeyMapKey"));
+            }
+        );
   }
 
   @Test
@@ -313,11 +305,9 @@ public class LazyClassKeyMapBindingComponentProcessorTest {
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              PrimitiveByteArraySubject proguardFile =
-                  subject.generatedResourceFileWithPath(
-                      "META-INF/proguard/test_FooKeyModule_LazyClassKeys.pro");
-              assertThatContentAsUtf8String(proguardFile)
-                .isEqualTo("-keep,allowobfuscation,allowshrinking class test.FooKey");
+              subject.generatedTextResourceFileWithPath(
+                      "META-INF/proguard/test_FooKeyModule_LazyClassKeys.pro")
+                  .isEqualTo("-keep,allowobfuscation,allowshrinking class test.FooKey");
             });
   }
 
@@ -353,11 +343,9 @@ public class LazyClassKeyMapBindingComponentProcessorTest {
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              PrimitiveByteArraySubject proguardFile =
-                  subject.generatedResourceFileWithPath(
-                      "META-INF/proguard/test_OuterClass_FooKeyModule_LazyClassKeys.pro");
-              assertThatContentAsUtf8String(proguardFile)
-                .isEqualTo("-keep,allowobfuscation,allowshrinking class test.FooKey");
+              subject.generatedTextResourceFileWithPath(
+                      "META-INF/proguard/test_OuterClass_FooKeyModule_LazyClassKeys.pro")
+                  .isEqualTo("-keep,allowobfuscation,allowshrinking class test.FooKey");
             });
   }
 
@@ -414,17 +402,12 @@ public class LazyClassKeyMapBindingComponentProcessorTest {
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              PrimitiveByteArraySubject fooKeyModuleProguardFile =
-                  subject.generatedResourceFileWithPath(
-                      "META-INF/proguard/test_FooKeyModule_LazyClassKeys.pro");
-              assertThatContentAsUtf8String(fooKeyModuleProguardFile)
-                .isEqualTo("-keep,allowobfuscation,allowshrinking class test.FooKey");
-
-              PrimitiveByteArraySubject barKeyModuleProguardFile =
-                  subject.generatedResourceFileWithPath(
-                      "META-INF/proguard/test_BarKeyModule_LazyClassKeys.pro");
-              assertThatContentAsUtf8String(barKeyModuleProguardFile)
-                .isEqualTo("-keep,allowobfuscation,allowshrinking class test.BarKey");
+              subject.generatedTextResourceFileWithPath(
+                      "META-INF/proguard/test_FooKeyModule_LazyClassKeys.pro")
+                  .isEqualTo("-keep,allowobfuscation,allowshrinking class test.FooKey");
+              subject.generatedTextResourceFileWithPath(
+                      "META-INF/proguard/test_BarKeyModule_LazyClassKeys.pro")
+                  .isEqualTo("-keep,allowobfuscation,allowshrinking class test.BarKey");
             });
   }
 
@@ -469,26 +452,11 @@ public class LazyClassKeyMapBindingComponentProcessorTest {
         .compile(
             subject -> {
               subject.hasErrorCount(0);
-              PrimitiveByteArraySubject proguardFile =
-                  subject.generatedResourceFileWithPath(
-                      "META-INF/proguard/test_FooKeyAndBarKeyModule_LazyClassKeys.pro");
-              assertThatContentAsUtf8String(proguardFile)
-                .isEqualTo(
-                    "-keep,allowobfuscation,allowshrinking class test.FooKey\n"
-                      + "-keep,allowobfuscation,allowshrinking class test.BarKey");
+              subject.generatedTextResourceFileWithPath(
+                      "META-INF/proguard/test_FooKeyAndBarKeyModule_LazyClassKeys.pro")
+                  .isEqualTo(
+                      "-keep,allowobfuscation,allowshrinking class test.FooKey\n"
+                          + "-keep,allowobfuscation,allowshrinking class test.BarKey");
             });
-  }
-
-  // TODO(b/386213524): Add support for getting a resource file as a StringSubject.
-  // Use reflection to get the subject's byte array and then convert it to a StringSubject.
-  private static StringSubject assertThatContentAsUtf8String(PrimitiveByteArraySubject subject) {
-    try {
-      Method protectedActualMethod = Subject.class.getDeclaredMethod("actual");
-      protectedActualMethod.setAccessible(true);
-      byte[] actualBytes = (byte[]) protectedActualMethod.invoke(subject);
-      return assertThat(new String(actualBytes, UTF_8));
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
   }
 }

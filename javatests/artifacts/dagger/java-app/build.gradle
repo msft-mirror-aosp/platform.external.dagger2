@@ -20,8 +20,9 @@ plugins {
 }
 
 java {
-    // Make sure the generated source is compatible with Java 8.
-    sourceCompatibility = JavaVersion.VERSION_1_8
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(11))
+    }
 }
 
 dependencies {
@@ -32,4 +33,6 @@ dependencies {
   testImplementation 'junit:junit:4.13'
 }
 
-mainClassName = 'app.SimpleApplication'
+application {
+  mainClass.set('app.SimpleApplication')
+}

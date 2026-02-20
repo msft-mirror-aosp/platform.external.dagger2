@@ -1,0 +1,79 @@
+package test
+
+import dagger.MembersInjector
+import dagger.`internal`.DaggerGenerated
+import dagger.`internal`.InjectedFieldSignature
+import dagger.`internal`.Provider
+import dagger.`internal`.QualifierMetadata
+import javax.`annotation`.processing.Generated
+import kotlin.Any
+import kotlin.Suppress
+import kotlin.jvm.JvmStatic
+
+@QualifierMetadata
+@DaggerGenerated
+@Generated(
+  value = ["dagger.internal.codegen.ComponentProcessor"],
+  comments = "https://dagger.dev",
+)
+@Suppress(names = [
+    "UNCHECKED_CAST",
+    "USELESS_CAST",
+    "DEPRECATION"
+])
+public class Child_MembersInjector<T> : MembersInjector<Any> {
+  private val xProvider: Provider<T>
+
+  private val yProvider: Provider<A?>
+
+  private val a2Provider: Provider<A2?>
+
+  private val aProvider: Provider<A?>
+
+  private val tProvider: Provider<T>
+
+  private constructor(
+    xProvider: Provider<T>,
+    yProvider: Provider<A?>,
+    a2Provider: Provider<A2?>,
+    aProvider: Provider<A?>,
+    tProvider: Provider<T>,
+  ) {
+    this.xProvider = xProvider;
+    this.yProvider = yProvider;
+    this.a2Provider = a2Provider;
+    this.aProvider = aProvider;
+    this.tProvider = tProvider;
+  }
+
+  public override fun injectMembers(instance: Any) {
+    Parent_MembersInjector.injectX<T, Any?>(instance, xProvider.get());
+    Parent_MembersInjector.injectY<T, Any?>(instance, yProvider.get());
+    Parent_MembersInjector.injectA2<T, Any?>(instance, a2Provider.get());
+    injectA<T>(instance, aProvider.get());
+    injectT<T>(instance, tProvider.get());
+  }
+
+  public companion object {
+    @JvmStatic
+    public fun <T> create(
+      xProvider: Provider<*>,
+      yProvider: Provider<*>,
+      a2Provider: Provider<*>,
+      aProvider: Provider<*>,
+      tProvider: Provider<*>,
+    ): MembersInjector<Any> = Child_MembersInjector<T>((xProvider) as Provider<T>, (yProvider) as Provider<A?>, (a2Provider) as Provider<A2?>, (aProvider) as Provider<A?>, (tProvider) as Provider<T>)
+
+    @InjectedFieldSignature(value = "test.Child.a")
+    @JvmStatic
+    public fun <T> injectA(instance: Any?, a: Any?) {
+      ((instance) as Child<T>).a = (a) as A?
+    }
+
+    @InjectedFieldSignature(value = "test.Child.t")
+    @JvmStatic
+    public fun <T> injectT(instance: Any?, t: Any?) {
+      ((instance) as Child<T>).t = (t) as T
+    }
+  }
+}

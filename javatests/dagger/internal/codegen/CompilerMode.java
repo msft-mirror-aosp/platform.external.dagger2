@@ -28,17 +28,25 @@ import java.util.List;
 // TODO(bcorso): Consider moving the java version into its own separate enum.
 public enum CompilerMode {
   DEFAULT_MODE,
-  FAST_INIT_MODE("-Adagger.fastInit=enabled");
+  FAST_INIT_MODE("-Adagger.fastInit=enabled"),
+  ;
 
   /** Returns the compiler modes as a list of parameters for parameterized tests */
   public static final ImmutableList<Object[]> TEST_PARAMETERS =
       ImmutableList.copyOf(
-          new Object[][] {{CompilerMode.DEFAULT_MODE}, {CompilerMode.FAST_INIT_MODE}});
+          new Object[][] {
+            {CompilerMode.DEFAULT_MODE},
+            {CompilerMode.FAST_INIT_MODE},
+          });
 
   private final ImmutableList<String> javacopts;
 
   private CompilerMode(String... javacopts) {
     this.javacopts = ImmutableList.copyOf(javacopts);
+  }
+
+  public boolean isKotlinCodegenEnabled() {
+    return false;
   }
 
   /**

@@ -9,6 +9,13 @@ inputs:
 runs:
   using: "composite"
   steps:
+    # https://github.com/marketplace/actions/android-emulator-runner#running-hardware-accelerated-emulators-on-linux-runners
+    - name: Enable KVM group perms
+      shell: bash
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
     - name: 'Check out repository'
       uses: actions/checkout@v4
     - name: 'Cache Gradle files'
@@ -25,17 +32,19 @@ runs:
       with:
         name: local-snapshot
         path: ~/.m2/repository/com/google/dagger
-    - name: 'Install Java ${{ env.USE_JAVA_VERSION }}'
+    - name: 'Install Java ${{ env.USE_JAVA_VERSION_FOR_GRADLE }}'
       uses: actions/setup-java@v4
       with:
         distribution: '${{ env.USE_JAVA_DISTRIBUTION }}'
-        java-version: '${{ env.USE_JAVA_VERSION }}'
+        java-version: '${{ env.USE_JAVA_VERSION_FOR_GRADLE }}'
     - name: 'Gradle Android emulator tests (API ${{ inputs.api-level }})'
       uses: reactivecircus/android-emulator-runner@v2
       with:
         api-level: ${{ inputs.api-level }}
         target: google_apis
         script: ./util/run-local-emulator-tests.sh
+      env:
+        AGP_VERSION: '${{ env.USE_AGP_VERSION }}'
     - name: 'Upload test reports (API ${{ inputs.api-level }})'
       if: ${{ always() }}
       uses: actions/upload-artifact@v4

@@ -19,14 +19,14 @@ package dagger.internal.codegen;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
-import androidx.room.compiler.processing.XConstructorElement;
-import androidx.room.compiler.processing.XElement;
-import androidx.room.compiler.processing.XMethodElement;
-import androidx.room.compiler.processing.XProcessingEnv;
-import androidx.room.compiler.processing.XProcessingStep;
-import androidx.room.compiler.processing.XTypeElement;
-import androidx.room.compiler.processing.XVariableElement;
-import androidx.room.compiler.processing.util.Source;
+import androidx.room3.compiler.processing.XConstructorElement;
+import androidx.room3.compiler.processing.XElement;
+import androidx.room3.compiler.processing.XMethodElement;
+import androidx.room3.compiler.processing.XProcessingEnv;
+import androidx.room3.compiler.processing.XProcessingStep;
+import androidx.room3.compiler.processing.XTypeElement;
+import androidx.room3.compiler.processing.XVariableElement;
+import androidx.room3.compiler.processing.util.Source;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -86,18 +86,14 @@ public class DaggerSuperficialValidationTest {
               assertThrows(
                   ValidationException.KnownErrorType.class,
                   () -> superficialValidation.validateElement(testClassElement));
-          // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
-          boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
           assertThat(exception)
               .hasMessageThat()
               .contains(
-                  String.format(
-                      NEW_LINES.join(
-                          "Validation trace:",
-                          "  => element (CLASS): test.TestClass",
-                          "  => element (METHOD): blah()",
-                          "  => type (ERROR return type): %1$s"),
-                      isJavac ? "MissingType" : "error.NonExistentClass"));
+                  NEW_LINES.join(
+                      "Validation trace:",
+                      "  => element (CLASS): test.TestClass",
+                      "  => element (METHOD): blah()",
+                      "  => type (ERROR return type): MissingType"));
         });
   }
 
@@ -132,8 +128,7 @@ public class DaggerSuperficialValidationTest {
                     ? isKAPT(processingEnv) ? "MissingType" : "MissingType<?>"
                     : "<any>";
           } else {
-            // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
-            errorType = "error.NonExistentClass";
+            errorType = "MissingType";
           }
           assertThat(exception)
               .hasMessageThat()
@@ -179,8 +174,7 @@ public class DaggerSuperficialValidationTest {
             // JDK 24 improves error type information.
             errorType = Runtime.version().feature() >= 24 ? "MissingType<?>" : "<any>";
           } else {
-            // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
-            errorType = "error.NonExistentClass";
+            errorType = "MissingType";
           }
           assertThat(exception)
               .hasMessageThat()
@@ -220,18 +214,14 @@ public class DaggerSuperficialValidationTest {
               assertThrows(
                   ValidationException.KnownErrorType.class,
                   () -> superficialValidation.validateElement(testClassElement));
-          // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
-          boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
           assertThat(exception)
               .hasMessageThat()
               .contains(
-                  String.format(
-                      NEW_LINES.join(
-                          "Validation trace:",
-                          "  => element (CLASS): test.TestClass",
-                          "  => element (TYPE_PARAMETER): T",
-                          "  => type (ERROR bound type): %s"),
-                      isJavac ? "MissingType" : "error.NonExistentClass"));
+                  NEW_LINES.join(
+                      "Validation trace:",
+                      "  => element (CLASS): test.TestClass",
+                      "  => element (TYPE_PARAMETER): T",
+                      "  => type (ERROR bound type): MissingType"));
         });
   }
 
@@ -258,22 +248,19 @@ public class DaggerSuperficialValidationTest {
               assertThrows(
                   ValidationException.KnownErrorType.class,
                   () -> superficialValidation.validateElement(testClassElement));
-          // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
-          boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
           assertThat(exception)
               .hasMessageThat()
               .contains(
-                  String.format(
-                      NEW_LINES.join(
-                          "Validation trace:",
-                          "  => element (CLASS): test.TestClass",
-                          "  => element (METHOD): foo(%1$s)",
-                          "  => element (PARAMETER): param",
-                          "  => type (ERROR parameter type): %1$s"),
-                      isJavac ? "MissingType" : "error.NonExistentClass"));
+                  NEW_LINES.join(
+                      "Validation trace:",
+                      "  => element (CLASS): test.TestClass",
+                      "  => element (METHOD): foo(MissingType)",
+                      "  => element (PARAMETER): param",
+                      "  => type (ERROR parameter type): MissingType"));
         });
   }
 
+  @org.junit.Ignore // TODO(b/394093156): This is a known issue with JDK17.
   @Test
   public void missingAnnotation() {
     runTest(
@@ -295,8 +282,11 @@ public class DaggerSuperficialValidationTest {
               assertThrows(
                   ValidationException.KnownErrorType.class,
                   () -> superficialValidation.validateElement(testClassElement));
-          // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
-          boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
+          String errorType =
+              processingEnv.getBackend() == XProcessingEnv.Backend.KSP
+                      && sourceKind == SourceKind.JAVA
+                  ? "error.NonExistentClass"
+                  : "MissingAnnotation";
           assertThat(exception)
               .hasMessageThat()
               .contains(
@@ -306,7 +296,7 @@ public class DaggerSuperficialValidationTest {
                           "  => element (CLASS): test.TestClass",
                           "  => annotation type: MissingAnnotation",
                           "  => type (ERROR annotation type): %s"),
-                      isJavac ? "MissingAnnotation" : "error.NonExistentClass"));
+                      errorType));
         });
   }
 
@@ -385,20 +375,16 @@ public class DaggerSuperficialValidationTest {
               assertThrows(
                   ValidationException.KnownErrorType.class,
                   () -> superficialValidation.validateElement(testClassElement));
-          // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
-          boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
           assertThat(exception)
               .hasMessageThat()
               .contains(
-                  String.format(
-                      NEW_LINES.join(
-                          "Validation trace:",
-                          "  => element (CLASS): test.TestClass",
-                          "  => element (METHOD): extendsTest()",
-                          "  => type (DECLARED return type): test.TestClass.Foo<? extends %1$s>",
-                          "  => type (WILDCARD type argument): ? extends %1$s",
-                          "  => type (ERROR extends bound type): %1$s"),
-                      isJavac ? "MissingType" : "error.NonExistentClass"));
+                  NEW_LINES.join(
+                      "Validation trace:",
+                      "  => element (CLASS): test.TestClass",
+                      "  => element (METHOD): extendsTest()",
+                      "  => type (DECLARED return type): test.TestClass.Foo<? extends MissingType>",
+                      "  => type (WILDCARD type argument): ? extends MissingType",
+                      "  => type (ERROR extends bound type): MissingType"));
         });
   }
 
@@ -425,18 +411,14 @@ public class DaggerSuperficialValidationTest {
               assertThrows(
                   ValidationException.KnownErrorType.class,
                   () -> superficialValidation.validateElement(testClassElement));
-          // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
-          boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
           assertThat(exception)
               .hasMessageThat()
               .contains(
-                  String.format(
-                      NEW_LINES.join(
-                          "Validation trace:",
-                          "  => element (CLASS): test.TestClass",
-                          "  => element (TYPE_PARAMETER): T",
-                          "  => type (ERROR bound type): %s"),
-                      isJavac ? "Missing" : "error.NonExistentClass"));
+                  NEW_LINES.join(
+                      "Validation trace:",
+                      "  => element (CLASS): test.TestClass",
+                      "  => element (TYPE_PARAMETER): T",
+                      "  => type (ERROR bound type): Missing"));
         });
   }
 
@@ -481,15 +463,15 @@ public class DaggerSuperficialValidationTest {
                       "Validation trace:",
                       "  => element (CLASS): test.Outer.TestClass",
                       "  => annotation type: test.Outer.TestAnnotation",
-                      "  => annotation: @test.Outer.TestAnnotation(classes={<%1$s>})",
-                      "  => annotation value (TYPE_ARRAY): classes={<%1$s>}",
-                      "  => annotation value (TYPE): classes=<%1$s>"),
-                  isJavac ? "error" : "ERROR TYPE: MissingType");
+                      "  => annotation: @test.Outer.TestAnnotation(classes={%1$s})",
+                      "  => annotation value (TYPE_ARRAY): classes={%1$s}",
+                      "  => annotation value (TYPE): classes=%1$s"),
+                  isJavac ? "<error>" : "MissingType");
           if (!isJavac) {
             expectedMessage =
                 NEW_LINES.join(
                     expectedMessage,
-                    "  => type (ERROR annotation value type): error.NonExistentClass");
+                    "  => type (ERROR annotation value type): MissingType");
           }
           assertThat(exception).hasMessageThat().contains(expectedMessage);
         });
@@ -546,15 +528,15 @@ public class DaggerSuperficialValidationTest {
                       "  => element (CONSTRUCTOR): TestClass(java.lang.String)",
                       "  => element (PARAMETER): strParam",
                       "  => annotation type: test.Outer.TestAnnotation",
-                      "  => annotation: @test.Outer.TestAnnotation(classes={<%1$s>})",
-                      "  => annotation value (TYPE_ARRAY): classes={<%1$s>}",
-                      "  => annotation value (TYPE): classes=<%1$s>"),
-                  isJavac ? "error" : "ERROR TYPE: MissingType");
+                      "  => annotation: @test.Outer.TestAnnotation(classes={%1$s})",
+                      "  => annotation value (TYPE_ARRAY): classes={%1$s}",
+                      "  => annotation value (TYPE): classes=%1$s"),
+                  isJavac ? "<error>" : "MissingType");
           if (!isJavac) {
             expectedMessage =
                 NEW_LINES.join(
                     expectedMessage,
-                    "  => type (ERROR annotation value type): error.NonExistentClass");
+                    "  => type (ERROR annotation value type): MissingType");
           }
           assertThat(exception).hasMessageThat().contains(expectedMessage);
         });
@@ -603,7 +585,7 @@ public class DaggerSuperficialValidationTest {
                           "  => type (DECLARED return type): test.Outer.Child<java.lang.Long>",
                           "  => type (DECLARED supertype): test.Outer.Parent<java.lang.Long>",
                           "  => type (ERROR supertype): %s"),
-                      isJavac ? "MissingType<T>" : "error.NonExistentClass"));
+                      isJavac ? "MissingType<T>" : "MissingType"));
         });
   }
 
@@ -644,20 +626,177 @@ public class DaggerSuperficialValidationTest {
                   () ->
                       superficialValidation.validateTypeHierarchyOf(
                           "return type", getChildMethod, getChildMethod.getReturnType()));
-          // TODO(b/248552462): Javac and KSP should match once this bug is fixed.
-          boolean isJavac = processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC;
           assertThat(exception)
               .hasMessageThat()
               .contains(
-                  String.format(
-                      NEW_LINES.join(
-                          "Validation trace:",
-                          "  => element (CLASS): test.Outer",
-                          "  => element (METHOD): getChild()",
-                          "  => type (DECLARED return type): test.Outer.Child",
-                          "  => type (DECLARED supertype): test.Outer.Parent<%1$s>",
-                          "  => type (ERROR type argument): %1$s"),
-                      isJavac ? "MissingType" : "error.NonExistentClass"));
+                  NEW_LINES.join(
+                      "Validation trace:",
+                      "  => element (CLASS): test.Outer",
+                      "  => element (METHOD): getChild()",
+                      "  => type (DECLARED return type): test.Outer.Child",
+                      "  => type (DECLARED supertype): test.Outer.Parent<MissingType>",
+                      "  => type (ERROR type argument): MissingType"));
+        });
+  }
+
+  @Test
+  public void invalidSupertypeInClass() {
+    runTest(
+        CompilerTests.javaSource(
+            "test.Foo",
+            "package test;",
+            "",
+            "final class Foo implements MissingType {}"),
+        CompilerTests.kotlinSource(
+            "test.Foo.kt",
+            "package test",
+            "",
+            "class Foo : MissingType"),
+        (processingEnv, superficialValidation) -> {
+          XTypeElement foo = processingEnv.findTypeElement("test.Foo");
+          if (processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC) {
+            // TODO: b/444278301 - Javac's model is missing the error types.
+            superficialValidation.validateTypeHierarchyOf("type", foo, foo.getType());
+            return;
+          }
+          ValidationException exception =
+              assertThrows(
+                  ValidationException.KnownErrorType.class,
+                  () -> superficialValidation.validateTypeHierarchyOf("type", foo, foo.getType()));
+          assertThat(exception)
+              .hasMessageThat()
+              .contains(
+                  NEW_LINES.join(
+                      "Validation trace:",
+                      "  => element (CLASS): test.Foo",
+                      "  => type (DECLARED type): test.Foo",
+                      "  => type (ERROR supertype): MissingType"));
+        });
+  }
+
+  @Test
+  public void invalidSupertypeInInterface() {
+    runTest(
+        CompilerTests.javaSource(
+            "test.Foo",
+            "package test;",
+            "interface Foo extends MissingType {}"),
+        CompilerTests.kotlinSource(
+            "test.Foo.kt",
+            "package test",
+            "interface Foo : MissingType"),
+        (processingEnv, superficialValidation) -> {
+          XTypeElement foo = processingEnv.findTypeElement("test.Foo");
+          if (processingEnv.getBackend() == XProcessingEnv.Backend.JAVAC) {
+            // TODO: b/444278301 - Javac's model is missing the error types.
+            superficialValidation.validateTypeHierarchyOf("type", foo, foo.getType());
+            return;
+          }
+          ValidationException exception =
+              assertThrows(
+                  ValidationException.KnownErrorType.class,
+                  () -> superficialValidation.validateTypeHierarchyOf("type", foo, foo.getType()));
+          assertThat(exception)
+              .hasMessageThat()
+              .contains(
+                  NEW_LINES.join(
+                      "Validation trace:",
+                      "  => element (INTERFACE): test.Foo",
+                      "  => type (DECLARED type): test.Foo",
+                      "  => type (ERROR supertype): MissingType"));
+        });
+  }
+
+  @Test
+  public void invalidSuperInterfaceInTypeHierarchy() {
+    runTest(
+        CompilerTests.javaSource(
+            "test.Foo",
+            "package test;",
+            "class Foo extends Bar<Baz> {}",
+            "class Bar<T> {}",
+            "class Baz extends MissingType {}"),
+        CompilerTests.kotlinSource(
+            "test.Foo.kt",
+            "package test;",
+            "class Foo : Bar<Baz> {}",
+            "open class Bar<T> {}",
+            "class Baz : MissingType {}"),
+        (processingEnv, superficialValidation) -> {
+          XTypeElement foo = processingEnv.findTypeElement("test.Foo");
+          if (isKAPT(processingEnv)) {
+            // https://youtrack.jetbrains.com/issue/KT-34193/Kapt-CorrectErrorTypes-doesnt-work-for-generics
+            // There's no way to work around this bug in KAPT so validation doesn't catch this case.
+            superficialValidation.validateTypeHierarchyOf("type", foo, foo.getType());
+            return;
+          }
+          ValidationException exception =
+              assertThrows(
+                  ValidationException.KnownErrorType.class,
+                  () -> superficialValidation.validateTypeHierarchyOf("type", foo, foo.getType()));
+          assertThat(exception)
+              .hasMessageThat()
+              .contains(
+                  NEW_LINES.join(
+                      "Validation trace:",
+                      "  => element (CLASS): test.Foo",
+                      "  => type (DECLARED type): test.Foo",
+                      "  => type (DECLARED supertype): test.Bar<test.Baz>",
+                      "  => type (DECLARED type argument): test.Baz",
+                      "  => type (ERROR supertype): MissingType"));
+        });
+  }
+
+  @Test
+  public void invalidSuperInterfaceInArrayTypeHierarchy() {
+    runTest(
+        CompilerTests.javaSource(
+            "test.Outer",
+            "package test;",
+            "",
+            "final class Outer {",
+            "  static class Foo extends Bar<Baz[]> {}",
+            "  static class Bar<T> {}",
+            "  static class Baz extends MissingType {}",
+            "  Foo getFoo() { return null; }",
+            "}"),
+        CompilerTests.kotlinSource(
+            "test.Outer.kt",
+            "package test;",
+            "",
+            "class Outer {",
+            "  class Foo : Bar<Array<Baz>> {}",
+            "  open class Bar<T> {}",
+            "  class Baz : MissingType {}",
+            "  fun getFoo(): Foo = TODO()",
+            "}"),
+        (processingEnv, superficialValidation) -> {
+          XTypeElement outerElement = processingEnv.findTypeElement("test.Outer");
+          XMethodElement getFooMethod = outerElement.getDeclaredMethods().get(0);
+          if (isKAPT(processingEnv)) {
+            // https://youtrack.jetbrains.com/issue/KT-34193/Kapt-CorrectErrorTypes-doesnt-work-for-generics
+            // There's no way to work around this bug in KAPT so validation doesn't catch this case.
+            superficialValidation.validateTypeHierarchyOf(
+                "return type", getFooMethod, getFooMethod.getReturnType());
+            return;
+          }
+          ValidationException exception =
+              assertThrows(
+                  ValidationException.KnownErrorType.class,
+                  () ->
+                      superficialValidation.validateTypeHierarchyOf(
+                          "return type", getFooMethod, getFooMethod.getReturnType()));
+          final String expectedTrace =
+              NEW_LINES.join(
+                  "Validation trace:",
+                  "  => element (CLASS): test.Outer",
+                  "  => element (METHOD): getFoo()",
+                  "  => type (DECLARED return type): test.Outer.Foo",
+                  "  => type (DECLARED supertype): test.Outer.Bar<test.Outer.Baz[]>",
+                  "  => type (ARRAY type argument): test.Outer.Baz[]",
+                  "  => type (DECLARED array component type): test.Outer.Baz",
+                  "  => type (ERROR supertype): MissingType");
+          assertThat(exception).hasMessageThat().contains(expectedTrace);
         });
   }
 

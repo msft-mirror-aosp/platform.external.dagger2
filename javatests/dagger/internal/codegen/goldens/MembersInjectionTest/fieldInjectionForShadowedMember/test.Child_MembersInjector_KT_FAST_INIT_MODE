@@ -1,0 +1,49 @@
+package test
+
+import dagger.MembersInjector
+import dagger.`internal`.DaggerGenerated
+import dagger.`internal`.InjectedFieldSignature
+import dagger.`internal`.Provider
+import dagger.`internal`.QualifierMetadata
+import javax.`annotation`.processing.Generated
+import kotlin.Any
+import kotlin.Suppress
+import kotlin.jvm.JvmStatic
+
+@QualifierMetadata
+@DaggerGenerated
+@Generated(
+  value = ["dagger.internal.codegen.ComponentProcessor"],
+  comments = "https://dagger.dev",
+)
+@Suppress(names = [
+    "UNCHECKED_CAST",
+    "USELESS_CAST",
+    "DEPRECATION"
+])
+public class Child_MembersInjector : MembersInjector<Any> {
+  private val objectProvider: Provider<Foo?>
+
+  private val objectProvider2: Provider<Bar?>
+
+  private constructor(objectProvider: Provider<Foo?>, objectProvider2: Provider<Bar?>) {
+    this.objectProvider = objectProvider;
+    this.objectProvider2 = objectProvider2;
+  }
+
+  public override fun injectMembers(instance: Any) {
+    Parent_MembersInjector.injectObject(instance, objectProvider.get());
+    injectObject(instance, objectProvider2.get());
+  }
+
+  public companion object {
+    @JvmStatic
+    public fun create(objectProvider: Provider<*>, objectProvider2: Provider<*>): MembersInjector<Any> = Child_MembersInjector((objectProvider) as Provider<Foo?>, (objectProvider2) as Provider<Bar?>)
+
+    @InjectedFieldSignature(value = "test.Child.object")
+    @JvmStatic
+    public fun injectObject(instance: Any?, `object`: Any?) {
+      ((instance) as Child).`object` = (`object`) as Bar?
+    }
+  }
+}

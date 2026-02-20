@@ -1,0 +1,56 @@
+package test
+
+import dagger.MembersInjector
+import dagger.`internal`.DaggerGenerated
+import dagger.`internal`.InjectedFieldSignature
+import dagger.`internal`.Provider
+import dagger.`internal`.QualifierMetadata
+import javax.`annotation`.processing.Generated
+import kotlin.Any
+import kotlin.Int
+import kotlin.Suppress
+import kotlin.jvm.JvmStatic
+
+@QualifierMetadata
+@DaggerGenerated
+@Generated(
+  value = ["dagger.internal.codegen.ComponentProcessor"],
+  comments = "https://dagger.dev",
+)
+@Suppress(names = [
+    "UNCHECKED_CAST",
+    "USELESS_CAST",
+    "DEPRECATION"
+])
+public class InjectedType_MembersInjector : MembersInjector<Any> {
+  private val primitiveIntProvider: Provider<Int>
+
+  private val boxedIntProvider: Provider<Int?>
+
+  private constructor(primitiveIntProvider: Provider<Int>, boxedIntProvider: Provider<Int?>) {
+    this.primitiveIntProvider = primitiveIntProvider;
+    this.boxedIntProvider = boxedIntProvider;
+  }
+
+  public override fun injectMembers(instance: Any) {
+    injectPrimitiveInt(instance, primitiveIntProvider.get());
+    injectBoxedInt(instance, boxedIntProvider.get());
+  }
+
+  public companion object {
+    @JvmStatic
+    public fun create(primitiveIntProvider: Provider<*>, boxedIntProvider: Provider<*>): MembersInjector<Any> = InjectedType_MembersInjector((primitiveIntProvider) as Provider<Int>, (boxedIntProvider) as Provider<Int?>)
+
+    @InjectedFieldSignature(value = "test.InjectedType.primitiveInt")
+    @JvmStatic
+    public fun injectPrimitiveInt(instance: Any?, primitiveInt: Any?) {
+      ((instance) as InjectedType).primitiveInt = (primitiveInt) as Int
+    }
+
+    @InjectedFieldSignature(value = "test.InjectedType.boxedInt")
+    @JvmStatic
+    public fun injectBoxedInt(instance: Any?, boxedInt: Any?) {
+      ((instance) as InjectedType).boxedInt = (boxedInt) as Int?
+    }
+  }
+}

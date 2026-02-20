@@ -16,7 +16,7 @@
 
 package dagger.internal.codegen;
 
-import androidx.room.compiler.processing.util.Source;
+import androidx.room3.compiler.processing.util.Source;
 import dagger.testing.compile.CompilerTests;
 import dagger.testing.golden.GoldenFileRule;
 import java.util.Collection;
@@ -520,6 +520,122 @@ public class DelegateRequestRepresentationTest {
             "}");
 
     CompilerTests.daggerCompiler(module, component)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(0);
+              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
+            });
+  }
+
+  @Test
+  public void frameworkRequestOnDelegate() throws Exception {
+    Source dep =
+        CompilerTests.javaSource(
+            "test.Dep",
+            "package test;",
+            "",
+            "import javax.inject.Inject;",
+            "",
+            "class Dep {",
+            "  @Inject Dep() {}",
+            "}");
+    Source module =
+        CompilerTests.javaSource(
+            "test.TestModule",
+            "package test;",
+            "",
+            "import dagger.Binds;",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "",
+            "@Module",
+            "interface TestModule {",
+            "  @Provides",
+            "  static String provideString(Dep dep) { return new String(); }",
+            "",
+            "  @Binds",
+            "  CharSequence charSequence(String string);",
+            "",
+            "  @Binds",
+            "  Object object(CharSequence charSequence);",
+            "}");
+    Source component =
+        CompilerTests.javaSource(
+            "test.TestComponent",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "import javax.inject.Provider;",
+            "",
+            "@Component(modules = TestModule.class)",
+            "interface TestComponent {",
+            "  Provider<String> stringProvider();",
+            "  CharSequence charSequence();",
+            "  Object object();",
+            "}");
+
+    CompilerTests.daggerCompiler(dep, module, component)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(0);
+              subject.generatedSource(goldenFileRule.goldenSource("test/DaggerTestComponent"));
+            });
+  }
+
+  @Test
+  public void frameworkRequestOnDelegateWithMixedScopes() throws Exception {
+    Source dep =
+        CompilerTests.javaSource(
+            "test.Dep",
+            "package test;",
+            "",
+            "import javax.inject.Inject;",
+            "",
+            "class Dep {",
+            "  @Inject Dep() {}",
+            "}");
+    Source module =
+        CompilerTests.javaSource(
+            "test.TestModule",
+            "package test;",
+            "",
+            "import dagger.Binds;",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import javax.inject.Singleton;",
+            "",
+            "@Module",
+            "interface TestModule {",
+            "  @Provides",
+            "  static String provideString(Dep dep) { return new String(); }",
+            "",
+            "  @Binds",
+            "  @Singleton",
+            "  CharSequence charSequence(String string);",
+            "",
+            "  @Binds",
+            "  Object object(CharSequence charSequence);",
+            "}");
+    Source component =
+        CompilerTests.javaSource(
+            "test.TestComponent",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "import javax.inject.Provider;",
+            "import javax.inject.Singleton;",
+            "",
+            "@Singleton",
+            "@Component(modules = TestModule.class)",
+            "interface TestComponent {",
+            "  Provider<String> stringProvider();",
+            "  CharSequence charSequence();",
+            "  Object object();",
+            "}");
+
+    CompilerTests.daggerCompiler(dep, module, component)
         .withProcessingOptions(compilerMode.processorOptions())
         .compile(
             subject -> {

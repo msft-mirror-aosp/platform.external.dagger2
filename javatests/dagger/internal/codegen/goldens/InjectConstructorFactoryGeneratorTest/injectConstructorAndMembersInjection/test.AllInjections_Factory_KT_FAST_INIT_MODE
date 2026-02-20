@@ -1,0 +1,61 @@
+package test
+
+import dagger.`internal`.DaggerGenerated
+import dagger.`internal`.Factory
+import dagger.`internal`.Provider
+import dagger.`internal`.QualifierMetadata
+import dagger.`internal`.ScopeMetadata
+import javax.`annotation`.processing.Generated
+import kotlin.Any
+import kotlin.String
+import kotlin.Suppress
+import kotlin.jvm.JvmStatic
+
+@ScopeMetadata
+@QualifierMetadata
+@DaggerGenerated
+@Generated(
+  value = ["dagger.internal.codegen.ComponentProcessor"],
+  comments = "https://dagger.dev",
+)
+@Suppress(names = [
+    "UNCHECKED_CAST",
+    "USELESS_CAST",
+    "DEPRECATION"
+])
+public class AllInjections_Factory : Factory<Any?> {
+  private val sProvider: Provider<String?>
+
+  private val sProvider2: Provider<String?>
+
+  private val sProvider3: Provider<String?>
+
+  private constructor(
+    sProvider: Provider<String?>,
+    sProvider2: Provider<String?>,
+    sProvider3: Provider<String?>,
+  ) {
+    this.sProvider = sProvider
+    this.sProvider2 = sProvider2
+    this.sProvider3 = sProvider3
+  }
+
+  public override fun `get`(): Any? {
+    var instance: Any? = newInstance(sProvider.get())
+    AllInjections_MembersInjector.injectS(instance, sProvider2.get());
+    AllInjections_MembersInjector.injectS2(instance, sProvider3.get());
+    return instance
+  }
+
+  public companion object {
+    @JvmStatic
+    public fun create(
+      sProvider: Provider<*>,
+      sProvider2: Provider<*>,
+      sProvider3: Provider<*>,
+    ): AllInjections_Factory = AllInjections_Factory((sProvider) as Provider<String?>, (sProvider2) as Provider<String?>, (sProvider3) as Provider<String?>)
+
+    @JvmStatic
+    public fun newInstance(s: Any?): Any? = AllInjections((s) as String?)
+  }
+}

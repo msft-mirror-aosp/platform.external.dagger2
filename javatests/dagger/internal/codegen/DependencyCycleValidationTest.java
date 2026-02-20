@@ -16,7 +16,7 @@
 
 package dagger.internal.codegen;
 
-import androidx.room.compiler.processing.util.Source;
+import androidx.room3.compiler.processing.util.Source;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import dagger.testing.compile.CompilerTests;
@@ -121,14 +121,14 @@ public class DependencyCycleValidationTest {
                       String.join(
                           "\n",
                           "Found a dependency cycle:",
-                          "    Outer.C is injected at",
-                          "        [Outer.MModule] Outer.A(cParam)",
                           "    Outer.A is injected at",
                           "        [Outer.MModule] Outer.B(aParam)",
                           "    Outer.B is injected at",
                           "        [Outer.MModule] Outer.C(bParam)",
                           "    Outer.C is injected at",
                           "        [Outer.MModule] Outer.A(cParam)",
+                          "    Outer.A is injected at",
+                          "        [Outer.MModule] Outer.B(aParam)",
                           "    ...",
                           "",
                           "======================",
@@ -146,14 +146,14 @@ public class DependencyCycleValidationTest {
                       String.join(
                           "\n",
                           "Found a dependency cycle:",
-                          "    Outer.C is injected at",
-                          "        [Outer.CComponent] Outer.A(cParam)",
                           "    Outer.A is injected at",
                           "        [Outer.CComponent] Outer.B(aParam)",
                           "    Outer.B is injected at",
                           "        [Outer.CComponent] Outer.C(bParam)",
                           "    Outer.C is injected at",
                           "        [Outer.CComponent] Outer.A(cParam)",
+                          "    Outer.A is injected at",
+                          "        [Outer.CComponent] Outer.B(aParam)",
                           "    ...",
                           "",
                           "======================",

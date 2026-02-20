@@ -1,0 +1,69 @@
+package test
+
+import dagger.`internal`.DaggerGenerated
+import dagger.`internal`.Factory
+import dagger.`internal`.Provider
+import dagger.`internal`.QualifierMetadata
+import dagger.`internal`.ScopeMetadata
+import javax.`annotation`.processing.Generated
+import kotlin.Any
+import kotlin.Float
+import kotlin.Int
+import kotlin.String
+import kotlin.Suppress
+import kotlin.jvm.JvmStatic
+
+@ScopeMetadata
+@QualifierMetadata(value = ["test.FooConstructorQualifier"])
+@DaggerGenerated
+@Generated(
+  value = ["dagger.internal.codegen.ComponentProcessor"],
+  comments = "https://dagger.dev",
+)
+@Suppress(names = [
+    "UNCHECKED_CAST",
+    "USELESS_CAST",
+    "DEPRECATION"
+])
+public class Foo_Factory : Factory<Any?> {
+  private val iProvider: Provider<Int>
+
+  private val injectFieldProvider: Provider<String?>
+
+  private val injectFieldProvider2: Provider<String?>
+
+  private val fProvider: Provider<Float>
+
+  private constructor(
+    iProvider: Provider<Int>,
+    injectFieldProvider: Provider<String?>,
+    injectFieldProvider2: Provider<String?>,
+    fProvider: Provider<Float>,
+  ) {
+    this.iProvider = iProvider
+    this.injectFieldProvider = injectFieldProvider
+    this.injectFieldProvider2 = injectFieldProvider2
+    this.fProvider = fProvider
+  }
+
+  public override fun `get`(): Any? {
+    var instance: Any? = newInstance(iProvider.get())
+    FooBase_MembersInjector.injectInjectField(instance, injectFieldProvider.get());
+    Foo_MembersInjector.injectInjectField(instance, injectFieldProvider2.get());
+    Foo_MembersInjector.injectInjectMethod(instance, fProvider.get());
+    return instance
+  }
+
+  public companion object {
+    @JvmStatic
+    public fun create(
+      iProvider: Provider<*>,
+      injectFieldProvider: Provider<*>,
+      injectFieldProvider2: Provider<*>,
+      fProvider: Provider<*>,
+    ): Foo_Factory = Foo_Factory((iProvider) as Provider<Int>, (injectFieldProvider) as Provider<String?>, (injectFieldProvider2) as Provider<String?>, (fProvider) as Provider<Float>)
+
+    @JvmStatic
+    public fun newInstance(i: Any?): Any? = Foo((i) as Int)
+  }
+}
