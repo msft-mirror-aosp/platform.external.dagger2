@@ -435,17 +435,6 @@ public final class BindingFactory {
     return delegateBinding(delegateDeclaration, Optional.empty());
   }
 
-  /**
-   * Returns a {@link BindingKind#DELEGATE} binding.
-   *
-   * @param delegateDeclaration the {@code @Binds}-annotated declaration
-   * @param actualBinding the binding that satisfies the {@code @Binds} declaration
-   */
-  DelegateBinding delegateBinding(
-      DelegateDeclaration delegateDeclaration, ContributionBinding actualBinding) {
-    return delegateBinding(delegateDeclaration, delegateBindingType(Optional.of(actualBinding)));
-  }
-
   private DelegateBinding delegateBinding(
       DelegateDeclaration delegateDeclaration, Optional<BindingType> optionalBindingType) {
     return DelegateBinding.builder()
@@ -461,7 +450,7 @@ public final class BindingFactory {
                 // In this case, multibound map contributions will always return the key type
                 // without framework types, i.e. Map<K,V>.
                 ? delegateDeclaration.key()
-                // This is used by LegacyBindingGraphFactory, which passes in a non-empty
+                // This is used by unresolvedDelegateBinding, which passes in a non-empty
                 // optionalBindingType. Then, KeyFactory decides whether or not multibound map
                 // contributions should include the factory type based on the compiler flag,
                 // -Adagger.useFrameworkTypeInMapMultibindingContributionKey.
@@ -478,14 +467,6 @@ public final class BindingFactory {
    */
   public DelegateBinding unresolvedDelegateBinding(DelegateDeclaration delegateDeclaration) {
     return delegateBinding(delegateDeclaration, Optional.of(BindingType.PROVISION));
-  }
-
-  private Optional<BindingType> delegateBindingType(Optional<ContributionBinding> actualBinding) {
-    if (actualBinding.isEmpty()) {
-      return Optional.empty();
-    }
-    checkArgument(actualBinding.get().bindingType() != BindingType.MEMBERS_INJECTION);
-    return Optional.of(actualBinding.get().bindingType());
   }
 
   /** Returns an {@link BindingKind#OPTIONAL} present binding for {@code key}. */

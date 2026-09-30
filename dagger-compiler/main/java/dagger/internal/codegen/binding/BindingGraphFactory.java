@@ -21,7 +21,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Predicates.not;
 import static dagger.internal.codegen.binding.AssistedInjectionAnnotations.isAssistedFactoryType;
-import static dagger.internal.codegen.binding.LegacyBindingGraphFactory.useLegacyBindingGraphFactory;
 import static dagger.internal.codegen.extension.DaggerCollectors.onlyElement;
 import static dagger.internal.codegen.extension.DaggerGraphs.unreachableNodes;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
@@ -73,7 +72,6 @@ import javax.tools.Diagnostic;
 
 /** A factory for {@link BindingGraph} objects. */
 public final class BindingGraphFactory {
-  private final LegacyBindingGraphFactory legacyBindingGraphFactory;
   private final InjectBindingRegistry injectBindingRegistry;
   private final KeyFactory keyFactory;
   private final BindingFactory bindingFactory;
@@ -83,14 +81,12 @@ public final class BindingGraphFactory {
 
   @Inject
   BindingGraphFactory(
-      LegacyBindingGraphFactory legacyBindingGraphFactory,
       InjectBindingRegistry injectBindingRegistry,
       KeyFactory keyFactory,
       BindingFactory bindingFactory,
       BindingNode.Factory bindingNodeFactory,
       ComponentDeclarations.Factory componentDeclarationsFactory,
       CompilerOptions compilerOptions) {
-    this.legacyBindingGraphFactory = legacyBindingGraphFactory;
     this.injectBindingRegistry = injectBindingRegistry;
     this.keyFactory = keyFactory;
     this.bindingFactory = bindingFactory;
@@ -107,9 +103,7 @@ public final class BindingGraphFactory {
    */
   public BindingGraph create(
       ComponentDescriptor componentDescriptor, boolean createFullBindingGraph) {
-    return useLegacyBindingGraphFactory(compilerOptions, componentDescriptor)
-        ? legacyBindingGraphFactory.create(componentDescriptor, createFullBindingGraph)
-        : createBindingGraph(componentDescriptor, createFullBindingGraph);
+    return createBindingGraph(componentDescriptor, createFullBindingGraph);
   }
 
   private BindingGraph createBindingGraph(
@@ -485,7 +479,7 @@ public final class BindingGraphFactory {
       if (!binding.kind().equals(DELEGATE)) {
         return false;
       }
-      if (LegacyBindingGraphFactory.hasStrictMultibindingsExemption(compilerOptions, binding)) {
+      if (StrictMultibindingExemptions.hasStrictMultibindingsExemption(compilerOptions, binding)) {
         return false;
       }
       return declarations.delegates(binding.key()).stream()
