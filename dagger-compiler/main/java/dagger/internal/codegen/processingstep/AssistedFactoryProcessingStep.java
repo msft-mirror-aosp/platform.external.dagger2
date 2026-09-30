@@ -59,7 +59,6 @@ import com.google.common.collect.ImmutableSet;
 import dagger.internal.codegen.base.DaggerSuperficialValidation;
 import dagger.internal.codegen.base.SourceFileGenerator;
 import dagger.internal.codegen.base.ValidationReport;
-import dagger.internal.codegen.binding.AssistedElementsRegistry;
 import dagger.internal.codegen.binding.AssistedFactoryBinding;
 import dagger.internal.codegen.binding.AssistedInjectionAnnotations;
 import dagger.internal.codegen.binding.AssistedInjectionAnnotations.AssistedFactoryMetadata;
@@ -80,16 +79,13 @@ import javax.inject.Inject;
 /** An annotation processor for {@link dagger.assisted.AssistedFactory}-annotated types. */
 final class AssistedFactoryProcessingStep extends TypeCheckingProcessingStep<XTypeElement> {
   private final XProcessingEnv processingEnv;
-
   @SuppressWarnings("HidingField")
   private final XMessager messager;
-
   private final XFiler filer;
   private final BindingFactory bindingFactory;
   private final MethodSignatureFormatter methodSignatureFormatter;
   private final DaggerSuperficialValidation superficialValidation;
   private final InjectValidator injectValidator;
-  private final AssistedElementsRegistry processedElementsRegistry;
 
   @Inject
   AssistedFactoryProcessingStep(
@@ -99,8 +95,7 @@ final class AssistedFactoryProcessingStep extends TypeCheckingProcessingStep<XTy
       BindingFactory bindingFactory,
       MethodSignatureFormatter methodSignatureFormatter,
       DaggerSuperficialValidation superficialValidation,
-      InjectValidator injectValidator,
-      AssistedElementsRegistry processedElementsRegistry) {
+      InjectValidator injectValidator) {
     this.processingEnv = processingEnv;
     this.messager = messager;
     this.filer = filer;
@@ -108,7 +103,6 @@ final class AssistedFactoryProcessingStep extends TypeCheckingProcessingStep<XTy
     this.methodSignatureFormatter = methodSignatureFormatter;
     this.superficialValidation = superficialValidation;
     this.injectValidator = injectValidator;
-    this.processedElementsRegistry = processedElementsRegistry;
   }
 
   @Override
@@ -123,7 +117,6 @@ final class AssistedFactoryProcessingStep extends TypeCheckingProcessingStep<XTy
 
   @Override
   protected void process(XTypeElement factory, ImmutableSet<XClassName> annotations) {
-    processedElementsRegistry.registerAssistedFactory(factory);
     ValidationReport report = new AssistedFactoryValidator().validate(factory);
     report.printMessagesTo(messager);
     if (report.isClean()) {
@@ -323,7 +316,7 @@ final class AssistedFactoryProcessingStep extends TypeCheckingProcessingStep<XTy
           // newer versions to break.
           .addFunction(
               staticCreateMethod(
-                  /* methodName= */ "create",
+                  /* methodName= */"create",
                   /* returnType= */ javaxProviderOf(accessibleFactoryTypeName(factory)),
                   generatedClassName,
                   metadata,
@@ -407,10 +400,10 @@ final class AssistedFactoryProcessingStep extends TypeCheckingProcessingStep<XTy
       return assistedInjectType.getTypeArguments().isEmpty()
           ? generatedFactoryClassName
           : generatedFactoryClassName.parametrizedBy(
-              assistedInjectType.getTypeArguments().stream()
-                  .map(XTypeArgument::asTypeName)
-                  .collect(toImmutableList())
-                  .toArray(new XTypeName[0]));
+                assistedInjectType.getTypeArguments().stream()
+                    .map(XTypeArgument::asTypeName)
+                    .collect(toImmutableList())
+                    .toArray(new XTypeName[0]));
     }
   }
 }

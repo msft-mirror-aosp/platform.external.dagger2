@@ -19,7 +19,6 @@ package dagger.internal.codegen;
 import androidx.room3.compiler.processing.util.Source;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import dagger.testing.compile.CompilerTests;
 import dagger.testing.golden.GoldenFileRule;
 import java.io.File;
@@ -477,7 +476,7 @@ public class AssistedFactoryTest {
   // Verify that Dagger does not support consuming assisted factories from libraries
   // compiled without Dagger's annotation processor.
   @Test
-  public void assistedFactoryFromLibraryWithoutProcessor_strictValidationDisabled() {
+  public void testAssistedFactoryFromLibraryWithoutProcessor() {
     Source libraryTarget =
         CompilerTests.javaSource(
             "test.LibraryTarget",
@@ -525,21 +524,14 @@ public class AssistedFactoryTest {
             "  LibraryTarget.Factory getFactory();",
             "}");
 
-    ImmutableMap<String, String> options =
-        ImmutableMap.<String, String>builder()
-            .putAll(compilerMode.processorOptions())
-            .put("dagger.strictAssistedInjectValidation", "disabled")
-            .build();
-
     CompilerTests.DaggerCompiler daggerCompiler =
         CompilerTests.daggerCompiler(component)
             .withAdditionalClasspath(libraryClasspath)
-            .withProcessingOptions(options);
+            .withProcessingOptions(compilerMode.processorOptions());
 
     if (compilerMode.isFastInitEnabled()) {
-      // In fastInit mode, by mistake Dagger allowed consuming assisted factories from
-      // libraries compiled without the processor by generating the factories on-the-fly.
-      // Now this is allowed when the strict validation flag is disabled.
+      // TODO(b/529883325): This should fail to compile because Dagger does not support
+      // consuming assisted factories from libraries compiled without Dagger's processor.
       daggerCompiler.compile(
           subject -> {
             subject.hasErrorCount(0);
@@ -613,134 +605,5 @@ public class AssistedFactoryTest {
         subject -> {
           subject.hasErrorContaining("PackagePrivateBar");
         });
-  }
-
-  @Test
-  public void assistedFactoryFromLibraryWithoutProcessor_strictValidationEnabled() {
-    Source libraryTarget =
-        CompilerTests.javaSource(
-            "test.LibraryTarget",
-            "package test;",
-            "",
-            "import dagger.assisted.Assisted;",
-            "import dagger.assisted.AssistedFactory;",
-            "import dagger.assisted.AssistedInject;",
-            "",
-            "public final class LibraryTarget {",
-            "  private final Dep dep;",
-            "  private final String assistedDep;",
-            "",
-            "  public static class Dep {",
-            "    @javax.inject.Inject",
-            "    public Dep() {}",
-            "  }",
-            "",
-            "  @AssistedInject",
-            "  LibraryTarget(Dep dep, @Assisted String assistedDep) {",
-            "    this.dep = dep;",
-            "    this.assistedDep = assistedDep;",
-            "  }",
-            "",
-            "  @AssistedFactory",
-            "  public interface Factory {",
-            "    LibraryTarget create(String assistedDep);",
-            "  }",
-            "}");
-
-    ImmutableList<File> libraryClasspath = CompilerTests.libraryCompiler(libraryTarget).compile();
-
-    Source component =
-        CompilerTests.javaSource(
-            "test.TestComponent",
-            "package test;",
-            "",
-            "import dagger.Component;",
-            "",
-            "@Component",
-            "interface TestComponent {",
-            "  LibraryTarget.Factory getFactory();",
-            "}");
-
-    ImmutableMap<String, String> options =
-        ImmutableMap.<String, String>builder()
-            .putAll(compilerMode.processorOptions())
-            .put("dagger.strictAssistedInjectValidation", "enabled")
-            .build();
-
-    CompilerTests.daggerCompiler(component)
-        .withAdditionalClasspath(libraryClasspath)
-        .withProcessingOptions(options)
-        .compile(
-            subject -> {
-              subject.hasErrorContaining(
-                  "The @AssistedInject-annotated class LibraryTarget is in a dependency, but "
-                      + "its factory LibraryTarget_Factory was not found.");
-              subject.hasErrorContaining(
-                  "The @AssistedFactory-annotated interface LibraryTarget.Factory is in a "
-                      + "dependency, but its implementation LibraryTarget_Factory_Impl was "
-                      + "not found.");
-            });
-  }
-
-  @Test
-  public void assistedFactoryFromLibraryWithProcessor_strictValidationEnabled() {
-    Source libraryTarget =
-        CompilerTests.javaSource(
-            "test.LibraryTarget",
-            "package test;",
-            "",
-            "import dagger.assisted.Assisted;",
-            "import dagger.assisted.AssistedFactory;",
-            "import dagger.assisted.AssistedInject;",
-            "",
-            "public final class LibraryTarget {",
-            "  private final Dep dep;",
-            "  private final String assistedDep;",
-            "",
-            "  public static class Dep {",
-            "    @javax.inject.Inject",
-            "    public Dep() {}",
-            "  }",
-            "",
-            "  @AssistedInject",
-            "  LibraryTarget(Dep dep, @Assisted String assistedDep) {",
-            "    this.dep = dep;",
-            "    this.assistedDep = assistedDep;",
-            "  }",
-            "",
-            "  @AssistedFactory",
-            "  public interface Factory {",
-            "    LibraryTarget create(String assistedDep);",
-            "  }",
-            "}");
-
-    ImmutableList<File> libraryClasspath =
-        CompilerTests.daggerCompiler(libraryTarget).compileFilesWithJavac();
-
-    Source component =
-        CompilerTests.javaSource(
-            "test.TestComponent",
-            "package test;",
-            "",
-            "import dagger.Component;",
-            "",
-            "@Component",
-            "interface TestComponent {",
-            "  LibraryTarget.Factory getFactory();",
-            "}");
-
-    ImmutableMap<String, String> options =
-        ImmutableMap.<String, String>builder()
-            .putAll(compilerMode.processorOptions())
-            .put("dagger.strictAssistedInjectValidation", "enabled")
-            .build();
-
-    CompilerTests.daggerCompiler(component)
-        .withAdditionalClasspath(libraryClasspath)
-        .withProcessingOptions(options)
-        .compile(
-            subject -> {
-              subject.hasErrorCount(0);
-            });
   }
 }

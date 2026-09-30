@@ -21,8 +21,7 @@ import dagger.Module;
 import dagger.internal.codegen.binding.InjectBindingRegistry;
 
 /** Binds the {@link InjectBindingRegistry} implementation. */
-@Module(includes = AssistedElementsRegistryModule.class)
+@Module
 public interface InjectBindingRegistryModule {
-  @Binds
-  InjectBindingRegistry injectBindingRegistry(InjectBindingRegistryImpl impl);
+  @Binds InjectBindingRegistry injectBindingRegistry(InjectBindingRegistryImpl impl);
 }

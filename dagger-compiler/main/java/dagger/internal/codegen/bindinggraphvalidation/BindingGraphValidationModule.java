@@ -44,7 +44,6 @@ public interface BindingGraphValidationModule {
       ProvisionDependencyOnProducerBindingValidator provisionDependencyOnProducerBindingValidator,
       InvalidProductionBindingScopeValidator invalidProductionBindingScopeValidator,
       SetMultibindingValidator setMultibindingValidator,
-      StrictAssistedInjectValidator strictAssistedInjectValidator,
     SubcomponentFactoryMethodValidator subcomponentFactoryMethodValidator) {
     ImmutableSet.Builder<ValidationBindingGraphPlugin> builder =
         ImmutableSet.<ValidationBindingGraphPlugin>builder()
@@ -59,8 +58,7 @@ public interface BindingGraphValidationModule {
             .add(provisionDependencyOnProducerBindingValidator)
             .add(invalidProductionBindingScopeValidator)
             .add(setMultibindingValidator)
-            .add(subcomponentFactoryMethodValidator)
-            .add(strictAssistedInjectValidator);
+            .add(subcomponentFactoryMethodValidator);
 
     if (compilerOptions.experimentalDaggerErrorMessages()) {
       return ImmutableSet.of(factory.create(builder.build()));

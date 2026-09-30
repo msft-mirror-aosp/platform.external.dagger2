@@ -160,7 +160,7 @@ public final class SourceFiles {
       case PRODUCTION:
         return factoryNameForElement(asExecutable(binding.bindingElement().get()));
       case ASSISTED_FACTORY:
-        return assistedFactoryImplNameForType(asTypeElement(binding.bindingElement().get()));
+        return siblingClassName(asTypeElement(binding.bindingElement().get()), "_Impl");
       case MEMBERS_INJECTION:
         return membersInjectorNameForType(
             ((MembersInjectionBinding) binding).membersInjectedType());
@@ -179,10 +179,6 @@ public final class SourceFiles {
    */
   public static XClassName factoryNameForElement(XExecutableElement element) {
     return elementBasedClassName(element, "Factory");
-  }
-
-  public static XClassName assistedFactoryImplNameForType(XTypeElement typeElement) {
-    return siblingClassName(typeElement, "_Impl");
   }
 
   /**
