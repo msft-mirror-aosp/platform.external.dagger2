@@ -16,7 +16,9 @@
 
 package dagger.internal.codegen.kotlin;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static dagger.internal.codegen.xprocessing.XElements.closestEnclosingTypeElement;
+import static dagger.internal.codegen.xprocessing.XElements.isStatic;
 
 import androidx.room3.compiler.processing.XElement;
 import androidx.room3.compiler.processing.XTypeElement;
@@ -51,6 +53,11 @@ public final class KotlinMetadataFactory implements ClearableCache {
     XTypeElement enclosingElement = closestEnclosingTypeElement(element);
     if (!enclosingElement.hasAnnotation(XTypeNames.KOTLIN_METADATA)) {
       throw new IllegalStateException("Missing @Metadata for: " + enclosingElement);
+    }
+    // If this is a static field in a non-object class, we need to get the metadata from the
+    // companion object.
+    if (isStatic(element) && !enclosingElement.isKotlinObject()) {
+      enclosingElement = checkNotNull(enclosingElement.getCompanionObject());
     }
     return metadataCache.computeIfAbsent(enclosingElement, KotlinMetadata::from);
   }

@@ -20,7 +20,6 @@ import static androidx.room3.compiler.processing.XElementKt.isField;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
 import static dagger.internal.codegen.xprocessing.XElements.asField;
-import static dagger.internal.codegen.xprocessing.XElements.isStatic;
 
 import androidx.room3.compiler.processing.XAnnotation;
 import androidx.room3.compiler.processing.XElement;
@@ -131,9 +130,7 @@ public final class KotlinMetadataUtil {
    * method, if any, of a Kotlin property and not for annotations in its backing field.
    */
   private ImmutableList<XAnnotation> getSyntheticPropertyAnnotations(XElement element) {
-    // Currently, we avoid trying to get annotations from properties on object class's (i.e.
-    // properties with static jvm backing fields) due to issues explained in CL/336150864.
-    if (!isField(element) || isStatic(element)) {
+    if (!isField(element)) {
       return ImmutableList.of();
     }
     XFieldElement field = asField(element);
