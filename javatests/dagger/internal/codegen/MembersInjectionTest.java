@@ -1719,6 +1719,63 @@ public class MembersInjectionTest {
             });
   }
 
+  @Test
+  public void injectionMethodParameterNamedComponentImpl_doesNotShadowComponentField() {
+    Source dep =
+        CompilerTests.javaSource(
+            "dagger.internal.codegen.Dep",
+            "package dagger.internal.codegen;",
+            "",
+            "import javax.inject.Inject;",
+            "",
+            "final class Dep {",
+            "  @Inject Dep() {}",
+            "}");
+    Source injectedType =
+        CompilerTests.javaSource(
+            "dagger.internal.codegen.InjectedType",
+            "package dagger.internal.codegen;",
+            "",
+            "import javax.inject.Inject;",
+            "",
+            "final class InjectedType {",
+            "  @Inject Dep dep;",
+            "}");
+    Source component =
+        CompilerTests.javaSource(
+            "dagger.internal.codegen.TestComponent",
+            "package dagger.internal.codegen;",
+            "",
+            "import dagger.Component;",
+            "",
+            "@Component",
+            "interface TestComponent {",
+            "  // The parameter name `testComponentImpl` matches the default name of the root",
+            "  // component's self-reference field, forcing the field to be disambiguated to",
+            "  // `testComponentImpl2` so it is not shadowed when accessing `testComponentImplShard`.",
+            "  void inject(InjectedType testComponentImpl);",
+            "}");
+    CompilerTests.daggerCompiler(dep, injectedType, component)
+        .withProcessingOptions(
+            ImmutableMap.<String, String>builder()
+                .putAll(compilerMode.processorOptions())
+                // Setting `keysPerComponentShard` to 1 forces `InjectedType`'s members-injection
+                // method onto a separate shard (`TestComponentImplShard`), which requires
+                // `TestComponentImpl.inject(...)` to reference the shard via the component's
+                // self-reference field (`testComponentImpl2.testComponentImplShard`).
+                .put("dagger.keysPerComponentShard", "1")
+                .buildOrThrow())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(0);
+              subject
+                  .generatedSourceFileWithPath("dagger/internal/codegen/DaggerTestComponent.java")
+                  .contains(
+                      "testComponentImpl2.testComponentImplShard.injectInjectedType("
+                          + "testComponentImpl)");
+            });
+  }
+
   private Source stripJetbrainsNullable(Source source) {
     return CompilerTests.transformContent(
         source,

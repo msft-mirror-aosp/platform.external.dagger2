@@ -378,6 +378,25 @@ public final class ComponentImplementation {
     checkArgument(
         componentImplementation.componentShard != null,
         "The component shard must be set before computing the component fields.");
+    // Claim method parameter names from all component and creator methods so that generated
+    // component fields (e.g. `testComponentImpl`) do not collide with or get shadowed by
+    // user-defined method parameters when referenced unqualified inside generated methods.
+    UniqueNameSet componentMethodParameterNames = new UniqueNameSet();
+    componentImplementation
+        .graph
+        .componentDescriptorsByPath()
+        .values()
+        .stream()
+        .flatMap(
+            descriptor ->
+                Stream.concat(
+                    Stream.of(descriptor.typeElement()),
+                    descriptor.creatorDescriptor().stream()
+                        .map(ComponentCreatorDescriptor::typeElement)))
+        .flatMap(type -> XTypeElements.getAllNonPrivateInstanceMethods(type).stream())
+        .flatMap(method -> method.getParameters().stream())
+        .map(XExecutableParameterElement::getJvmName)
+        .forEach(componentMethodParameterNames::claim);
     ImmutableList.Builder<ComponentImplementation> builder = ImmutableList.builder();
     for (ComponentImplementation curr = componentImplementation;
         curr != null;
@@ -403,15 +422,14 @@ public final class ComponentImplementation {
                       componentImpl.isNested()
                           ? simpleVariableName(componentImpl.name())
                           : simpleVariableName(component);
+                  if (fieldName.equals(componentImpl.name().getSimpleName())) {
+                    fieldName = "_" + fieldName;
+                  }
+                  fieldName =
+                      componentImplementation.componentShard.getUniqueFieldName(
+                          componentMethodParameterNames.getUniqueName(fieldName));
                   XPropertySpecs.Builder field =
-                      XPropertySpecs.builder(
-                          fieldName.equals(componentImpl.name().getSimpleName())
-                              ? "_" + fieldName
-                              : fieldName,
-                          fieldType,
-                          PRIVATE,
-                          FINAL);
-                  componentImplementation.componentShard.componentFieldNames.claim(fieldName);
+                      XPropertySpecs.builder(fieldName, fieldType, PRIVATE, FINAL);
 
                   return field.build();
                 }));
@@ -518,12 +536,18 @@ public final class ComponentImplementation {
 
     private ShardImplementation createShard() {
       checkState(isComponentShard(), "Only the componentShard can create other shards.");
-      return new ShardImplementation(
-          topLevelImplementation()
-              .name()
-              .nestedClass(
-                  topLevelImplementation()
-                      .getUniqueClassName(getComponentShard().name().getSimpleName() + "Shard")));
+      ShardImplementation shard =
+          new ShardImplementation(
+              topLevelImplementation()
+                  .name()
+                  .nestedClass(
+                      topLevelImplementation()
+                          .getUniqueClassName(
+                              getComponentShard().name().getSimpleName() + "Shard")));
+      componentFieldsByImplementation.values().stream()
+          .map(field -> toJavaPoet(field).name)
+          .forEach(shard.componentFieldNames::claim);
+      return shard;
     }
 
     public ImmutableList<XParameterSpec> constructorParameters() {

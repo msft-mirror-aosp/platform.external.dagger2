@@ -884,4 +884,97 @@ public class SubcomponentValidationTest {
             subject.hasWarningCount(0);
           });
   }
+
+  @Test
+  public void subcomponentSupertypeEnclosingConflictingImplName_compilesCleanly() {
+    // A `@Singleton` dependency scoped to `ParentComponent` and requested by each subcomponent
+    // ensures that the generated subcomponent implementations hold and reference a field of the
+    // parent component implementation type (`parentComponentImpl`), which would fail to compile if
+    // the parent or subcomponent implementation class name were shadowed by an inherited enclosed
+    // type from `ParentSub1` or `ParentSub2`.
+    Source dep =
+        CompilerTests.javaSource(
+            "test.Dep",
+            "package test;",
+            "",
+            "import javax.inject.Inject;",
+            "import javax.inject.Singleton;",
+            "",
+            "@Singleton",
+            "final class Dep {",
+            "  @Inject Dep() {}",
+            "}");
+    Source parentSub1 =
+        CompilerTests.javaSource(
+            "test.ParentSub1",
+            "package test;",
+            "",
+            "import dagger.Subcomponent;",
+            "",
+            "public interface ParentSub1 {",
+            "  Dep dep();",
+            "",
+            "  interface SubImpl {}",
+            "",
+            "  @Subcomponent",
+            "  interface Sub extends ParentSub1 {",
+            "    @Subcomponent.Builder",
+            "    interface Builder {",
+            "      Sub build();",
+            "    }",
+            "  }",
+            "}");
+    Source parentSub2 =
+        CompilerTests.javaSource(
+            "test.ParentSub2",
+            "package test;",
+            "",
+            "import dagger.Subcomponent;",
+            "",
+            "public interface ParentSub2 {",
+            "  Dep dep();",
+            "",
+            "  @Subcomponent",
+            "  interface ParentComponentImpl extends ParentSub2 {",
+            "    @Subcomponent.Builder",
+            "    interface Builder {",
+            "      ParentComponentImpl build();",
+            "    }",
+            "  }",
+            "}");
+    Source parent =
+        CompilerTests.javaSource(
+            "test.ParentComponent",
+            "package test;",
+            "",
+            "import dagger.Component;",
+            "import javax.inject.Singleton;",
+            "",
+            "@Singleton",
+            "@Component",
+            "interface ParentComponent {",
+            "  // Tests when a subcomponent's supertype (`ParentSub1`) encloses a type (`SubImpl`)",
+            "  // that conflicts with the subcomponent's own default implementation name (`SubImpl`),",
+            "  // forcing it to be disambiguated to `PS1_SubImpl`.",
+            "  ParentSub1.Sub.Builder sub1Builder();",
+            "",
+            "  // Tests when a subcomponent's supertype (`ParentSub2`) encloses a type",
+            "  // (`ParentComponentImpl`) that conflicts with the root component's default",
+            "  // implementation name (`ParentComponentImpl`), forcing it to be disambiguated to",
+            "  // `t_ParentComponentImpl`.",
+            "  ParentSub2.ParentComponentImpl.Builder sub2Builder();",
+            "}");
+    CompilerTests.daggerCompiler(dep, parentSub1, parentSub2, parent)
+        .withProcessingOptions(compilerMode.processorOptions())
+        .compile(
+            subject -> {
+              subject.hasErrorCount(0);
+              subject
+                  .generatedSourceFileWithPath("test/DaggerParentComponent.java")
+                  .contains("class PS1_SubImpl");
+              subject
+                  .generatedSourceFileWithPath("test/DaggerParentComponent.java")
+                  .contains("class t_ParentComponentImpl");
+            });
+  }
 }

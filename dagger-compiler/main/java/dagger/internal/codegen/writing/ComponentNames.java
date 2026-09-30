@@ -24,10 +24,13 @@ import static dagger.internal.codegen.xprocessing.XElements.getSimpleName;
 import static java.lang.String.format;
 
 import androidx.room3.compiler.codegen.XClassName;
+import androidx.room3.compiler.processing.XType;
+import androidx.room3.compiler.processing.XTypeElement;
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimaps;
 import dagger.internal.codegen.base.ComponentCreatorKind;
@@ -39,7 +42,9 @@ import dagger.internal.codegen.binding.KeyFactory;
 import dagger.internal.codegen.compileroption.CompilerOptions;
 import dagger.internal.codegen.model.ComponentPath;
 import dagger.internal.codegen.model.Key;
+import dagger.internal.codegen.xprocessing.XElements;
 import dagger.internal.codegen.xprocessing.XTypeNames;
+import dagger.internal.codegen.xprocessing.XTypes;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -80,7 +85,7 @@ public final class ComponentNames {
   XClassName get(ComponentPath componentPath) {
     return compilerOptions.generatedClassExtendsComponent() && componentPath.atRoot()
         ? topLevelClassName
-        : topLevelClassName.nestedClass(namesByPath.get(componentPath) + "Impl");
+        : topLevelClassName.nestedClass(getComponentImplName(namesByPath.get(componentPath)));
   }
 
   /**
@@ -132,14 +137,40 @@ public final class ComponentNames {
   }
 
   private static ImmutableMap<ComponentPath, String> namesByPath(BindingGraph graph) {
+    ImmutableSet<String> enclosedTypeNames = getEnclosedTypeNames(graph);
     Map<ComponentPath, String> componentPathsBySimpleName = new LinkedHashMap<>();
     Multimaps.index(graph.componentDescriptorsByPath().keySet(), ComponentNames::simpleName)
         .asMap()
         .values()
         .stream()
-        .map(ComponentNames::disambiguateConflictingSimpleNames)
+        .map(
+            componentPaths ->
+                disambiguateConflictingSimpleNames(componentPaths, enclosedTypeNames))
         .forEach(componentPathsBySimpleName::putAll);
     return ImmutableMap.copyOf(componentPathsBySimpleName);
+  }
+
+  private static ImmutableSet<String> getEnclosedTypeNames(BindingGraph graph) {
+    ImmutableSet.Builder<String> builder = ImmutableSet.builder();
+    for (ComponentDescriptor componentDescriptor : graph.componentDescriptorsByPath().values()) {
+      addEnclosedTypeNames(componentDescriptor.typeElement(), builder);
+      componentDescriptor
+          .creatorDescriptor()
+          .ifPresent(creator -> addEnclosedTypeNames(creator.typeElement(), builder));
+    }
+    return builder.build();
+  }
+
+  private static void addEnclosedTypeNames(
+      XTypeElement typeElement, ImmutableSet.Builder<String> builder) {
+    typeElement.getEnclosedTypeElements().stream()
+        .map(XElements::getSimpleName)
+        .forEach(builder::add);
+
+    typeElement.getType().getSuperTypes().stream()
+        .filter(XTypes::isDeclared)
+        .map(XType::getTypeElement)
+        .forEach(superType -> addEnclosedTypeNames(superType, builder));
   }
 
   private static ImmutableMultimap<Key, ComponentPath> pathsByCreatorKey(
@@ -160,11 +191,16 @@ public final class ComponentNames {
   }
 
   private static ImmutableMap<ComponentPath, String> disambiguateConflictingSimpleNames(
-      Collection<ComponentPath> componentsWithConflictingNames) {
-    // If there's only 1 component there's nothing to disambiguate so return the simple name.
+      Collection<ComponentPath> componentsWithConflictingNames,
+      ImmutableSet<String> enclosedTypeNames) {
+    // If there's only 1 component and its generated implementation name doesn't conflict with an
+    // enclosed type name, there's nothing to disambiguate so return the simple name.
     if (componentsWithConflictingNames.size() == 1) {
       ComponentPath componentPath = Iterables.getOnlyElement(componentsWithConflictingNames);
-      return ImmutableMap.of(componentPath, simpleName(componentPath));
+      String simpleName = simpleName(componentPath);
+      if (!enclosedTypeNames.contains(getComponentImplName(simpleName))) {
+        return ImmutableMap.of(componentPath, simpleName);
+      }
     }
 
     // There are conflicting simple names, so disambiguate them with a unique prefix.
@@ -174,10 +210,17 @@ public final class ComponentNames {
     for (ComponentPath componentPath : componentsWithConflictingNames) {
       String simpleName = simpleName(componentPath);
       String basePrefix = uniquingPrefix(componentPath);
-      uniqueNames.put(
-          componentPath, format("%s_%s", nameSet.getUniqueName(basePrefix), simpleName));
+      String uniqueName;
+      do {
+        uniqueName = format("%s_%s", nameSet.getUniqueName(basePrefix), simpleName);
+      } while (enclosedTypeNames.contains(getComponentImplName(uniqueName)));
+      uniqueNames.put(componentPath, uniqueName);
     }
     return uniqueNames.build();
+  }
+
+  private static String getComponentImplName(String componentSimpleName) {
+    return componentSimpleName + "Impl";
   }
 
   private static String simpleName(ComponentPath componentPath) {
