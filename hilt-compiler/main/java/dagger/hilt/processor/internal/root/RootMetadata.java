@@ -94,10 +94,7 @@ public final class RootMetadata {
 
   public ImmutableSet<TypeName> entryPoints(ClassName componentName) {
     return ImmutableSet.<TypeName>builder()
-        .addAll(
-            deps.entryPoints().get(componentName).stream()
-                .map(XTypeElement::getClassName)
-                .collect(toImmutableSet()))
+        .addAll(deps.entryPoints().get(componentName))
         .add(
             root.isTestRoot() && componentName.equals(ClassNames.SINGLETON_COMPONENT)
                 ? ClassNames.TEST_SINGLETON_COMPONENT

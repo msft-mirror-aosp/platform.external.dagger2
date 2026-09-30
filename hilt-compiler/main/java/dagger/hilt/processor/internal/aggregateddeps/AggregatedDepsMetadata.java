@@ -49,18 +49,23 @@ public abstract class AggregatedDepsMetadata {
     COMPONENT_ENTRY_POINT
   }
 
-  /** Returns the aggregating element */
+  /** Returns the name of the aggregating element. */
+  public abstract ClassName name();
+
+  /** Returns the aggregating element. */
   public abstract XTypeElement aggregatingElement();
 
-  public abstract Optional<XTypeElement> testElement();
+  public abstract Optional<ClassName> testName();
 
-  public abstract ImmutableSet<XTypeElement> componentElements();
+  public abstract ImmutableSet<ClassName> componentNames();
 
   abstract DependencyType dependencyType();
 
+  public abstract ClassName dependencyName();
+
   public abstract XTypeElement dependency();
 
-  public abstract ImmutableSet<XTypeElement> replacedDependencies();
+  public abstract ImmutableSet<ClassName> replacedDependencies();
 
   public boolean isModule() {
     return dependencyType() == DependencyType.MODULE;
@@ -81,28 +86,22 @@ public abstract class AggregatedDepsMetadata {
 
   public static AggregatedDepsIr toIr(AggregatedDepsMetadata metadata) {
     return new AggregatedDepsIr(
-        metadata.aggregatingElement().getClassName(),
-        metadata.componentElements().stream()
-            .map(XTypeElement::getClassName)
+        metadata.name(),
+        metadata.componentNames().stream()
             .map(ClassName::canonicalName)
             .collect(Collectors.toList()),
-        metadata
-            .testElement()
-            .map(XTypeElement::getClassName)
-            .map(ClassName::canonicalName)
-            .orElse(null),
+        metadata.testName().map(ClassName::canonicalName).orElse(null),
         metadata.replacedDependencies().stream()
-            .map(XTypeElement::getClassName)
             .map(ClassName::canonicalName)
             .collect(Collectors.toList()),
         metadata.dependencyType() == DependencyType.MODULE
-            ? metadata.dependency().getClassName().canonicalName()
+            ? metadata.dependencyName().canonicalName()
             : null,
         metadata.dependencyType() == DependencyType.ENTRY_POINT
-            ? metadata.dependency().getClassName().canonicalName()
+            ? metadata.dependencyName().canonicalName()
             : null,
         metadata.dependencyType() == DependencyType.COMPONENT_ENTRY_POINT
-            ? metadata.dependency().getClassName().canonicalName()
+            ? metadata.dependencyName().canonicalName()
             : null);
   }
 
@@ -112,33 +111,38 @@ public abstract class AggregatedDepsMetadata {
         "Missing @AggregatedDeps annotation on %s",
         element.getClassName().canonicalName());
     XAnnotation annotation = element.getAnnotation(ClassNames.AGGREGATED_DEPS);
-    return new AutoValue_AggregatedDepsMetadata(
-        element,
-        getTestElement(annotation.getAnnotationValue("test"), env),
-        getComponents(annotation.getAnnotationValue("components"), env),
-        getDependencyType(
-            annotation.getAnnotationValue("modules"),
-            annotation.getAnnotationValue("entryPoints"),
-            annotation.getAnnotationValue("componentEntryPoints")),
+    XTypeElement dependency =
         getDependency(
             annotation.getAnnotationValue("modules"),
             annotation.getAnnotationValue("entryPoints"),
             annotation.getAnnotationValue("componentEntryPoints"),
-            env),
+            env);
+    return new AutoValue_AggregatedDepsMetadata(
+        element.getClassName(),
+        element,
+        getTestName(annotation.getAnnotationValue("test"), env),
+        getComponentNames(annotation.getAnnotationValue("components"), env),
+        getDependencyType(
+            annotation.getAnnotationValue("modules"),
+            annotation.getAnnotationValue("entryPoints"),
+            annotation.getAnnotationValue("componentEntryPoints")),
+        dependency.getClassName(),
+        dependency,
         getReplacedDependencies(annotation.getAnnotationValue("replaces"), env));
   }
 
-  private static Optional<XTypeElement> getTestElement(
-      XAnnotationValue testValue, XProcessingEnv env) {
+  private static Optional<ClassName> getTestName(XAnnotationValue testValue, XProcessingEnv env) {
     checkNotNull(testValue);
     String test = testValue.asString();
-    return test.isEmpty() ? Optional.empty() : Optional.of(env.findTypeElement(test));
+    return test.isEmpty()
+        ? Optional.empty()
+        : Optional.of(env.findTypeElement(test).getClassName());
   }
 
-  private static ImmutableSet<XTypeElement> getComponents(
+  private static ImmutableSet<ClassName> getComponentNames(
       XAnnotationValue componentsValue, XProcessingEnv env) {
     checkNotNull(componentsValue);
-    ImmutableSet<XTypeElement> componentNames =
+    ImmutableSet<ClassName> componentNames =
         componentsValue.asStringList().stream()
             .map(
                 // This is a temporary hack to map the old ApplicationComponent to the new
@@ -148,9 +152,8 @@ public abstract class AggregatedDepsMetadata {
                 componentName ->
                     componentName.contentEquals(
                             "dagger.hilt.android.components.ApplicationComponent")
-                        ? ClassNames.SINGLETON_COMPONENT.canonicalName()
-                        : componentName)
-            .map(env::requireTypeElement)
+                        ? ClassNames.SINGLETON_COMPONENT
+                        : env.requireTypeElement(componentName).getClassName())
             .collect(toImmutableSet());
     checkState(!componentNames.isEmpty());
     return componentNames;
@@ -199,21 +202,21 @@ public abstract class AggregatedDepsMetadata {
     return dependency;
   }
 
-  private static ImmutableSet<XTypeElement> getReplacedDependencies(
+  private static ImmutableSet<ClassName> getReplacedDependencies(
       XAnnotationValue replacedDependenciesValue, XProcessingEnv env) {
     // Allow null values to support libraries using a Hilt version before @TestInstallIn was added
     return replacedDependenciesValue == null
         ? ImmutableSet.of()
         : replacedDependenciesValue.asStringList().stream()
             .map(env::requireTypeElement)
-            .map(replacedDep -> getPublicDependency(replacedDep, env))
+            .map(AggregatedDepsMetadata::getPublicDependency)
             .collect(toImmutableSet());
   }
 
   /** Returns the public Hilt wrapper module, or the module itself if its already public. */
-  private static XTypeElement getPublicDependency(XTypeElement dependency, XProcessingEnv env) {
+  private static ClassName getPublicDependency(XTypeElement dependency) {
     return PkgPrivateMetadata.of(dependency, ClassNames.MODULE)
-        .map(metadata -> env.requireTypeElement(metadata.generatedClassName().toString()))
-        .orElse(dependency);
+        .map(PkgPrivateMetadata::generatedClassName)
+        .orElseGet(dependency::getClassName);
   }
 }

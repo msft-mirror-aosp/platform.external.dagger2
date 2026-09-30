@@ -41,7 +41,7 @@ public abstract class ComponentDependencies {
   public abstract ImmutableSetMultimap<ClassName, XTypeElement> modules();
 
   /** Returns the entry points associated with the given a component. */
-  public abstract ImmutableSetMultimap<ClassName, XTypeElement> entryPoints();
+  public abstract ImmutableSetMultimap<ClassName, ClassName> entryPoints();
 
   /** Returns the component entry point associated with the given a component. */
   public abstract ImmutableSetMultimap<ClassName, XTypeElement> componentEntryPoints();
@@ -50,7 +50,7 @@ public abstract class ComponentDependencies {
   abstract static class Builder {
     abstract ImmutableSetMultimap.Builder<ClassName, XTypeElement> modulesBuilder();
 
-    abstract ImmutableSetMultimap.Builder<ClassName, XTypeElement> entryPointsBuilder();
+    abstract ImmutableSetMultimap.Builder<ClassName, ClassName> entryPointsBuilder();
 
     abstract ImmutableSetMultimap.Builder<ClassName, XTypeElement> componentEntryPointsBuilder();
 
@@ -64,15 +64,15 @@ public abstract class ComponentDependencies {
       ImmutableSet<AggregatedUninstallModulesMetadata> aggregatedUninstallModulesMetadata,
       ImmutableSet<AggregatedEarlyEntryPointMetadata> aggregatedEarlyEntryPointMetadata,
       XProcessingEnv env) {
-    ImmutableSet<XTypeElement> uninstalledModules =
-        ImmutableSet.<XTypeElement>builder()
+    ImmutableSet<ClassName> uninstalledModules =
+        ImmutableSet.<ClassName>builder()
             .addAll(
                 aggregatedUninstallModulesMetadata.stream()
                     .flatMap(metadata -> metadata.uninstallModuleElements().stream())
                     // @AggregatedUninstallModules always references the user module, so convert to
                     // the generated public wrapper if needed.
                     // TODO(bcorso): Consider converting this to the public module in the processor.
-                    .map(module -> PkgPrivateMetadata.publicModule(module))
+                    .map(module -> PkgPrivateMetadata.publicModule(module).getClassName())
                     .collect(toImmutableSet()))
             .addAll(
                 aggregatedDepsMetadata.stream()
@@ -84,18 +84,19 @@ public abstract class ComponentDependencies {
     ImmutableSet<ClassName> componentNames =
         descriptors.stream().map(ComponentDescriptor::component).collect(toImmutableSet());
     for (AggregatedDepsMetadata metadata : aggregatedDepsMetadata) {
-      for (XTypeElement componentElement : metadata.componentElements()) {
-        ClassName componentName = componentElement.getClassName();
+      for (ClassName componentName : metadata.componentNames()) {
         checkState(
             componentNames.contains(componentName), "%s is not a valid Component.", componentName);
         switch (metadata.dependencyType()) {
           case MODULE:
-            if (!uninstalledModules.contains(metadata.dependency())) {
+            if (!uninstalledModules.contains(metadata.dependencyName())) {
               componentDependencies.modulesBuilder().put(componentName, metadata.dependency());
             }
             break;
           case ENTRY_POINT:
-            componentDependencies.entryPointsBuilder().put(componentName, metadata.dependency());
+            componentDependencies
+                .entryPointsBuilder()
+                .put(componentName, metadata.dependencyName());
             break;
           case COMPONENT_ENTRY_POINT:
             componentDependencies
@@ -116,6 +117,7 @@ public abstract class ComponentDependencies {
                 // to the generated public wrapper if needed.
                 // TODO(bcorso): Consider converting this to the public module in the processor.
                 .map(PkgPrivateMetadata::publicEarlyEntryPoint)
+                .map(XTypeElement::getClassName)
                 .collect(toImmutableSet()));
 
     return componentDependencies.build();
