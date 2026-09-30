@@ -26,6 +26,7 @@ import dagger.hilt.EntryPoint;
 import dagger.hilt.EntryPoints;
 import dagger.hilt.InstallIn;
 import dagger.hilt.android.components.ActivityComponent;
+import dagger.hilt.android.components.ActivityRetainedComponent;
 import dagger.hilt.android.components.FragmentComponent;
 import dagger.hilt.android.internal.builders.ViewModelComponentBuilder;
 import dagger.multibindings.Multibinds;
@@ -97,10 +98,10 @@ public final class DefaultViewModelFactories {
     }
   }
 
-  /** The activity module to declare the optional factories. */
+  /** The retained activity module to declare the optional factories. */
   @Module
-  @InstallIn(ActivityComponent.class)
-  interface ActivityModule {
+  @InstallIn(ActivityRetainedComponent.class)
+  interface RetainedActivityModule {
     @Multibinds
     @HiltViewModelMap.KeySet
     abstract Map<Class<?>, Boolean> viewModelKeys();
