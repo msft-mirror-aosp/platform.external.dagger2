@@ -25,3 +25,9 @@ runs:
     - name: 'Gradle Java local tests (Java ${{ env.USE_JAVA_VERSION_FOR_GRADLE }}, Kotlin ${{ env.USE_KOTLIN_VERSION }})'
       run: ./util/run-local-gradle-tests.sh "${{ env.USE_JAVA_VERSION_FOR_GRADLE }}" "${{ env.USE_KOTLIN_VERSION }}" "${{ env.USE_KSP_VERSION }}"
       shell: bash
+    - name: 'Upload test reports (Java ${{ env.USE_JAVA_VERSION_FOR_GRADLE }}, Kotlin ${{ env.USE_KOTLIN_VERSION }})'
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: java-tests-reports-java-${{ env.USE_JAVA_VERSION_FOR_GRADLE }}-kotlin-${{ env.USE_KOTLIN_VERSION }}
+        path: ${{ github.workspace }}/**/build/reports/tests/*

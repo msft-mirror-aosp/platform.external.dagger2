@@ -35,9 +35,9 @@ runs:
     - name: 'Gradle Android local tests (AGP ${{ env.USE_AGP_VERSION }}, Java ${{ env.USE_JAVA_VERSION_FOR_GRADLE }}, Kotlin ${{ env.USE_KOTLIN_VERSION }})'
       run: ./util/run-local-gradle-android-tests.sh "${{ env.USE_AGP_VERSION }}" "${{ env.USE_JAVA_VERSION_FOR_GRADLE }}" "${{ env.USE_KOTLIN_VERSION }}" "${{ env.USE_KSP_VERSION }}"
       shell: bash
-    - name: 'Upload test reports (AGP ${{ env.USE_AGP_VERSION }})'
+    - name: 'Upload test reports (AGP ${{ env.USE_AGP_VERSION }}, Java ${{ env.USE_JAVA_VERSION_FOR_GRADLE }}, Kotlin ${{ env.USE_KOTLIN_VERSION }})'
       if: ${{ always() }}
       uses: actions/upload-artifact@v4
       with:
-        name: tests-reports-agp-${{ env.USE_AGP_VERSION }}
+        name: android-tests-reports-agp-${{ env.USE_AGP_VERSION }}-java-${{ env.USE_JAVA_VERSION_FOR_GRADLE }}-kotlin-${{ env.USE_KOTLIN_VERSION }}
         path: ${{ github.workspace }}/**/build/reports/tests/*

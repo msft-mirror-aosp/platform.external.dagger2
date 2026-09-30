@@ -44,6 +44,12 @@ runs:
     - name: 'Build and test Hilt Gradle plugin'
       run: AGP_VERSION=${{ env.USE_AGP_VERSION }} ./java/dagger/hilt/android/plugin/gradlew -p java/dagger/hilt/android/plugin clean test  --continue --no-daemon --stacktrace
       shell: bash
+    - name: 'Upload test reports'
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: hilt-gradle-plugin-tests-reports
+        path: ${{ github.workspace }}/java/dagger/hilt/android/plugin/**/buildOut/reports/tests/*
     - name: 'Clean bazel cache'
       run: rm -rf $(bazel info repository_cache)
       shell: bash
