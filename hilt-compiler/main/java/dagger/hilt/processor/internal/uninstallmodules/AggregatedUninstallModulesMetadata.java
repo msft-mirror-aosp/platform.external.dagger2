@@ -39,16 +39,16 @@ import java.util.stream.Collectors;
 @AutoValue
 public abstract class AggregatedUninstallModulesMetadata {
 
-  /** Returns the aggregating element */
-  public abstract XTypeElement aggregatingElement();
+  /** Returns the name of the aggregating element. */
+  public abstract ClassName name();
 
   /** Returns the test annotated with {@link dagger.hilt.android.testing.UninstallModules}. */
-  public abstract XTypeElement testElement();
+  public abstract ClassName testName();
 
   /**
    * Returns the list of uninstall modules in {@link dagger.hilt.android.testing.UninstallModules}.
    */
-  public abstract ImmutableList<XTypeElement> uninstallModuleElements();
+  public abstract ImmutableList<ClassName> uninstallModuleNames();
 
   /** Returns metadata for all aggregated elements in the aggregating package. */
   public static ImmutableSet<AggregatedUninstallModulesMetadata> from(XProcessingEnv env) {
@@ -69,10 +69,9 @@ public abstract class AggregatedUninstallModulesMetadata {
 
   public static AggregatedUninstallModulesIr toIr(AggregatedUninstallModulesMetadata metadata) {
     return new AggregatedUninstallModulesIr(
-        metadata.aggregatingElement().getClassName(),
-        metadata.testElement().getClassName().canonicalName(),
-        metadata.uninstallModuleElements().stream()
-            .map(XTypeElement::getClassName)
+        metadata.name(),
+        metadata.testName().canonicalName(),
+        metadata.uninstallModuleNames().stream()
             .map(ClassName::canonicalName)
             .collect(Collectors.toList()));
   }
@@ -82,10 +81,11 @@ public abstract class AggregatedUninstallModulesMetadata {
     XAnnotation annotationMirror = element.getAnnotation(ClassNames.AGGREGATED_UNINSTALL_MODULES);
 
     return new AutoValue_AggregatedUninstallModulesMetadata(
-        element,
-        env.requireTypeElement(annotationMirror.getAsString("test")),
+        element.getClassName(),
+        env.requireTypeElement(annotationMirror.getAsString("test")).getClassName(),
         annotationMirror.getAsStringList("uninstallModules").stream()
             .map(env::requireTypeElement)
+            .map(XTypeElement::getClassName)
             .collect(toImmutableList()));
   }
 }

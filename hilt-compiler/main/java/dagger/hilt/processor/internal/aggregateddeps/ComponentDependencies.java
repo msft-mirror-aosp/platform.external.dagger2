@@ -68,11 +68,14 @@ public abstract class ComponentDependencies {
         ImmutableSet.<ClassName>builder()
             .addAll(
                 aggregatedUninstallModulesMetadata.stream()
-                    .flatMap(metadata -> metadata.uninstallModuleElements().stream())
+                    .flatMap(metadata -> metadata.uninstallModuleNames().stream())
                     // @AggregatedUninstallModules always references the user module, so convert to
                     // the generated public wrapper if needed.
                     // TODO(bcorso): Consider converting this to the public module in the processor.
-                    .map(module -> PkgPrivateMetadata.publicModule(module).getClassName())
+                    .map(
+                        module ->
+                            PkgPrivateMetadata.publicModule(env.requireTypeElement(module))
+                                .getClassName())
                     .collect(toImmutableSet()))
             .addAll(
                 aggregatedDepsMetadata.stream()
