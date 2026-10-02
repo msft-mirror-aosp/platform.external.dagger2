@@ -2016,7 +2016,7 @@ public class MissingBindingValidationTest {
             "",
             "@Module",
             "object TestModule {",
-            "   @Provides fun provideBars(): List<@JvmWildcard Bar> = setOf()",
+            "   @Provides fun provideBars(): List<@JvmWildcard Bar> = listOf()",
             "}");
 
     CompilerTests.daggerCompiler(component, fooSrc, barSrc, moduleSrc)

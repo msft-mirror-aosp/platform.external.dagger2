@@ -254,10 +254,12 @@ public class AndroidEntryPointProcessorTest {
         .compile(
             subject -> {
               subject.compilationDidFail();
-              if (HiltCompilerTests.backend(subject) == Backend.JAVAC) {
-                subject.hasErrorCount(2);
+              subject.hasErrorCount(2);
+              if (HiltCompilerTests.backend(subject) == Backend.KSP) {
+                subject.hasErrorContaining("Unresolved reference 'Hilt_BaseActivity'");
               } else {
-                subject.hasErrorCount(1);
+                subject.hasErrorContaining(
+                    "cannot find symbol\n      symbol: class Hilt_BaseActivity");
               }
               subject.hasErrorContaining(
                   "@AndroidEntryPoint-annotated classes cannot have type parameters.");
@@ -279,11 +281,10 @@ public class AndroidEntryPointProcessorTest {
     HiltCompilerTests.hiltCompiler(testActivity)
         .compile(
             (CompilationResultSubject subject) -> {
+              subject.hasErrorCount(2);
               if (HiltCompilerTests.backend(subject) == XProcessingEnv.Backend.KSP) {
-                subject.hasErrorCount(1);
+                subject.hasErrorContaining("Unresolved reference 'Hilt_MyApplication'");
               } else {
-                // Javac has an extra error due to the missing symbol.
-                subject.hasErrorCount(2);
                 subject.hasErrorContaining(
                     "cannot find symbol\n      symbol: class Hilt_MyApplication");
               }

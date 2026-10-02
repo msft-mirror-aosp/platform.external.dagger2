@@ -790,7 +790,7 @@ public class SubcomponentValidationTest {
             "class TestModule {",
             "  @Provides Sub.Builder providesConflictsWithModuleSubcomponents() { return null; }",
             "  @Provides Object usesSubcomponentBuilder(Sub.Builder builder) {",
-            "    return new Builder().toString();",
+            "    return builder.toString();",
             "  }",
             "}");
 

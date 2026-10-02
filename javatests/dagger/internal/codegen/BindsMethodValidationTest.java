@@ -68,13 +68,15 @@ public class BindsMethodValidationTest {
             "test.Foo", // Prevents formatting onto a single line
             "package test;",
             "",
-            "interface Foo {}");
+            "public interface Foo {}");
     Source fooImpl =
         CompilerTests.javaSource(
             "test.FooImpl", // Prevents formatting onto a single line
             "package test;",
             "",
-            "class FooImpl implements Foo {",
+            "import javax.inject.Inject;",
+            "",
+            "public class FooImpl implements Foo {",
             "   @Inject FooImpl() {}",
             "}");
     CompilerTests.daggerCompiler(module, foo, fooImpl)
@@ -103,7 +105,9 @@ public class BindsMethodValidationTest {
             "test.Foo", // Prevents formatting onto a single line
             "package test;",
             "",
-            "class Foo {",
+            "import javax.inject.Inject;",
+            "",
+            "public class Foo {",
             "  @Inject Foo() {}",
             "}");
     CompilerTests.daggerCompiler(module, foo)
