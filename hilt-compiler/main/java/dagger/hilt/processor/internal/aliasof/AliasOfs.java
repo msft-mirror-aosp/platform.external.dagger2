@@ -18,6 +18,7 @@ package dagger.hilt.processor.internal.aliasof;
 
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
 
+import androidx.room3.compiler.processing.XProcessingEnv;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.squareup.javapoet.ClassName;
@@ -30,6 +31,7 @@ import dagger.hilt.processor.internal.ProcessorErrors;
  */
 public final class AliasOfs {
   public static AliasOfs create(
+      XProcessingEnv env,
       ImmutableSet<AliasOfPropagatedDataMetadata> metadatas,
       ImmutableSet<ComponentDescriptor> componentDescriptors) {
     ImmutableSet<ClassName> defineComponentScopes =
@@ -40,19 +42,19 @@ public final class AliasOfs {
     ImmutableSetMultimap.Builder<ClassName, ClassName> builder = ImmutableSetMultimap.builder();
     metadatas.forEach(
         metadata -> {
-          ClassName aliasScopeName = metadata.aliasElement().getClassName();
+          ClassName aliasScopeName = metadata.aliasName();
           metadata
-              .defineComponentScopeElements()
+              .defineComponentScopeNames()
               .forEach(
-                  defineComponentScope -> {
-                    ClassName defineComponentScopeName = defineComponentScope.getClassName();
-                    ProcessorErrors.checkState(
-                        defineComponentScopes.contains(defineComponentScopeName),
-                        metadata.aliasElement(),
-                        "The scope %s cannot be an alias for %s. You can only have aliases of a"
-                            + " scope defined directly on a @DefineComponent type.",
-                        aliasScopeName,
-                        defineComponentScopeName);
+                  defineComponentScopeName -> {
+                    if (!defineComponentScopes.contains(defineComponentScopeName)) {
+                      ProcessorErrors.error(
+                          env.requireTypeElement(aliasScopeName),
+                          "The scope %s cannot be an alias for %s. You can only have aliases of a"
+                              + " scope defined directly on a @DefineComponent type.",
+                          aliasScopeName,
+                          defineComponentScopeName);
+                    }
                     builder.put(defineComponentScopeName, aliasScopeName);
                   });
         });

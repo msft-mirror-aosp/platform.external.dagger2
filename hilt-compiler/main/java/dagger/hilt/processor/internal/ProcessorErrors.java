@@ -133,6 +133,29 @@ public final class ProcessorErrors {
   }
 
   /**
+   * Throws an error for a bad input.
+   *
+   * @param badElement the element that was at fault
+   * @param errorMessageTemplate a template for the exception message. The message is formed by
+   *     replacing each {@code %s} placeholder in the template with an argument. These are matched
+   *     by position - the first {@code %s} gets {@code errorMessageArgs[0]}, etc. Unmatched
+   *     arguments will be appended to the formatted message in square braces. Unmatched
+   *     placeholders will be left as-is.
+   * @param errorMessageArgs the arguments to be substituted into the message template. Arguments
+   *     are converted to strings using {@link String#valueOf(Object)}.
+   * @throws BadInputException always
+   * @throws NullPointerException if either {@code errorMessageTemplate} or {@code errorMessageArgs}
+   *     is null (don't let this happen)
+   */
+  @FormatMethod
+  public static void error(
+      XElement badElement,
+      @Nullable @FormatString String errorMessageTemplate,
+      @Nullable Object... errorMessageArgs) {
+    checkState(false, badElement, errorMessageTemplate, errorMessageArgs);
+  }
+
+  /**
    * Ensures the truth of an expression involving the state of the calling instance, but not
    * involving any parameters to the calling method.
    *

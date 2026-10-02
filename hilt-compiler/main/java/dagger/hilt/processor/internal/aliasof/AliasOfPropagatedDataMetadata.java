@@ -27,6 +27,7 @@ import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.squareup.javapoet.ClassName;
 import dagger.hilt.processor.internal.AggregatedElements;
 import dagger.hilt.processor.internal.BadInputException;
 import dagger.hilt.processor.internal.ClassNames;
@@ -41,12 +42,12 @@ import dagger.internal.codegen.xprocessing.XAnnotations;
 @AutoValue
 public abstract class AliasOfPropagatedDataMetadata {
 
-  /** Returns the aggregating element */
-  public abstract XTypeElement aggregatingElement();
+  /** Returns the name of the aggregating element. */
+  public abstract ClassName name();
 
-  abstract ImmutableList<XTypeElement> defineComponentScopeElements();
+  abstract ImmutableList<ClassName> defineComponentScopeNames();
 
-  abstract XTypeElement aliasElement();
+  abstract ClassName aliasName();
 
   /** Returns metadata for all aggregated elements in the aggregating package. */
   public static ImmutableSet<AliasOfPropagatedDataMetadata> from(XProcessingEnv env) {
@@ -65,11 +66,7 @@ public abstract class AliasOfPropagatedDataMetadata {
 
   public static AliasOfPropagatedDataIr toIr(AliasOfPropagatedDataMetadata metadata) {
     return new AliasOfPropagatedDataIr(
-        metadata.aggregatingElement().getClassName(),
-        metadata.defineComponentScopeElements().stream()
-            .map(XTypeElement::getClassName)
-            .collect(toImmutableList()),
-        metadata.aliasElement().getClassName());
+        metadata.name(), metadata.defineComponentScopeNames(), metadata.aliasName());
   }
 
   private static AliasOfPropagatedDataMetadata create(XTypeElement element) {
@@ -79,21 +76,28 @@ public abstract class AliasOfPropagatedDataMetadata {
     // `XAnnotation.hasAnnotationValue(methodName: String)`.
     ImmutableMap<String, XAnnotationValue> values = Processors.getAnnotationValues(annotation);
 
-    ImmutableList<XTypeElement> defineComponentScopes;
+    ImmutableList<ClassName> defineComponentScopes;
 
     if (values.containsKey("defineComponentScopes")) {
       defineComponentScopes =
-          XAnnotations.getAsTypeElementList(annotation, "defineComponentScopes");
+          XAnnotations.getAsTypeElementList(annotation, "defineComponentScopes").stream()
+              .map(XTypeElement::getClassName)
+              .collect(toImmutableList());
     } else if (values.containsKey("defineComponentScope")) {
       // Older version of AliasOfPropagatedData only passed a single defineComponentScope class
       // value. Fall back on reading the single value if we get old propagated data.
-      defineComponentScopes = XAnnotations.getAsTypeElementList(annotation, "defineComponentScope");
+      defineComponentScopes =
+          XAnnotations.getAsTypeElementList(annotation, "defineComponentScope").stream()
+              .map(XTypeElement::getClassName)
+              .collect(toImmutableList());
     } else {
       throw new BadInputException(
           "AliasOfPropagatedData is missing defineComponentScopes", element);
     }
 
     return new AutoValue_AliasOfPropagatedDataMetadata(
-        element, defineComponentScopes, annotation.getAsType("alias").getTypeElement());
+        element.getClassName(),
+        defineComponentScopes,
+        annotation.getAsType("alias").getTypeElement().getClassName());
   }
 }

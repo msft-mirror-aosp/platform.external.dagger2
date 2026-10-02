@@ -132,7 +132,9 @@ public final class ComponentTreeDepsProcessingStep extends BaseProcessingStep {
               processingEnv());
       AliasOfs aliasOfs =
           AliasOfs.create(
-              AliasOfPropagatedDataMetadata.from(metadata.aliasOfDeps()), componentDescriptors);
+              processingEnv(),
+              AliasOfPropagatedDataMetadata.from(metadata.aliasOfDeps()),
+              componentDescriptors);
       RootMetadata rootMetadata = RootMetadata.create(root, tree, deps, aliasOfs, processingEnv());
 
       generateComponents(metadata, rootMetadata, componentNames);
