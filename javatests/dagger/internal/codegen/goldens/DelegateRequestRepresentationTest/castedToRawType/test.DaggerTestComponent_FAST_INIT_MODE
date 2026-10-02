@@ -35,16 +35,16 @@ final class DaggerTestComponent {
     }
 
     public TestComponent build() {
-      return new ComponentImpl();
+      return new TestComponentImpl();
     }
   }
 
-  private static final class ComponentImpl implements TestComponent {
-    private final ComponentImpl componentImpl = this;
+  private static final class TestComponentImpl implements TestComponent {
+    private final TestComponentImpl testComponentImpl = this;
 
     Provider<String> provideStringProvider;
 
-    ComponentImpl() {
+    TestComponentImpl() {
 
       initialize();
 
@@ -52,7 +52,7 @@ final class DaggerTestComponent {
 
     @SuppressWarnings("unchecked")
     private void initialize() {
-      this.provideStringProvider = new SwitchingProvider<>(componentImpl, 0);
+      this.provideStringProvider = new SwitchingProvider<>(testComponentImpl, 0);
     }
 
     @Override
@@ -71,12 +71,12 @@ final class DaggerTestComponent {
     }
 
     private static final class SwitchingProvider<T> implements Provider<T> {
-      private final ComponentImpl componentImpl;
+      private final TestComponentImpl testComponentImpl;
 
       private final int id;
 
-      SwitchingProvider(ComponentImpl componentImpl, int id) {
-        this.componentImpl = componentImpl;
+      SwitchingProvider(TestComponentImpl testComponentImpl, int id) {
+        this.testComponentImpl = testComponentImpl;
         this.id = id;
       }
 

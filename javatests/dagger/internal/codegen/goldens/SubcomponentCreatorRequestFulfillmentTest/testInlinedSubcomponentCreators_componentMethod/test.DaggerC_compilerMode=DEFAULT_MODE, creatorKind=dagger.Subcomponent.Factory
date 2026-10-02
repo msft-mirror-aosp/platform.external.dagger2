@@ -34,51 +34,51 @@ final class DaggerC {
     }
 
     public C build() {
-      return new ComponentImpl();
+      return new CImpl();
     }
   }
 
   private static final class SubFactory implements Sub.Factory {
-    private final ComponentImpl componentImpl;
+    private final CImpl cImpl;
 
-    private SubFactory(ComponentImpl componentImpl) {
-      this.componentImpl = componentImpl;
+    private SubFactory(CImpl cImpl) {
+      this.cImpl = cImpl;
     }
 
     @Override
     public Sub createComponent() {
-      return new SubImpl(componentImpl);
+      return new SubImpl(cImpl);
     }
   }
 
   private static final class SubImpl implements Sub {
-    private final ComponentImpl componentImpl;
+    private final CImpl cImpl;
 
     private final SubImpl subImpl = this;
 
-    SubImpl(ComponentImpl componentImpl) {
-      this.componentImpl = componentImpl;
+    SubImpl(CImpl cImpl) {
+      this.cImpl = cImpl;
 
 
     }
   }
 
-  private static final class ComponentImpl implements C {
-    private final ComponentImpl componentImpl = this;
+  private static final class CImpl implements C {
+    private final CImpl cImpl = this;
 
-    ComponentImpl() {
+    CImpl() {
 
 
     }
 
     @Override
     public Sub.Factory sFactory() {
-      return new SubFactory(componentImpl);
+      return new SubFactory(cImpl);
     }
 
     @Override
     public UsesSubcomponent usesSubcomponent() {
-      return new UsesSubcomponent(new SubFactory(componentImpl));
+      return new UsesSubcomponent(new SubFactory(cImpl));
     }
   }
 }

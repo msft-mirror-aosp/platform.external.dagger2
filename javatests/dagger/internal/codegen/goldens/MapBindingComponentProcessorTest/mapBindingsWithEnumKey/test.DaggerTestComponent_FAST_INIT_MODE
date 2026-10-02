@@ -58,16 +58,16 @@ final class DaggerTestComponent {
       if (mapModuleTwo == null) {
         this.mapModuleTwo = new MapModuleTwo();
       }
-      return new ComponentImpl(mapModuleOne, mapModuleTwo);
+      return new TestComponentImpl(mapModuleOne, mapModuleTwo);
     }
   }
 
-  private static final class ComponentImpl implements TestComponent {
+  private static final class TestComponentImpl implements TestComponent {
     private final MapModuleOne mapModuleOne;
 
     private final MapModuleTwo mapModuleTwo;
 
-    private final ComponentImpl componentImpl = this;
+    private final TestComponentImpl testComponentImpl = this;
 
     Provider<Handler> provideAdminHandlerProvider;
 
@@ -75,7 +75,7 @@ final class DaggerTestComponent {
 
     Provider mapOfPathEnumAndProviderOfHandlerProvider;
 
-    ComponentImpl(MapModuleOne mapModuleOneParam, MapModuleTwo mapModuleTwoParam) {
+    TestComponentImpl(MapModuleOne mapModuleOneParam, MapModuleTwo mapModuleTwoParam) {
       this.mapModuleOne = mapModuleOneParam;
       this.mapModuleTwo = mapModuleTwoParam;
       initialize(mapModuleOneParam, mapModuleTwoParam);
@@ -85,9 +85,9 @@ final class DaggerTestComponent {
     @SuppressWarnings("unchecked")
     private void initialize(final MapModuleOne mapModuleOneParam,
         final MapModuleTwo mapModuleTwoParam) {
-      this.provideAdminHandlerProvider = new SwitchingProvider<>(componentImpl, 1);
-      this.provideLoginHandlerProvider = new SwitchingProvider<>(componentImpl, 2);
-      this.mapOfPathEnumAndProviderOfHandlerProvider = new SwitchingProvider<>(componentImpl, 0);
+      this.provideAdminHandlerProvider = new SwitchingProvider<>(testComponentImpl, 1);
+      this.provideLoginHandlerProvider = new SwitchingProvider<>(testComponentImpl, 2);
+      this.mapOfPathEnumAndProviderOfHandlerProvider = new SwitchingProvider<>(testComponentImpl, 0);
     }
 
     @Override
@@ -96,12 +96,12 @@ final class DaggerTestComponent {
     }
 
     private static final class SwitchingProvider<T> implements Provider<T> {
-      private final ComponentImpl componentImpl;
+      private final TestComponentImpl testComponentImpl;
 
       private final int id;
 
-      SwitchingProvider(ComponentImpl componentImpl, int id) {
-        this.componentImpl = componentImpl;
+      SwitchingProvider(TestComponentImpl testComponentImpl, int id) {
+        this.testComponentImpl = testComponentImpl;
         this.id = id;
       }
 
@@ -110,13 +110,13 @@ final class DaggerTestComponent {
       public T get() {
         switch (id) {
           case 0: // java.util.Map<test.PathEnum,javax.inject.Provider<test.Handler>>
-          return (T) ImmutableMap.<PathEnum, javax.inject.Provider<Handler>>of(PathEnum.ADMIN, componentImpl.provideAdminHandlerProvider, PathEnum.LOGIN, componentImpl.provideLoginHandlerProvider);
+          return (T) ImmutableMap.<PathEnum, javax.inject.Provider<Handler>>of(PathEnum.ADMIN, testComponentImpl.provideAdminHandlerProvider, PathEnum.LOGIN, testComponentImpl.provideLoginHandlerProvider);
 
           case 1: // java.util.Map<test.PathEnum,test.Handler> test.MapModuleOne#provideAdminHandler
-          return (T) MapModuleOne_ProvideAdminHandlerFactory.provideAdminHandler(componentImpl.mapModuleOne);
+          return (T) MapModuleOne_ProvideAdminHandlerFactory.provideAdminHandler(testComponentImpl.mapModuleOne);
 
           case 2: // java.util.Map<test.PathEnum,test.Handler> test.MapModuleTwo#provideLoginHandler
-          return (T) MapModuleTwo_ProvideLoginHandlerFactory.provideLoginHandler(componentImpl.mapModuleTwo);
+          return (T) MapModuleTwo_ProvideLoginHandlerFactory.provideLoginHandler(testComponentImpl.mapModuleTwo);
 
           default: throw new AssertionError(id);
         }

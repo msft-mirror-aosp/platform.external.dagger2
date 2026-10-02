@@ -46,16 +46,16 @@ final class DaggerTestComponent {
       if (mapModule == null) {
         this.mapModule = new MapModule();
       }
-      return new ComponentImpl(mapModule);
+      return new TestComponentImpl(mapModule);
     }
   }
 
-  private static final class ComponentImpl implements TestComponent {
+  private static final class TestComponentImpl implements TestComponent {
     private final MapModule mapModule;
 
-    private final ComponentImpl componentImpl = this;
+    private final TestComponentImpl testComponentImpl = this;
 
-    ComponentImpl(MapModule mapModuleParam) {
+    TestComponentImpl(MapModule mapModuleParam) {
       this.mapModule = mapModuleParam;
 
     }

@@ -37,14 +37,14 @@ final class DaggerRequestsSubtypeAsProvider {
     }
 
     public RequestsSubtypeAsProvider build() {
-      return new ComponentImpl();
+      return new RequestsSubtypeAsProviderImpl();
     }
   }
 
-  private static final class ComponentImpl implements RequestsSubtypeAsProvider {
-    private final ComponentImpl componentImpl = this;
+  private static final class RequestsSubtypeAsProviderImpl implements RequestsSubtypeAsProvider {
+    private final RequestsSubtypeAsProviderImpl requestsSubtypeAsProviderImpl = this;
 
-    ComponentImpl() {
+    RequestsSubtypeAsProviderImpl() {
 
 
     }

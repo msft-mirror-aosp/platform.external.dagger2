@@ -36,12 +36,12 @@ final class DaggerMyComponent {
     }
 
     public MyComponent build() {
-      return new ComponentImpl();
+      return new MyComponentImpl();
     }
   }
 
   private static final class MySubcomponentImpl implements MySubcomponent {
-    private final ComponentImpl componentImpl;
+    private final MyComponentImpl myComponentImpl;
 
     private final MySubcomponentImpl mySubcomponentImpl = this;
 
@@ -50,8 +50,8 @@ final class DaggerMyComponent {
      */
     Provider<?> mySubcomponentAssistedFactoryProvider;
 
-    MySubcomponentImpl(ComponentImpl componentImpl) {
-      this.componentImpl = componentImpl;
+    MySubcomponentImpl(MyComponentImpl myComponentImpl) {
+      this.myComponentImpl = myComponentImpl;
 
       initialize();
 
@@ -59,7 +59,7 @@ final class DaggerMyComponent {
 
     @SuppressWarnings("unchecked")
     private void initialize() {
-      this.mySubcomponentAssistedFactoryProvider = SingleCheck.provider(new SwitchingProvider<>(componentImpl, mySubcomponentImpl, 0));
+      this.mySubcomponentAssistedFactoryProvider = SingleCheck.provider(new SwitchingProvider<>(myComponentImpl, mySubcomponentImpl, 0));
     }
 
     @Override
@@ -68,15 +68,15 @@ final class DaggerMyComponent {
     }
 
     private static final class SwitchingProvider<T> implements Provider<T> {
-      private final ComponentImpl componentImpl;
+      private final MyComponentImpl myComponentImpl;
 
       private final MySubcomponentImpl mySubcomponentImpl;
 
       private final int id;
 
-      SwitchingProvider(ComponentImpl componentImpl, MySubcomponentImpl mySubcomponentImpl,
+      SwitchingProvider(MyComponentImpl myComponentImpl, MySubcomponentImpl mySubcomponentImpl,
           int id) {
-        this.componentImpl = componentImpl;
+        this.myComponentImpl = myComponentImpl;
         this.mySubcomponentImpl = mySubcomponentImpl;
         this.id = id;
       }
@@ -99,15 +99,15 @@ final class DaggerMyComponent {
     }
   }
 
-  private static final class ComponentImpl implements MyComponent {
-    private final ComponentImpl componentImpl = this;
+  private static final class MyComponentImpl implements MyComponent {
+    private final MyComponentImpl myComponentImpl = this;
 
     /**
      * {@code Provider<MyComponentAssistedFactory>}
      */
     Provider<?> myComponentAssistedFactoryProvider;
 
-    ComponentImpl() {
+    MyComponentImpl() {
 
       initialize();
 
@@ -115,7 +115,7 @@ final class DaggerMyComponent {
 
     @SuppressWarnings("unchecked")
     private void initialize() {
-      this.myComponentAssistedFactoryProvider = SingleCheck.provider(new SwitchingProvider<>(componentImpl, 0));
+      this.myComponentAssistedFactoryProvider = SingleCheck.provider(new SwitchingProvider<>(myComponentImpl, 0));
     }
 
     @Override
@@ -125,16 +125,16 @@ final class DaggerMyComponent {
 
     @Override
     public MySubcomponent mySubcomponent() {
-      return new MySubcomponentImpl(componentImpl);
+      return new MySubcomponentImpl(myComponentImpl);
     }
 
     private static final class SwitchingProvider<T> implements Provider<T> {
-      private final ComponentImpl componentImpl;
+      private final MyComponentImpl myComponentImpl;
 
       private final int id;
 
-      SwitchingProvider(ComponentImpl componentImpl, int id) {
-        this.componentImpl = componentImpl;
+      SwitchingProvider(MyComponentImpl myComponentImpl, int id) {
+        this.myComponentImpl = myComponentImpl;
         this.id = id;
       }
 

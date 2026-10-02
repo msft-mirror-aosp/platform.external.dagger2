@@ -34,15 +34,15 @@ final class DaggerMyComponent {
     }
 
     public MyComponent build() {
-      return new ComponentImpl();
+      return new MyComponentImpl();
     }
   }
 
-  private static final class ComponentImpl implements MyComponent {
+  private static final class MyComponentImpl implements MyComponent {
     @Weak
-    private final ComponentImpl componentImpl = this;
+    private final MyComponentImpl myComponentImpl = this;
 
-    ComponentImpl() {
+    MyComponentImpl() {
 
 
     }

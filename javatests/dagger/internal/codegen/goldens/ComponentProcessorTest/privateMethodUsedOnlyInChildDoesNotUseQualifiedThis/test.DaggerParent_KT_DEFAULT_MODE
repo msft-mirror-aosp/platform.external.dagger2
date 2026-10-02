@@ -36,36 +36,36 @@ final class DaggerParent {
     }
 
     public Parent build() {
-      return new ComponentImpl();
+      return new ParentImpl();
     }
   }
 
   private static final class ChildImpl implements Child {
-    private final ComponentImpl componentImpl;
+    private final ParentImpl parentImpl;
 
     private final ChildImpl childImpl = this;
 
-    ChildImpl(ComponentImpl componentImpl) {
-      this.componentImpl = componentImpl;
+    ChildImpl(ParentImpl parentImpl) {
+      this.parentImpl = parentImpl;
 
 
     }
 
     @Override
     public String string() {
-      return (String) ((Object) (componentImpl.string()));
+      return (String) ((Object) (parentImpl.string()));
     }
   }
 
-  private static final class ComponentImpl implements Parent {
-    private final ComponentImpl componentImpl = this;
+  private static final class ParentImpl implements Parent {
+    private final ParentImpl parentImpl = this;
 
     /**
      * {@code Provider<java.lang.Number>}
      */
     Provider<?> numberProvider;
 
-    ComponentImpl() {
+    ParentImpl() {
 
       initialize();
 
@@ -82,7 +82,7 @@ final class DaggerParent {
 
     @Override
     public Child child() {
-      return new ChildImpl(componentImpl);
+      return new ChildImpl(parentImpl);
     }
   }
 }

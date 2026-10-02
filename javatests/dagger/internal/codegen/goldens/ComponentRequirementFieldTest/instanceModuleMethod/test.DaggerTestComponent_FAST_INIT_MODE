@@ -57,18 +57,18 @@ final class DaggerTestComponent {
       if (otherPackageModule == null) {
         this.otherPackageModule = new OtherPackageModule();
       }
-      return new ComponentImpl(parentModule, otherPackageModule);
+      return new TestComponentImpl(parentModule, otherPackageModule);
     }
   }
 
-  private static final class ComponentImpl implements TestComponent {
+  private static final class TestComponentImpl implements TestComponent {
     private final ParentModule parentModule;
 
     private final OtherPackageModule otherPackageModule;
 
-    private final ComponentImpl componentImpl = this;
+    private final TestComponentImpl testComponentImpl = this;
 
-    ComponentImpl(ParentModule parentModuleParam, OtherPackageModule otherPackageModuleParam) {
+    TestComponentImpl(ParentModule parentModuleParam, OtherPackageModule otherPackageModuleParam) {
       this.parentModule = parentModuleParam;
       this.otherPackageModule = otherPackageModuleParam;
 

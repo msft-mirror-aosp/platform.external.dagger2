@@ -48,12 +48,12 @@ final class DaggerTestComponent {
       if (parentModule == null) {
         this.parentModule = new ParentModule();
       }
-      return new ComponentImpl(parentModule);
+      return new TestComponentImpl(parentModule);
     }
   }
 
   private static final class TestSubcomponentImpl implements TestSubcomponent {
-    private final ComponentImpl componentImpl;
+    private final TestComponentImpl testComponentImpl;
 
     private final TestSubcomponentImpl testSubcomponentImpl = this;
 
@@ -61,8 +61,8 @@ final class DaggerTestComponent {
 
     Provider<Object> reliesOnMultibindingProvider;
 
-    TestSubcomponentImpl(ComponentImpl componentImpl) {
-      this.componentImpl = componentImpl;
+    TestSubcomponentImpl(TestComponentImpl testComponentImpl) {
+      this.testComponentImpl = testComponentImpl;
 
       initialize();
 
@@ -71,7 +71,7 @@ final class DaggerTestComponent {
     @SuppressWarnings("unchecked")
     private void initialize() {
       this.setOfObjectProvider = setOfObjectBuilder();
-      this.reliesOnMultibindingProvider = ParentModule_ReliesOnMultibindingFactory.create(componentImpl.parentModule, setOfObjectProvider);
+      this.reliesOnMultibindingProvider = ParentModule_ReliesOnMultibindingFactory.create(testComponentImpl.parentModule, setOfObjectProvider);
     }
 
     SetFactory<Object> setOfObjectBuilder() {
@@ -87,16 +87,16 @@ final class DaggerTestComponent {
     }
   }
 
-  private static final class ComponentImpl implements TestComponent {
+  private static final class TestComponentImpl implements TestComponent {
     private final ParentModule parentModule;
 
-    private final ComponentImpl componentImpl = this;
+    private final TestComponentImpl testComponentImpl = this;
 
     Provider<Set<Object>> setOfObjectProvider;
 
     Provider<Object> reliesOnMultibindingProvider;
 
-    ComponentImpl(ParentModule parentModuleParam) {
+    TestComponentImpl(ParentModule parentModuleParam) {
       this.parentModule = parentModuleParam;
       initialize(parentModuleParam);
 
@@ -121,7 +121,7 @@ final class DaggerTestComponent {
 
     @Override
     public TestSubcomponent subcomponent() {
-      return new TestSubcomponentImpl(componentImpl);
+      return new TestSubcomponentImpl(testComponentImpl);
     }
   }
 }

@@ -40,16 +40,16 @@ final class DaggerAComponent {
 
     public AComponent build() {
       Preconditions.checkBuilderRequirement(nestedNullableComponent, NestedNullableComponent.class);
-      return new ComponentImpl(nestedNullableComponent);
+      return new AComponentImpl(nestedNullableComponent);
     }
   }
 
-  private static final class ComponentImpl implements AComponent {
+  private static final class AComponentImpl implements AComponent {
     private final NestedNullableComponent nestedNullableComponent;
 
-    private final ComponentImpl componentImpl = this;
+    private final AComponentImpl aComponentImpl = this;
 
-    ComponentImpl(NestedNullableComponent nestedNullableComponentParam) {
+    AComponentImpl(NestedNullableComponent nestedNullableComponentParam) {
       this.nestedNullableComponent = nestedNullableComponentParam;
 
     }

@@ -51,7 +51,8 @@ public class LongCycleTest {
     ClassName componentImpl =
         System.getProperty("dagger.mode").contains("ExtendsComponent")
             ? ClassName.get(DaggerLongCycle_LongCycleComponent.class)
-            : ClassName.get(DaggerLongCycle_LongCycleComponent.class).nestedClass("ComponentImpl");
+            : ClassName.get(DaggerLongCycle_LongCycleComponent.class)
+                .nestedClass("LongCycleComponentImpl");
     boolean hasInitialize2 =
         stream(
                 DaggerLongCycle_LongCycleComponent.class

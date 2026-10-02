@@ -36,14 +36,14 @@ final class DaggerTestComponent {
     }
 
     public TestComponent build() {
-      return new ComponentImpl();
+      return new TestComponentImpl();
     }
   }
 
   private static final class TestSubcomponentImpl implements TestSubcomponent {
     TestSubcomponentImplShard testSubcomponentImplShard;
 
-    private final ComponentImpl componentImpl;
+    private final TestComponentImpl testComponentImpl;
 
     private final TestSubcomponentImpl testSubcomponentImpl = this;
 
@@ -57,17 +57,17 @@ final class DaggerTestComponent {
      */
     Provider<?> binding2Provider;
 
-    TestSubcomponentImpl(ComponentImpl componentImpl) {
-      this.componentImpl = componentImpl;
+    TestSubcomponentImpl(TestComponentImpl testComponentImpl) {
+      this.testComponentImpl = testComponentImpl;
 
       initialize();
-      testSubcomponentImplShard = new TestSubcomponentImplShard(componentImpl, testSubcomponentImpl);
+      testSubcomponentImplShard = new TestSubcomponentImplShard(testComponentImpl, testSubcomponentImpl);
     }
 
     @SuppressWarnings("unchecked")
     private void initialize() {
-      this.binding1Provider = DoubleCheck.provider(new SwitchingProvider<>(componentImpl, testSubcomponentImpl, 0));
-      this.binding2Provider = DoubleCheck.provider(new SwitchingProvider<>(componentImpl, testSubcomponentImpl, 1));
+      this.binding1Provider = DoubleCheck.provider(new SwitchingProvider<>(testComponentImpl, testSubcomponentImpl, 0));
+      this.binding2Provider = DoubleCheck.provider(new SwitchingProvider<>(testComponentImpl, testSubcomponentImpl, 1));
     }
 
     @Override
@@ -101,15 +101,15 @@ final class DaggerTestComponent {
     }
 
     private static final class SwitchingProvider<T> implements Provider<T> {
-      private final ComponentImpl componentImpl;
+      private final TestComponentImpl testComponentImpl;
 
       private final TestSubcomponentImpl testSubcomponentImpl;
 
       private final int id;
 
-      SwitchingProvider(ComponentImpl componentImpl, TestSubcomponentImpl testSubcomponentImpl,
-          int id) {
-        this.componentImpl = componentImpl;
+      SwitchingProvider(TestComponentImpl testComponentImpl,
+          TestSubcomponentImpl testSubcomponentImpl, int id) {
+        this.testComponentImpl = testComponentImpl;
         this.testSubcomponentImpl = testSubcomponentImpl;
         this.id = id;
       }
@@ -130,22 +130,22 @@ final class DaggerTestComponent {
     }
   }
 
-  private static final class ComponentImpl implements TestComponent {
-    private final ComponentImpl componentImpl = this;
+  private static final class TestComponentImpl implements TestComponent {
+    private final TestComponentImpl testComponentImpl = this;
 
-    ComponentImpl() {
+    TestComponentImpl() {
 
 
     }
 
     @Override
     public TestSubcomponent subcomponent() {
-      return new TestSubcomponentImpl(componentImpl);
+      return new TestSubcomponentImpl(testComponentImpl);
     }
   }
 
   private static final class TestSubcomponentImplShard {
-    private final ComponentImpl componentImpl;
+    private final TestComponentImpl testComponentImpl;
 
     private final TestSubcomponentImpl testSubcomponentImpl;
 
@@ -154,28 +154,28 @@ final class DaggerTestComponent {
      */
     Provider<?> binding3Provider;
 
-    TestSubcomponentImplShard(ComponentImpl componentImpl,
+    TestSubcomponentImplShard(TestComponentImpl testComponentImpl,
         TestSubcomponentImpl testSubcomponentImpl) {
-      this.componentImpl = componentImpl;
+      this.testComponentImpl = testComponentImpl;
       this.testSubcomponentImpl = testSubcomponentImpl;
       initialize();
     }
 
     @SuppressWarnings("unchecked")
     private void initialize() {
-      this.binding3Provider = DoubleCheck.provider(new SwitchingProvider<>(componentImpl, testSubcomponentImpl, 0));
+      this.binding3Provider = DoubleCheck.provider(new SwitchingProvider<>(testComponentImpl, testSubcomponentImpl, 0));
     }
 
     private static final class SwitchingProvider<T> implements Provider<T> {
-      private final ComponentImpl componentImpl;
+      private final TestComponentImpl testComponentImpl;
 
       private final TestSubcomponentImpl testSubcomponentImpl;
 
       private final int id;
 
-      SwitchingProvider(ComponentImpl componentImpl, TestSubcomponentImpl testSubcomponentImpl,
-          int id) {
-        this.componentImpl = componentImpl;
+      SwitchingProvider(TestComponentImpl testComponentImpl,
+          TestSubcomponentImpl testSubcomponentImpl, int id) {
+        this.testComponentImpl = testComponentImpl;
         this.testSubcomponentImpl = testSubcomponentImpl;
         this.id = id;
       }

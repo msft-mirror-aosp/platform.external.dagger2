@@ -20,6 +20,7 @@ import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.TruthJUnit.assume
 import com.squareup.javapoet.ClassName
 import java.lang.reflect.Method
+import java.util.Arrays
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4

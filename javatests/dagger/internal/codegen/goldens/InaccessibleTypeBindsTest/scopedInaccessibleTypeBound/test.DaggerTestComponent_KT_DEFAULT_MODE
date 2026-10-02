@@ -37,19 +37,19 @@ final class DaggerTestComponent {
     }
 
     public TestComponent build() {
-      return new ComponentImpl();
+      return new TestComponentImpl();
     }
   }
 
-  private static final class ComponentImpl implements TestComponent {
-    private final ComponentImpl componentImpl = this;
+  private static final class TestComponentImpl implements TestComponent {
+    private final TestComponentImpl testComponentImpl = this;
 
     /**
      * {@code Provider<Foo>}
      */
     Provider<?> bindProvider;
 
-    ComponentImpl() {
+    TestComponentImpl() {
 
       initialize();
 

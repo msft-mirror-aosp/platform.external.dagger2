@@ -36,19 +36,19 @@ final class DaggerSimpleComponent {
     }
 
     public SimpleComponent build() {
-      return new ComponentImpl();
+      return new SimpleComponentImpl();
     }
   }
 
-  private static final class ComponentImpl implements SimpleComponent {
-    private final ComponentImpl componentImpl = this;
+  private static final class SimpleComponentImpl implements SimpleComponent {
+    private final SimpleComponentImpl simpleComponentImpl = this;
 
     /**
      * {@code Provider<SimpleComponent>}
      */
     Provider<?> simpleComponentProvider;
 
-    ComponentImpl() {
+    SimpleComponentImpl() {
 
       initialize();
 
@@ -56,7 +56,7 @@ final class DaggerSimpleComponent {
 
     @SuppressWarnings("unchecked")
     private void initialize() {
-      this.simpleComponentProvider = InstanceFactory.create((SimpleComponent) (componentImpl));
+      this.simpleComponentProvider = InstanceFactory.create((SimpleComponent) (simpleComponentImpl));
     }
 
     @Override

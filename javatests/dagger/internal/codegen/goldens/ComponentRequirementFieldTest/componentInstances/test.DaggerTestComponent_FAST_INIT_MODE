@@ -39,38 +39,38 @@ final class DaggerTestComponent {
 
     public TestComponent build() {
       Preconditions.checkBuilderRequirement(dep, Dep.class);
-      return new ComponentImpl(dep);
+      return new TestComponentImpl(dep);
     }
   }
 
   private static final class TestSubcomponentImpl implements TestSubcomponent {
-    private final ComponentImpl componentImpl;
+    private final TestComponentImpl testComponentImpl;
 
     private final TestSubcomponentImpl testSubcomponentImpl = this;
 
-    TestSubcomponentImpl(ComponentImpl componentImpl) {
-      this.componentImpl = componentImpl;
+    TestSubcomponentImpl(TestComponentImpl testComponentImpl) {
+      this.testComponentImpl = testComponentImpl;
 
 
     }
 
     @Override
     public TestComponent parent() {
-      return componentImpl;
+      return testComponentImpl;
     }
 
     @Override
     public Dep depFromSubcomponent() {
-      return componentImpl.dep;
+      return testComponentImpl.dep;
     }
   }
 
-  private static final class ComponentImpl implements TestComponent {
+  private static final class TestComponentImpl implements TestComponent {
     private final Dep dep;
 
-    private final ComponentImpl componentImpl = this;
+    private final TestComponentImpl testComponentImpl = this;
 
-    ComponentImpl(Dep depParam) {
+    TestComponentImpl(Dep depParam) {
       this.dep = depParam;
 
     }
@@ -97,7 +97,7 @@ final class DaggerTestComponent {
 
     @Override
     public TestSubcomponent subcomponent() {
-      return new TestSubcomponentImpl(componentImpl);
+      return new TestSubcomponentImpl(testComponentImpl);
     }
   }
 }

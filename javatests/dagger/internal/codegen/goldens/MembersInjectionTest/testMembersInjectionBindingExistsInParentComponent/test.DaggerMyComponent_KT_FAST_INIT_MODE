@@ -36,17 +36,17 @@ public final class DaggerMyComponent {
     }
 
     public MyComponent build() {
-      return new ComponentImpl();
+      return new MyComponentImpl();
     }
   }
 
   private static final class MySubcomponentImpl implements MySubcomponent {
-    private final ComponentImpl componentImpl;
+    private final MyComponentImpl myComponentImpl;
 
     private final MySubcomponentImpl mySubcomponentImpl = this;
 
-    MySubcomponentImpl(ComponentImpl componentImpl) {
-      this.componentImpl = componentImpl;
+    MySubcomponentImpl(MyComponentImpl myComponentImpl) {
+      this.myComponentImpl = myComponentImpl;
 
 
     }
@@ -71,10 +71,10 @@ public final class DaggerMyComponent {
     }
   }
 
-  private static final class ComponentImpl implements MyComponent {
-    private final ComponentImpl componentImpl = this;
+  private static final class MyComponentImpl implements MyComponent {
+    private final MyComponentImpl myComponentImpl = this;
 
-    ComponentImpl() {
+    MyComponentImpl() {
 
 
     }
@@ -90,7 +90,7 @@ public final class DaggerMyComponent {
 
     @Override
     public MySubcomponent subcomponent() {
-      return new MySubcomponentImpl(componentImpl);
+      return new MySubcomponentImpl(myComponentImpl);
     }
 
     @CanIgnoreReturnValue

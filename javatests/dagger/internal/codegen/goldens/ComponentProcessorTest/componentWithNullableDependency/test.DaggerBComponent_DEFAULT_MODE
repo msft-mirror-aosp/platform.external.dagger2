@@ -40,16 +40,16 @@ final class DaggerBComponent {
 
     public BComponent build() {
       Preconditions.checkBuilderRequirement(nullableStringComponent, NullableStringComponent.class);
-      return new ComponentImpl(nullableStringComponent);
+      return new BComponentImpl(nullableStringComponent);
     }
   }
 
-  private static final class ComponentImpl implements BComponent {
-    private final ComponentImpl componentImpl = this;
+  private static final class BComponentImpl implements BComponent {
+    private final BComponentImpl bComponentImpl = this;
 
     Provider<String> nullableStringProvider;
 
-    ComponentImpl(NullableStringComponent nullableStringComponentParam) {
+    BComponentImpl(NullableStringComponent nullableStringComponentParam) {
 
       initialize(nullableStringComponentParam);
 

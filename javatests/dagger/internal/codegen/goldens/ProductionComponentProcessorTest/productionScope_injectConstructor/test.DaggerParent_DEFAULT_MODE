@@ -37,24 +37,24 @@ final class DaggerParent {
     }
 
     public Parent build() {
-      return new ComponentImpl();
+      return new ParentImpl();
     }
   }
 
   private static final class ChildImpl implements Child, CancellationListener {
-    private final ComponentImpl componentImpl;
+    private final ParentImpl parentImpl;
 
     private final ChildImpl childImpl = this;
 
-    ChildImpl(ComponentImpl componentImpl) {
-      this.componentImpl = componentImpl;
+    ChildImpl(ParentImpl parentImpl) {
+      this.parentImpl = parentImpl;
 
 
     }
 
     @Override
     public ProductionScoped productionScoped() {
-      return componentImpl.productionScopedProvider.get();
+      return parentImpl.productionScopedProvider.get();
     }
 
     @Override
@@ -64,12 +64,12 @@ final class DaggerParent {
     }
   }
 
-  private static final class ComponentImpl implements Parent, CancellationListener {
-    private final ComponentImpl componentImpl = this;
+  private static final class ParentImpl implements Parent, CancellationListener {
+    private final ParentImpl parentImpl = this;
 
     Provider<ProductionScoped> productionScopedProvider;
 
-    ComponentImpl() {
+    ParentImpl() {
 
       initialize();
 
@@ -82,7 +82,7 @@ final class DaggerParent {
 
     @Override
     public Child child() {
-      return new ChildImpl(componentImpl);
+      return new ChildImpl(parentImpl);
     }
 
     @Override

@@ -40,21 +40,21 @@ final class DaggerBComponent {
 
     public BComponent build() {
       Preconditions.checkBuilderRequirement(nullableStringComponent, NullableStringComponent.class);
-      return new ComponentImpl(nullableStringComponent);
+      return new BComponentImpl(nullableStringComponent);
     }
   }
 
-  private static final class ComponentImpl implements BComponent {
+  private static final class BComponentImpl implements BComponent {
     private final NullableStringComponent nullableStringComponent;
 
-    private final ComponentImpl componentImpl = this;
+    private final BComponentImpl bComponentImpl = this;
 
     /**
      * {@code Provider<java.lang.String>}
      */
     Provider<?> nullableStringProvider;
 
-    ComponentImpl(NullableStringComponent nullableStringComponentParam) {
+    BComponentImpl(NullableStringComponent nullableStringComponentParam) {
       this.nullableStringComponent = nullableStringComponentParam;
       initialize(nullableStringComponentParam);
 
@@ -62,7 +62,7 @@ final class DaggerBComponent {
 
     @SuppressWarnings("unchecked")
     private void initialize(final NullableStringComponent nullableStringComponentParam) {
-      this.nullableStringProvider = new SwitchingProvider<>(componentImpl, 0);
+      this.nullableStringProvider = new SwitchingProvider<>(bComponentImpl, 0);
     }
 
     @Override
@@ -71,12 +71,12 @@ final class DaggerBComponent {
     }
 
     private static final class SwitchingProvider<T> implements Provider<T> {
-      private final ComponentImpl componentImpl;
+      private final BComponentImpl bComponentImpl;
 
       private final int id;
 
-      SwitchingProvider(ComponentImpl componentImpl, int id) {
-        this.componentImpl = componentImpl;
+      SwitchingProvider(BComponentImpl bComponentImpl, int id) {
+        this.bComponentImpl = bComponentImpl;
         this.id = id;
       }
 
@@ -85,7 +85,7 @@ final class DaggerBComponent {
       public T get() {
         switch (id) {
           case 0: // java.lang.String
-          return (T) componentImpl.nullableStringComponent.nullableString();
+          return (T) bComponentImpl.nullableStringComponent.nullableString();
 
           default: throw new AssertionError(id);
         }
