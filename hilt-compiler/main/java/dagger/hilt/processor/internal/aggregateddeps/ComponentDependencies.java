@@ -115,12 +115,14 @@ public abstract class ComponentDependencies {
         .putAll(
             ClassNames.SINGLETON_COMPONENT,
             aggregatedEarlyEntryPointMetadata.stream()
-                .map(AggregatedEarlyEntryPointMetadata::earlyEntryPoint)
+                .map(AggregatedEarlyEntryPointMetadata::earlyEntryPointName)
                 // @AggregatedEarlyEntryPointMetadata always references the user module, so convert
                 // to the generated public wrapper if needed.
                 // TODO(bcorso): Consider converting this to the public module in the processor.
-                .map(PkgPrivateMetadata::publicEarlyEntryPoint)
-                .map(XTypeElement::getClassName)
+                .map(
+                    entryPoint ->
+                        PkgPrivateMetadata.publicEarlyEntryPoint(env.requireTypeElement(entryPoint))
+                            .getClassName())
                 .collect(toImmutableSet()));
 
     return componentDependencies.build();

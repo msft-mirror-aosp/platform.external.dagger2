@@ -24,6 +24,7 @@ import androidx.room3.compiler.processing.XProcessingEnv;
 import androidx.room3.compiler.processing.XTypeElement;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableSet;
+import com.squareup.javapoet.ClassName;
 import dagger.hilt.processor.internal.AggregatedElements;
 import dagger.hilt.processor.internal.ClassNames;
 import dagger.hilt.processor.internal.root.ir.AggregatedEarlyEntryPointIr;
@@ -35,11 +36,11 @@ import dagger.hilt.processor.internal.root.ir.AggregatedEarlyEntryPointIr;
 @AutoValue
 public abstract class AggregatedEarlyEntryPointMetadata {
 
-  /** Returns the aggregating element */
-  public abstract XTypeElement aggregatingElement();
+  /** Returns the name of the aggregating element. */
+  public abstract ClassName name();
 
   /** Returns the element annotated with {@link dagger.hilt.android.EarlyEntryPoint}. */
-  public abstract XTypeElement earlyEntryPoint();
+  public abstract ClassName earlyEntryPointName();
 
   /** Returns metadata for all aggregated elements in the aggregating package. */
   public static ImmutableSet<AggregatedEarlyEntryPointMetadata> from(XProcessingEnv env) {
@@ -60,8 +61,7 @@ public abstract class AggregatedEarlyEntryPointMetadata {
 
   public static AggregatedEarlyEntryPointIr toIr(AggregatedEarlyEntryPointMetadata metadata) {
     return new AggregatedEarlyEntryPointIr(
-        metadata.aggregatingElement().getClassName(),
-        metadata.earlyEntryPoint().getClassName().canonicalName());
+        metadata.name(), metadata.earlyEntryPointName().canonicalName());
   }
 
   private static AggregatedEarlyEntryPointMetadata create(
@@ -69,6 +69,7 @@ public abstract class AggregatedEarlyEntryPointMetadata {
     XAnnotation annotation = element.getAnnotation(ClassNames.AGGREGATED_EARLY_ENTRY_POINT);
 
     return new AutoValue_AggregatedEarlyEntryPointMetadata(
-        element, env.requireTypeElement(annotation.getAsString("earlyEntryPoint")));
+        element.getClassName(),
+        env.requireTypeElement(annotation.getAsString("earlyEntryPoint")).getClassName());
   }
 }
