@@ -254,10 +254,10 @@ public class AndroidEntryPointProcessorTest {
         .compile(
             subject -> {
               subject.compilationDidFail();
-              subject.hasErrorCount(2);
               if (HiltCompilerTests.backend(subject) == Backend.KSP) {
-                subject.hasErrorContaining("Unresolved reference 'Hilt_BaseActivity'");
+                subject.hasErrorCount(1);
               } else {
+                subject.hasErrorCount(2);
                 subject.hasErrorContaining(
                     "cannot find symbol\n      symbol: class Hilt_BaseActivity");
               }
@@ -281,10 +281,11 @@ public class AndroidEntryPointProcessorTest {
     HiltCompilerTests.hiltCompiler(testActivity)
         .compile(
             (CompilationResultSubject subject) -> {
-              subject.hasErrorCount(2);
               if (HiltCompilerTests.backend(subject) == XProcessingEnv.Backend.KSP) {
-                subject.hasErrorContaining("Unresolved reference 'Hilt_MyApplication'");
+                subject.hasErrorCount(1);
               } else {
+                // Javac has an extra error due to the missing symbol.
+                subject.hasErrorCount(2);
                 subject.hasErrorContaining(
                     "cannot find symbol\n      symbol: class Hilt_MyApplication");
               }
