@@ -90,6 +90,19 @@ public class ViewModelSavedStateOwnerTest {
   }
 
   @Test
+  public void firstTimeAccessToActivityRetainedSaveStateAfterRecreate_succeeds() {
+    try (ActivityScenario<TestSavedStateProviderActivity> scenario =
+        ActivityScenario.launch(TestSavedStateProviderActivity.class)) {
+      scenario.onActivity(activity -> {});
+      scenario.recreate();
+      scenario.onActivity(
+          activity -> {
+            assertThat(activity.savedStateHandleProvider.get()).isNotNull();
+          });
+    }
+  }
+
+  @Test
   public void testViewModelSavedState() {
     try (ActivityScenario<TestActivity> scenario = ActivityScenario.launch(TestActivity.class)) {
       scenario.onActivity(
@@ -217,6 +230,12 @@ public class ViewModelSavedStateOwnerTest {
       super.onDestroy();
       SavedStateHandle savedStateHandle = provider.get();
     }
+  }
+
+  @AndroidEntryPoint(FragmentActivity.class)
+  public static class TestSavedStateProviderActivity
+      extends Hilt_ViewModelSavedStateOwnerTest_TestSavedStateProviderActivity {
+    @Inject @ActivityRetainedSavedState Provider<SavedStateHandle> savedStateHandleProvider;
   }
 
   @AndroidEntryPoint(Fragment.class)

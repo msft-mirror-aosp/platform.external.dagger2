@@ -23,6 +23,7 @@ import android.os.Bundle;
 import androidx.annotation.Nullable;
 import androidx.lifecycle.SavedStateHandle;
 import androidx.lifecycle.SavedStateHandleSupport;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.lifecycle.viewmodel.CreationExtras;
 import androidx.lifecycle.viewmodel.MutableCreationExtras;
 import dagger.hilt.android.internal.ThreadUtil;
@@ -32,10 +33,21 @@ public final class SavedStateHandleHolder {
   @Nullable private CreationExtras extras;
   @Nullable private SavedStateHandle handle;
   private final boolean isComponentActivity;
+  @Nullable private final String viewModelKey;
 
   public SavedStateHandleHolder(@Nullable CreationExtras extras) {
     isComponentActivity = (extras != null);
     this.extras = extras;
+    // This extras key is set by ViewModelProvider. If this goes through a configuration change
+    // before the SavedStateHandle is created, then the extras will be restored manually via
+    // setExtras(), but this won't go through ViewModelProvider so it will be missing this key.
+    // So we save this key here to add back to the extras in setExtras().
+    this.viewModelKey =
+        isComponentActivity
+            // TODO(b/568871839): Use ViewModelProvider.VIEW_MODEL_KEY once the external
+            // androidx.lifecycle dependency is updated to 2.8.0+.
+            ? extras.get(ViewModelProvider.NewInstanceFactory.VIEW_MODEL_KEY)
+            : null;
   }
 
   public SavedStateHandle getSavedStateHandle() {
@@ -73,7 +85,9 @@ public final class SavedStateHandleHolder {
       // If handle is already created, we don't need to store CreationExtras.
       return;
     }
-    this.extras = extras;
+    MutableCreationExtras newExtras = new MutableCreationExtras(extras);
+    newExtras.set(ViewModelProvider.NewInstanceFactory.VIEW_MODEL_KEY, viewModelKey);
+    this.extras = newExtras;
   }
 
   public boolean isInvalid() {

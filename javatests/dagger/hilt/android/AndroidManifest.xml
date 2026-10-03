@@ -99,6 +99,10 @@
         android:exported="false"
         tools:ignore="MissingClass"/>
     <activity
+        android:name=".ViewModelSavedStateOwnerTest$TestSavedStateProviderActivity"
+        android:exported="false"
+        tools:ignore="MissingClass"/>
+    <activity
         android:name=".ViewModelWithBaseTest$TestActivity"
         android:exported="false"
         tools:ignore="MissingClass"/>
