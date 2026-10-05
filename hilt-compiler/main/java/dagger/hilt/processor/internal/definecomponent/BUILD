@@ -88,6 +88,7 @@ java_library(
         "//hilt-compiler/main/java/dagger/hilt/processor/internal/root/ir",
         "//third_party/java/auto:value",
         "//third_party/java/guava/collect",
+        "//third_party/java/javapoet",
     ],
 )
 

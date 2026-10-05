@@ -24,6 +24,7 @@ import androidx.room3.compiler.processing.XProcessingEnv;
 import androidx.room3.compiler.processing.XTypeElement;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableSet;
+import com.squareup.javapoet.ClassName;
 import dagger.hilt.processor.internal.AggregatedElements;
 import dagger.hilt.processor.internal.ClassNames;
 import dagger.hilt.processor.internal.ProcessorErrors;
@@ -36,8 +37,8 @@ import dagger.hilt.processor.internal.root.ir.DefineComponentClassesIr;
 @AutoValue
 public abstract class DefineComponentClassesMetadata {
 
-  /** Returns the aggregating element */
-  public abstract XTypeElement aggregatingElement();
+  /** Returns the name of the aggregating element. */
+  public abstract ClassName name();
 
   /**
    * Returns the element annotated with {@code dagger.hilt.internal.definecomponent.DefineComponent}
@@ -96,12 +97,11 @@ public abstract class DefineComponentClassesMetadata {
         isComponent ? "component" : "builder",
         componentOrBuilderName);
     return new AutoValue_DefineComponentClassesMetadata(
-        element, componentOrBuilderElement, isComponent);
+        element.getClassName(), componentOrBuilderElement, isComponent);
   }
 
   public static DefineComponentClassesIr toIr(DefineComponentClassesMetadata metadata) {
     return new DefineComponentClassesIr(
-        metadata.aggregatingElement().getClassName(),
-        metadata.element().getClassName().canonicalName());
+        metadata.name(), metadata.element().getClassName().canonicalName());
   }
 }
