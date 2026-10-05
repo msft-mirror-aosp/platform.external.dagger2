@@ -36,8 +36,8 @@ import java.util.List;
 @AutoValue
 abstract class AggregatedRootMetadata {
 
-  /** Returns the aggregating element */
-  public abstract XTypeElement aggregatingElement();
+  /** Returns the name of the aggregating element. */
+  public abstract ClassName name();
 
   /** Returns the element that was annotated with the root annotation. */
   abstract XTypeElement rootElement();
@@ -46,10 +46,10 @@ abstract class AggregatedRootMetadata {
    * Returns the originating root element. In most cases this will be the same as {@link
    * #rootElement()}.
    */
-  abstract XTypeElement originatingRootElement();
+  abstract ClassName originatingRootName();
 
-  /** Returns the root annotation as an element. */
-  abstract XTypeElement rootAnnotation();
+  /** Returns the root annotation class name. */
+  abstract ClassName rootAnnotationName();
 
   /** Returns the name of the root component for this root. */
   abstract ClassName rootComponentName();
@@ -79,10 +79,10 @@ abstract class AggregatedRootMetadata {
 
   public static AggregatedRootIr toIr(AggregatedRootMetadata metadata) {
     return new AggregatedRootIr(
-        metadata.aggregatingElement().getClassName(),
+        metadata.name(),
         metadata.rootElement().getClassName(),
-        metadata.originatingRootElement().getClassName(),
-        metadata.rootAnnotation().getClassName(),
+        metadata.originatingRootName(),
+        metadata.rootAnnotationName(),
         metadata.rootComponentName(),
         metadata.allowsSharingComponent());
   }
@@ -93,10 +93,10 @@ abstract class AggregatedRootMetadata {
     XTypeElement rootElement = env.requireTypeElement(annotation.getAsString("root"));
     boolean allowSharingComponent = true;
     return new AutoValue_AggregatedRootMetadata(
-        element,
+        element.getClassName(),
         rootElement,
-        env.requireTypeElement(annotation.getAsString("originatingRoot")),
-        annotation.getAsType("rootAnnotation").getTypeElement(),
+        env.requireTypeElement(annotation.getAsString("originatingRoot")).getClassName(),
+        annotation.getAsType("rootAnnotation").getTypeElement().getClassName(),
         parseRootComponentClassName(
             annotation.getAsString("rootComponentPackage"),
             annotation.getAsStringList("rootComponentSimpleNames")),
