@@ -18,11 +18,8 @@ package dagger.hilt.processor.internal.root;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Suppliers.memoize;
-import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
 
-import androidx.room3.compiler.processing.XConstructorElement;
 import androidx.room3.compiler.processing.XProcessingEnv;
-import androidx.room3.compiler.processing.XTypeElement;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
@@ -30,17 +27,11 @@ import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.TypeName;
 import dagger.hilt.processor.internal.ClassNames;
 import dagger.hilt.processor.internal.ComponentDescriptor;
-import dagger.hilt.processor.internal.Processors;
 import dagger.hilt.processor.internal.aggregateddeps.ComponentDependencies;
 import dagger.hilt.processor.internal.aliasof.AliasOfs;
-import java.util.List;
-import javax.tools.Diagnostic;
 
 /** Contains metadata about the given hilt root. */
 public final class RootMetadata {
-
-  private static final ClassName APPLICATION_CONTEXT_MODULE =
-      ClassName.get("dagger.hilt.android.internal.modules", "ApplicationContextModule");
 
   static RootMetadata create(
       Root root,
@@ -107,21 +98,6 @@ public final class RootMetadata {
     return scopesByComponent.get().get(componentName);
   }
 
-  /**
-   * Returns all modules in the given component that do not have accessible default constructors.
-   * Note that a non-static module nested in an outer class is considered to have no default
-   * constructors, since an instance of the outer class is needed to construct the module. This also
-   * filters out framework modules directly referenced by the codegen, since those are already known
-   * about and are specifically handled in the codegen.
-   */
-  public ImmutableSet<XTypeElement> modulesThatDaggerCannotConstruct(ClassName componentName) {
-    return deps.testModules().get(componentName).stream()
-        .filter(module -> !module.equals(APPLICATION_CONTEXT_MODULE))
-        .map(env::requireTypeElement)
-        .filter(module -> !daggerCanConstruct(module))
-        .collect(toImmutableSet());
-  }
-
   public TestRootMetadata testRootMetadata() {
     checkState(!root.isDefaultRoot(), "The default root does not have TestRootMetadata!");
     return testRootMetadata.get();
@@ -140,33 +116,6 @@ public final class RootMetadata {
    * {@link ComponentDependencies}.
    */
   private void validate() {
-
-    // Only test modules in the application component can be missing default constructor
-    for (ComponentDescriptor componentDescriptor : componentTree.getComponentDescriptors()) {
-      ClassName componentName = componentDescriptor.component();
-      if (root.isTestRoot() && componentName.equals(ClassNames.SINGLETON_COMPONENT)) {
-        continue;
-      }
-      for (XTypeElement extraModule : modulesThatDaggerCannotConstruct(componentName)) {
-        if (root.isTestRoot()) {
-          env.getMessager()
-              .printMessage(
-                  Diagnostic.Kind.ERROR,
-                  "[Hilt] All test modules (unless installed in ApplicationComponent) must use "
-                      + "static provision methods or have a visible, no-arg constructor. Found: "
-                      + extraModule.getQualifiedName(),
-                  root.originatingRootElement());
-        } else {
-          env.getMessager()
-              .printMessage(
-                  Diagnostic.Kind.ERROR,
-                  "[Hilt] All modules must be static and use static provision methods or have a "
-                      + "visible, no-arg constructor. Found: "
-                      + extraModule.getQualifiedName(),
-                  root.originatingRootElement());
-        }
-      }
-    }
   }
 
   private ImmutableSetMultimap<ClassName, ClassName> getScopesByComponentUncached() {
@@ -179,20 +128,5 @@ public final class RootMetadata {
     }
 
     return builder.build();
-  }
-
-  private static boolean daggerCanConstruct(XTypeElement type) {
-    if (!Processors.requiresModuleInstance(type)) {
-      return true;
-    }
-    return hasVisibleEmptyConstructor(type) && (!type.isNested() || type.isStatic());
-  }
-
-  private static boolean hasVisibleEmptyConstructor(XTypeElement type) {
-    List<XConstructorElement> constructors = type.getConstructors();
-    return constructors.isEmpty()
-        || constructors.stream()
-            .filter(constructor -> constructor.getParameters().isEmpty())
-            .anyMatch(constructor -> !constructor.isPrivate());
   }
 }

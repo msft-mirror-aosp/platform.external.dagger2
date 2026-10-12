@@ -16,11 +16,14 @@
 
 package dagger.hilt.processor.internal.root;
 
+import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
+
 import androidx.room3.compiler.processing.XAnnotation;
 import androidx.room3.compiler.processing.XElement;
 import androidx.room3.compiler.processing.XProcessingEnv;
 import androidx.room3.compiler.processing.XTypeElement;
 import com.google.auto.value.AutoValue;
+import com.google.common.collect.ImmutableSet;
 import com.squareup.javapoet.ClassName;
 import dagger.hilt.processor.internal.ClassNames;
 import dagger.hilt.processor.internal.ProcessorErrors;
@@ -61,8 +64,36 @@ abstract class TestRootMetadata {
   }
 
   /**
-   * Returns either the SkipTestInjection annotation or the first annotation that was annotated
-   * with SkipTestInjection, if present.
+   * Returns all modules enclosed in this test root and installed in {@code SingletonComponent} that
+   * do not have accessible default constructors. Note that a non-static module nested in an outer
+   * class is considered to have no default constructors, since an instance of the outer class is
+   * needed to construct the module.
+   */
+  public ImmutableSet<XTypeElement> modulesThatDaggerCannotConstruct() {
+    return testElement().getEnclosedTypeElements().stream()
+        .filter(element -> element.hasAnnotation(ClassNames.MODULE))
+        .filter(element -> element.hasAnnotation(ClassNames.INSTALL_IN))
+        .filter(element -> installInComponents(element).contains(ClassNames.SINGLETON_COMPONENT))
+        .filter(element -> !daggerCanConstruct(element))
+        .collect(toImmutableSet());
+  }
+
+  private static boolean daggerCanConstruct(XTypeElement type) {
+    return !Processors.requiresModuleInstance(type)
+        || (Processors.hasVisibleEmptyConstructor(type) && (!type.isNested() || type.isStatic()));
+  }
+
+  private static ImmutableSet<ClassName> installInComponents(XElement element) {
+    return Processors.getOptionalAnnotationClassValues(
+            element.getAnnotation(ClassNames.INSTALL_IN), "value")
+        .stream()
+        .map(XTypeElement::getClassName)
+        .collect(toImmutableSet());
+  }
+
+  /**
+   * Returns either the SkipTestInjection annotation or the first annotation that was annotated with
+   * SkipTestInjection, if present.
    */
   Optional<XAnnotation> skipTestInjectionAnnotation() {
     XAnnotation skipTestAnnotation = testElement().getAnnotation(ClassNames.SKIP_TEST_INJECTION);

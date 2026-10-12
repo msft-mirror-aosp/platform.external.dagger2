@@ -145,11 +145,18 @@ public final class AggregatedDepsProcessingStep extends BaseProcessingStep {
         "Only classes and interfaces can be annotated with @Module: %s",
         LazyString.of(() -> XElements.toStableString(module)));
 
+    boolean isNestedInTest =
+        module.isNested()
+            && (module.getEnclosingElement().hasAnnotation(ClassNames.HILT_ANDROID_TEST)
+            );
     ProcessorErrors.checkState(
         Processors.isTopLevel(module)
             || module.isStatic()
             || module.isAbstract()
-            || module.getEnclosingElement().hasAnnotation(ClassNames.HILT_ANDROID_TEST),
+            || (isNestedInTest
+                && (!Processors.requiresModuleInstance(module)
+                    || Components.getComponents(module)
+                        .equals(ImmutableSet.of(ClassNames.SINGLETON_COMPONENT)))),
         module,
         "Nested @%s modules must be static unless they are directly nested within a"
             + " test. Found: %s",
@@ -159,7 +166,6 @@ public final class AggregatedDepsProcessingStep extends BaseProcessingStep {
     // Check that if Dagger needs an instance of the module, Hilt can provide it automatically by
     // calling a visible empty constructor.
     ProcessorErrors.checkState(
-        // Skip ApplicationContextModule, since Hilt manages this module internally.
         ClassNames.APPLICATION_CONTEXT_MODULE.equals(module.getClassName())
             || !Processors.requiresModuleInstance(module)
             || Processors.hasVisibleEmptyConstructor(module)

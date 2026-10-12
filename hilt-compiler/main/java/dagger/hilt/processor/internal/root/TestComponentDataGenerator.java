@@ -116,7 +116,7 @@ public final class TestComponentDataGenerator {
         componentNames.generatedComponent(
             testElement.getClassName(), ClassNames.SINGLETON_COMPONENT);
     ImmutableSet<XTypeElement> daggerRequiredModules =
-        rootMetadata.modulesThatDaggerCannotConstruct(ClassNames.SINGLETON_COMPONENT);
+        rootMetadata.testRootMetadata().modulesThatDaggerCannotConstruct();
     ImmutableSet<XTypeElement> hiltRequiredModules =
         daggerRequiredModules.stream()
             .filter(module -> !canBeConstructedByHilt(module, testElement))

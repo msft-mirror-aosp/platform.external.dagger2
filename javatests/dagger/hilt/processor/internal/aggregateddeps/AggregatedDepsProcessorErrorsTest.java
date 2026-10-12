@@ -230,8 +230,8 @@ public class AggregatedDepsProcessorErrorsTest {
           subject.compilationDidFail();
           subject.hasErrorCount(1);
           subject.hasErrorContaining(
-              "Nested @InstallIn modules must be static unless they are directly nested within"
-                  + " a test. Found: foo.bar.Outer.InnerModule");
+              "Nested @InstallIn modules must be static unless they are directly nested within a"
+                  + " test. Found: foo.bar.Outer.InnerModule");
         });
   }
 
@@ -262,8 +262,8 @@ public class AggregatedDepsProcessorErrorsTest {
           subject.compilationDidFail();
           subject.hasErrorCount(1);
           subject.hasErrorContaining(
-              "Nested @InstallIn modules must be static unless they are directly nested within"
-                  + " a test. Found: foo.bar.Outer.Nested.InnerModule");
+              "Nested @InstallIn modules must be static unless they are directly nested within a"
+                  + " test. Found: foo.bar.Outer.Nested.InnerModule");
         });
   }
 
@@ -287,6 +287,64 @@ public class AggregatedDepsProcessorErrorsTest {
             "}");
 
     compile(source, subject -> subject.hasErrorCount(0));
+  }
+
+  @Test
+  public void testNonSingletonEmptyInnerModuleInTest_succeeds() {
+    Source source =
+        HiltCompilerTests.javaSource(
+            "foo.bar.Outer",
+            "package foo.bar;",
+            "",
+            "import dagger.Module;",
+            "import dagger.hilt.InstallIn;",
+            "import dagger.hilt.android.components.ActivityComponent;",
+            "import dagger.hilt.android.testing.HiltAndroidTest;",
+            "",
+            "@HiltAndroidTest",
+            "public final class Outer {",
+            "  @Module",
+            "  @InstallIn(ActivityComponent.class)",
+            "  final class InnerModule {}",
+            "}");
+
+    compile(source, subject -> subject.hasErrorCount(0));
+  }
+
+  @Test
+  public void testNonSingletonInnerModuleInTest_fails() {
+    Source source =
+        HiltCompilerTests.javaSource(
+            "foo.bar.Outer",
+            "package foo.bar;",
+            "",
+            "import dagger.Module;",
+            "import dagger.Provides;",
+            "import dagger.hilt.InstallIn;",
+            "import dagger.hilt.android.components.ActivityComponent;",
+            "import dagger.hilt.android.testing.HiltAndroidTest;",
+            "",
+            "@HiltAndroidTest",
+            "public final class Outer {",
+            "  @Module",
+            "  @InstallIn(ActivityComponent.class)",
+            "  final class InnerModule {",
+            "    @Provides",
+            "    String provideString() {",
+            "      return \"\";",
+            "    }",
+            "  }",
+            "}");
+
+    compile(
+        source,
+        subject -> {
+          subject.compilationDidFail();
+          subject.hasErrorCount(1);
+          subject.hasErrorContaining(
+              "Nested @InstallIn modules must be static unless they are directly nested within a"
+                  + " test. Found: foo.bar.Outer.InnerModule");
+        });
   }
 
   private static void compile(
