@@ -18,5 +18,5 @@ package(default_visibility = ["//:src"])
 
 alias(
     name = "android_runtime",
-    actual = "@androidsdk//:platforms/android-34/android.jar",
+    actual = "@androidsdk//:platforms/android-36/android.jar",
 )

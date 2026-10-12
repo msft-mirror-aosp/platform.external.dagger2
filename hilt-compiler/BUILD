@@ -121,7 +121,7 @@ gen_maven_artifact(
     artifact_target = ":artifact-lib",
     artifact_target_libs = _ARTIFACT_TARGET_LIBS,
     artifact_target_maven_deps = _ARTIFACT_TARGET_MAVEN_DEPS,
-    javadoc_android_api_level = 34,
+    javadoc_android_api_level = 36,
     javadoc_root_packages = _JAVA_DOC_ROOT_PACKAGES,
     javadoc_srcs = _JAVA_DOC_SRCS,
 )
@@ -141,7 +141,7 @@ gen_maven_artifact(
     artifact_target = ":legacy-artifact-lib",
     artifact_target_libs = _ARTIFACT_TARGET_LIBS,
     artifact_target_maven_deps = _ARTIFACT_TARGET_MAVEN_DEPS,
-    javadoc_android_api_level = 34,
+    javadoc_android_api_level = 36,
     javadoc_root_packages = _JAVA_DOC_ROOT_PACKAGES,
     javadoc_srcs = _JAVA_DOC_SRCS,
     pom_name = "legacy-pom",

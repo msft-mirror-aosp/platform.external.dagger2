@@ -42,7 +42,7 @@ gen_maven_artifact(
         "com.google.dagger:dagger",
         "com.google.dagger:dagger-android",
     ],
-    javadoc_android_api_level = 34,
+    javadoc_android_api_level = 36,
     javadoc_root_packages = [
         "dagger.android.support",
     ],

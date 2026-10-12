@@ -30,6 +30,6 @@ local_repository(
 
 android_sdk_repository(
     name = "androidsdk",
-    api_level = 34,
-    build_tools_version = "34.0.0",
+    api_level = 36,
+    build_tools_version = "36.0.0",
 )

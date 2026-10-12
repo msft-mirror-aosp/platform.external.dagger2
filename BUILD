@@ -64,7 +64,7 @@ javadoc_library(
         "//hilt-core:javadoc-srcs",
         "//java/dagger/hilt/android/plugin/main:srcs_filegroup",
     ],
-    android_api_level = 34,
+    android_api_level = 36,
     # TODO(ronshapiro): figure out how to specify the version number for release builds
     doctitle = "Dagger Dependency Injection API",
     exclude_packages = [

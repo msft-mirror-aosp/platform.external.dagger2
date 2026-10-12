@@ -178,7 +178,7 @@ class HiltGradlePluginTest {
       kotlin {
         androidLibrary {
           namespace 'minimal.kmp'
-          compileSdk 35
+          compileSdk 36
           minSdk 21
         }
       }

@@ -1,5 +1,5 @@
 [versions]
-androidCompileSdk = "35"
+androidCompileSdk = "36"
 androidGradlePlugin = "8.9.2"
 androidMinSdk = "21"
 autoFactory = "1.0"
