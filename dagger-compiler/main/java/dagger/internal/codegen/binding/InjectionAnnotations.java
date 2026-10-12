@@ -228,7 +228,7 @@ public final class InjectionAnnotations {
       if (!field.isStatic()
           && isTypeElement(field.getEnclosingElement())
           && hasInjectAnnotation(field)
-          && kotlinMetadataUtil.hasMetadata(field)) {
+          && field.getClosestMemberContainer().isFromKotlin()) {
         qualifiers =
             Stream.concat(qualifiers.stream(), getQualifiersForKotlinProperty(field).stream())
                 .map(DaggerAnnotation::from) // Wrap in DaggerAnnotation to deduplicate
@@ -400,11 +400,7 @@ public final class InjectionAnnotations {
       }
     } else {
       return qualifierTypeNames().stream()
-          .flatMap(
-              qualifier ->
-                  kotlinMetadataUtil
-                      .getSyntheticPropertyAnnotations(field.getOwner(), qualifier)
-                      .stream())
+          .flatMap(qualifier -> field.getOwner().getAnnotationsAnnotatedWith(qualifier).stream())
           .collect(toImmutableSet());
     }
   }

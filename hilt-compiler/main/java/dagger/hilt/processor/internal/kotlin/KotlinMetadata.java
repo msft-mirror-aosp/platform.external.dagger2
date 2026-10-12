@@ -26,7 +26,6 @@ import androidx.room3.compiler.processing.XTypeElement;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.collect.ImmutableMap;
-import dagger.internal.codegen.xprocessing.XElements;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -50,17 +49,17 @@ abstract class KotlinMetadata {
         .collect(toImmutableMap(XMethodElement::getJvmDescriptor, Function.identity()));
   }
 
-  /** Gets the synthetic method for annotations of a given property element. */
-  Optional<XMethodElement> getSyntheticAnnotationMethod(XPropertyElement propertyElement) {
+  /**
+   * Returns true if the synthetic method for annotations is missing. This can occur when inspecting
+   * the Kotlin metadata of a property from another compilation unit.
+   */
+  boolean isMissingSyntheticAnnotationMethod(XPropertyElement propertyElement) {
     return getAnnotationMethod(propertyElement)
-        .map(
-            methodForAnnotations -> {
-              if (methodForAnnotations == MethodForAnnotations.MISSING) {
-                throw new IllegalStateException(
-                    "Method for annotations is missing for " + propertyElement);
-              }
-              return XElements.asMethod(methodForAnnotations.method());
-            });
+        .map(methodForAnnotations -> methodForAnnotations == MethodForAnnotations.MISSING)
+        // This can be missing if there was no property annotation at all (e.g. no annotations or
+        // the qualifier is already properly attached to the field). For these cases, it isn't
+        // considered missing since there was no method to look for in the first place.
+        .orElse(false);
   }
 
   private Optional<MethodForAnnotations> getAnnotationMethod(XPropertyElement propertyElement) {

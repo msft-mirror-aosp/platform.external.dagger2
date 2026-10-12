@@ -19,6 +19,7 @@ package dagger.hilt.processor.internal.kotlin;
 import static androidx.room3.compiler.processing.XElementKt.isField;
 import static androidx.room3.compiler.processing.XElementKt.isProperty;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableList;
 import static dagger.internal.codegen.extension.DaggerStreams.toImmutableSet;
 import static dagger.internal.codegen.xprocessing.XElements.asField;
@@ -26,7 +27,6 @@ import static dagger.internal.codegen.xprocessing.XElements.asField;
 import androidx.room3.compiler.processing.XAnnotation;
 import androidx.room3.compiler.processing.XElement;
 import androidx.room3.compiler.processing.XExecutableParameterElement;
-import androidx.room3.compiler.processing.XMethodElement;
 import androidx.room3.compiler.processing.XPropertyElement;
 import androidx.room3.compiler.processing.XTypeElement;
 import com.google.common.base.Equivalence;
@@ -136,14 +136,15 @@ public final class KotlinMetadataUtil {
    */
   private ImmutableList<XAnnotation> getSyntheticPropertyAnnotations(
       XPropertyElement propertyElement) {
-    return hasMetadata(propertyElement)
-        ? metadataFactory
-            .create(propertyElement)
-            .getSyntheticAnnotationMethod(propertyElement)
-            .map(XMethodElement::getAllAnnotations)
-            .map(ImmutableList::copyOf)
-            .orElse(ImmutableList.<XAnnotation>of())
-        : ImmutableList.of();
+    if (hasMetadata(propertyElement)) {
+      checkState(
+          !metadataFactory
+              .create(propertyElement)
+              .isMissingSyntheticAnnotationMethod(propertyElement),
+          "Method for annotations is missing for %s",
+          propertyElement);
+    }
+    return ImmutableList.copyOf(propertyElement.getAllAnnotations());
   }
 
   public boolean containsConstructorWithDefaultParam(XTypeElement typeElement) {

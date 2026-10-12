@@ -18,11 +18,8 @@ package dagger.internal.codegen.kotlin;
 
 import static dagger.internal.codegen.xprocessing.XElements.closestEnclosingTypeElement;
 
-import androidx.room3.compiler.codegen.XClassName;
-import androidx.room3.compiler.processing.XAnnotation;
 import androidx.room3.compiler.processing.XElement;
 import androidx.room3.compiler.processing.XPropertyElement;
-import com.google.common.collect.ImmutableSet;
 import dagger.internal.codegen.xprocessing.XTypeNames;
 import javax.inject.Inject;
 
@@ -44,29 +41,14 @@ public final class KotlinMetadataUtil {
   }
 
   /**
-   * Returns the synthetic annotations of a Kotlin property.
-   *
-   * <p>Note that this method only looks for additional annotations in the synthetic property
-   * method, if any, of a Kotlin property and not for annotations in its backing field.
-   *
-   * <p>Callers should first check {@link #isMissingSyntheticAnnotationMethod}, since this method
-   * returns an empty set if the synthetic method is missing.
-   */
-  public ImmutableSet<XAnnotation> getSyntheticPropertyAnnotations(
-      XPropertyElement propertyElement, XClassName annotationType) {
-    // XPropertyElement's annotations are the annotations on the property's synthetic
-    // `$annotations` method, which XProcessing already resolves using the Kotlin metadata.
-    return ImmutableSet.copyOf(propertyElement.getAnnotationsAnnotatedWith(annotationType));
-  }
-
-  /**
    * Returns {@code true} if the synthetic method for annotations is missing. This can occur when
    * the Kotlin metadata of the property reports that it contains a synthetic method for annotations
    * but such method is not found since it is synthetic and ignored by the processor.
    */
   public boolean isMissingSyntheticAnnotationMethod(XPropertyElement propertyElement) {
-    return metadataFactory
-        .create(propertyElement)
-        .isMissingSyntheticAnnotationMethod(propertyElement);
+    return hasMetadata(propertyElement)
+        && metadataFactory
+            .create(propertyElement)
+            .isMissingSyntheticAnnotationMethod(propertyElement);
   }
 }
