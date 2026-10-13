@@ -25,9 +25,9 @@ import com.google.common.collect.ImmutableSet;
 import java.util.Set;
 import javax.lang.model.SourceVersion;
 
-/** A JavacBasicAnnotationProcessor that contains a single BaseProcessingStep. */
+/** A JavacBasicAnnotationProcessor that contains BaseProcessingSteps. */
 public abstract class JavacBaseProcessingStepProcessor extends JavacBasicAnnotationProcessor {
-  private BaseProcessingStep processingStep;
+  private ImmutableList<BaseProcessingStep> processingSteps;
 
   public JavacBaseProcessingStepProcessor() {
     super(HiltProcessingEnvConfigs.CONFIGS);
@@ -36,7 +36,7 @@ public abstract class JavacBaseProcessingStepProcessor extends JavacBasicAnnotat
   @Override
   public void initialize(XProcessingEnv env) {
     HiltCompilerOptions.checkWrongAndDeprecatedOptions(env);
-    processingStep = processingStep();
+    processingSteps = getProcessingSteps();
   }
 
   @Override
@@ -58,19 +58,29 @@ public abstract class JavacBaseProcessingStepProcessor extends JavacBasicAnnotat
 
   @Override
   public final ImmutableList<XProcessingStep> processingSteps() {
-    return ImmutableList.of(processingStep);
+    return ImmutableList.copyOf(processingSteps);
   }
 
   @Override
   public void preRound(XProcessingEnv env, XRoundEnv round) {
-    processingStep.preRoundProcess(env, round);
+    for (BaseProcessingStep processingStep : processingSteps) {
+      processingStep.preRoundProcess(env, round);
+    }
   }
 
-  protected abstract BaseProcessingStep processingStep();
+  protected BaseProcessingStep processingStep() {
+    throw new UnsupportedOperationException();
+  }
+
+  protected ImmutableList<BaseProcessingStep> getProcessingSteps() {
+    return ImmutableList.of(processingStep());
+  }
 
   @Override
   public void postRound(XProcessingEnv env, XRoundEnv round) {
-    processingStep.postRoundProcess(env, round);
+    for (BaseProcessingStep processingStep : processingSteps) {
+      processingStep.postRoundProcess(env, round);
+    }
   }
 
   /** Returns additional processing options that should only be applied for a single processor. */

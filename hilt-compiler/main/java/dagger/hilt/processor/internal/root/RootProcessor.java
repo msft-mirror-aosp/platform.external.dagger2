@@ -22,6 +22,7 @@ import static net.ltgt.gradle.incap.IncrementalAnnotationProcessorType.DYNAMIC;
 import static net.ltgt.gradle.incap.IncrementalAnnotationProcessorType.ISOLATING;
 
 import com.google.auto.service.AutoService;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import dagger.hilt.processor.internal.BaseProcessingStep;
 import dagger.hilt.processor.internal.JavacBaseProcessingStepProcessor;
@@ -33,8 +34,10 @@ import net.ltgt.gradle.incap.IncrementalAnnotationProcessor;
 @AutoService(Processor.class)
 public final class RootProcessor extends JavacBaseProcessingStepProcessor {
   @Override
-  protected BaseProcessingStep processingStep() {
-    return new RootProcessingStep(getXProcessingEnv());
+  protected ImmutableList<BaseProcessingStep> getProcessingSteps() {
+    return ImmutableList.of(
+        new RootProcessingStep(getXProcessingEnv()),
+        new ComponentTreeDepsProcessingStep(getXProcessingEnv()));
   }
 
   @Override

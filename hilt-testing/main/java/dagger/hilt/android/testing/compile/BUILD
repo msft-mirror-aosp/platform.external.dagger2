@@ -42,7 +42,6 @@ java_library(
         "//hilt-compiler/main/java/dagger/hilt/processor/internal/earlyentrypoint:processor_lib",
         "//hilt-compiler/main/java/dagger/hilt/processor/internal/generatesrootinput:processor_lib",
         "//hilt-compiler/main/java/dagger/hilt/processor/internal/originatingelement:processor_lib",
-        "//hilt-compiler/main/java/dagger/hilt/processor/internal/root:component_tree_deps_processor_lib",
         "//hilt-compiler/main/java/dagger/hilt/processor/internal/root:root_processor_lib",
         "//hilt-compiler/main/java/dagger/hilt/processor/internal/uninstallmodules:processor_lib",
         "//java/dagger/testing/compile",

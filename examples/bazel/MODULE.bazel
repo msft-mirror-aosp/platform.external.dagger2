@@ -23,24 +23,13 @@ module(name = "dagger_examples")
 
 bazel_dep(name = "dagger")
 
-# In a real project, this repository would use `archive_override` to link to a
-# tagged, released version of the Dagger, but we use `local_repository` so that
-# CI testing can test local changes to workspace_defs.bzl. And because dagger root
-# directory was not using the new module name, we need to use
-# `local_path_override` to point to the parent directory.
-
-DAGGER_TAG = "2.57.2"
-# DAGGER_SHA = "6c44dba5d18ac87c9afceea1af1b29b13220a1076c443f519b8f984e667fa1a9"
-# archive_override(
-#    module_name = "dagger",
-#    sha256 = DAGGER_SHA,
-#    strip_prefix = "dagger-dagger-%s" % DAGGER_TAG,
-#    urls = ["https://github.com/google/dagger/archive/dagger-%s.zip" % DAGGER_TAG],
-#)
-
-local_path_override(
+DAGGER_TAG = "2.60.1"
+DAGGER_SHA = "7ecce51ca45c551182df10fe4ea48fcdaabacaa282832a4244c04934e87fbc47"
+archive_override(
     module_name = "dagger",
-    path = "../../",
+    sha256 = DAGGER_SHA,
+    strip_prefix = "dagger-dagger-%s" % DAGGER_TAG,
+    urls = ["https://github.com/google/dagger/archive/dagger-%s.zip" % DAGGER_TAG],
 )
 
 ROBOLECTRIC_VERSION = "4.16"

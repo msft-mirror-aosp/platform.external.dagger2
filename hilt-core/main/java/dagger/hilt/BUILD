@@ -61,7 +61,6 @@ java_library(
         ":package_info",
         "//hilt-core/main/java/dagger/hilt/internal:component_manager",
         "//hilt-core/main/java/dagger/hilt/internal:generated_component",
-        "//hilt-core/main/java/dagger/hilt/internal:preconditions",
         "//hilt-core/main/java/dagger/hilt/internal:test_singleton_component",
         "//third_party/java/jsr305_annotations",
     ],

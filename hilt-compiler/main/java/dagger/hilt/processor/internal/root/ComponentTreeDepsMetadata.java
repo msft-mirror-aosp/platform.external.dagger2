@@ -36,7 +36,7 @@ import dagger.internal.codegen.xprocessing.XAnnotations;
  * dagger.hilt.internal.componenttreedeps.ComponentTreeDeps}.
  *
  * <p>This class is used in both writing ({@link ComponentTreeDepsGenerator}) and reading ({@link
- * ComponentTreeDepsProcessor}) of the {@code @ComponentTreeDeps} annotation.
+ * ComponentTreeDepsProcessingStep}) of the {@code @ComponentTreeDeps} annotation.
  */
 @AutoValue
 abstract class ComponentTreeDepsMetadata {

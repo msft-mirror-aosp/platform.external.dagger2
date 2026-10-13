@@ -17,6 +17,7 @@
 package dagger.hilt.processor.internal.root;
 
 import com.google.auto.service.AutoService;
+import com.google.common.collect.ImmutableList;
 import com.google.devtools.ksp.processing.SymbolProcessor;
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment;
 import com.google.devtools.ksp.processing.SymbolProcessorProvider;
@@ -31,8 +32,10 @@ public final class KspRootProcessor extends KspBaseProcessingStepProcessor {
   }
 
   @Override
-  protected BaseProcessingStep processingStep() {
-    return new RootProcessingStep(getXProcessingEnv());
+  protected ImmutableList<BaseProcessingStep> getProcessingSteps() {
+    return ImmutableList.of(
+        new RootProcessingStep(getXProcessingEnv()),
+        new ComponentTreeDepsProcessingStep(getXProcessingEnv()));
   }
 
   /** Provides the {@link KspRootProcessor}. */

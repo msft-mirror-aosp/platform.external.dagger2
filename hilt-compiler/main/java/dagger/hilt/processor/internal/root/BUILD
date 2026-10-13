@@ -16,25 +16,15 @@
 #   Annotation processor for Hilt.
 
 load("@rules_java//java:defs.bzl", "java_library", "java_plugin")
-load("//tools:processor_compat.bzl", "compat_processor_plugin")
 
 package(default_visibility = ["//:src"])
-
-compat_processor_plugin(
-    name = "component_tree_deps_processor",
-    generates_api = 1,
-    javac_processor_name = "ComponentTreeDepsProcessor",
-    processor_lib_dep = ":component_tree_deps_processor_lib",
-)
 
 java_library(
     name = "component_tree_deps_processor_lib",
     srcs = [
         "ComponentGenerator.java",
         "ComponentTreeDepsProcessingStep.java",
-        "ComponentTreeDepsProcessor.java",
         "EarlySingletonComponentCreatorGenerator.java",
-        "KspComponentTreeDepsProcessor.java",
         "RootFileFormatter.java",
         "RootGenerator.java",
         "TestComponentDataGenerator.java",
@@ -58,14 +48,11 @@ java_library(
         "//hilt-compiler/main/java/dagger/hilt/processor/internal/definecomponent:define_components",
         "//hilt-compiler/main/java/dagger/hilt/processor/internal/earlyentrypoint:aggregated_early_entry_point_metadata",
         "//hilt-compiler/main/java/dagger/hilt/processor/internal/uninstallmodules:aggregated_uninstall_modules_metadata",
-        "//third_party/java/auto:service",
         "//third_party/java/error_prone:annotations",
         "//third_party/java/guava/base",
         "//third_party/java/guava/collect",
         "//third_party/java/guava/graph",
-        "//third_party/java/incap",
         "//third_party/java/javapoet",
-        "//third_party/kotlin/kotlin_symbol_processing:symbol-processing-api",
     ],
 )
 
@@ -90,6 +77,7 @@ java_library(
         "TestInjectorGenerator.java",
     ],
     deps = [
+        ":component_tree_deps_processor_lib",
         ":root_metadata",
         ":root_type",
         "//dagger-compiler:xprocessing",

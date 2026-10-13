@@ -23,9 +23,9 @@ import androidx.room3.compiler.processing.ksp.KspBasicAnnotationProcessor;
 import com.google.common.collect.ImmutableList;
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment;
 
-/** A KspBasicAnnotationProcessor that contains a single BaseProcessingStep. */
+/** A KspBasicAnnotationProcessor that contains BaseProcessingSteps. */
 public abstract class KspBaseProcessingStepProcessor extends KspBasicAnnotationProcessor {
-  private BaseProcessingStep processingStep;
+  private ImmutableList<BaseProcessingStep> processingSteps;
 
   public KspBaseProcessingStepProcessor(SymbolProcessorEnvironment symbolProcessorEnvironment) {
     super(symbolProcessorEnvironment, HiltProcessingEnvConfigs.CONFIGS);
@@ -34,23 +34,33 @@ public abstract class KspBaseProcessingStepProcessor extends KspBasicAnnotationP
   @Override
   public void initialize(XProcessingEnv env) {
     HiltCompilerOptions.checkWrongAndDeprecatedOptions(env);
-    processingStep = processingStep();
+    processingSteps = getProcessingSteps();
   }
 
-  protected abstract BaseProcessingStep processingStep();
+  protected BaseProcessingStep processingStep() {
+    throw new UnsupportedOperationException();
+  }
+
+  protected ImmutableList<BaseProcessingStep> getProcessingSteps() {
+    return ImmutableList.of(processingStep());
+  }
 
   @Override
   public void preRound(XProcessingEnv env, XRoundEnv round) {
-    processingStep.preRoundProcess(env, round);
+    for (BaseProcessingStep processingStep : processingSteps) {
+      processingStep.preRoundProcess(env, round);
+    }
   }
 
   @Override
   public final ImmutableList<XProcessingStep> processingSteps() {
-    return ImmutableList.of(processingStep);
+    return ImmutableList.copyOf(processingSteps);
   }
 
   @Override
   public void postRound(XProcessingEnv env, XRoundEnv round) {
-    processingStep.postRoundProcess(env, round);
+    for (BaseProcessingStep processingStep : processingSteps) {
+      processingStep.postRoundProcess(env, round);
+    }
   }
 }

@@ -63,11 +63,12 @@ public final class AndroidEntryPointProcessingStep extends BaseProcessingStep {
         // The generated application references the generated component so they must be generated
         // in the same build unit. Thus, we only generate the application here if we're using the
         // aggregating root processor. If we're using the Hilt Gradle plugin's aggregating task, we
-        // need to generate the application within ComponentTreeDepsProcessor instead.
+        // need to generate the application within ComponentTreeDepsProcessingStep instead.
         if (useAggregatingRootProcessor(processingEnv())) {
-          // While we could always generate the application in ComponentTreeDepsProcessor, even if
-          // we're using the aggregating root processor, it can lead to extraneous errors when
-          // things fail before ComponentTreeDepsProcessor runs so we generate it here to avoid that
+          // While we could always generate the application in ComponentTreeDepsProcessingStep, even
+          // if we're using the aggregating root processor, it can lead to extraneous errors when
+          // things fail before ComponentTreeDepsProcessingStep runs so we generate it here to avoid
+          // that
           new ApplicationGenerator(processingEnv(), metadata).generate();
         } else {
           // If we're not using the aggregating root processor, then make sure the root application
