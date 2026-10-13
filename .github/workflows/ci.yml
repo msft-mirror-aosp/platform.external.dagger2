@@ -21,9 +21,6 @@ env:
   USE_JAVA_DISTRIBUTION: 'zulu'
   USE_JAVA_VERSION_FOR_BAZEL: '21'
   USE_JAVA_VERSION_FOR_GRADLE: '21'
-  # The default Maven 3.9.0 has a regression so we manually install 3.8.7.
-  # https://issues.apache.org/jira/browse/MNG-7679
-  USE_MAVEN_VERSION: '3.8.7'
 
 jobs:
   validate-latest-dagger-version:
