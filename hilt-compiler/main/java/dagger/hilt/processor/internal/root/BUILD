@@ -48,10 +48,8 @@ java_library(
         "//hilt-compiler/main/java/dagger/hilt/processor/internal/definecomponent:define_components",
         "//hilt-compiler/main/java/dagger/hilt/processor/internal/earlyentrypoint:aggregated_early_entry_point_metadata",
         "//hilt-compiler/main/java/dagger/hilt/processor/internal/uninstallmodules:aggregated_uninstall_modules_metadata",
-        "//third_party/java/error_prone:annotations",
         "//third_party/java/guava/base",
         "//third_party/java/guava/collect",
-        "//third_party/java/guava/graph",
         "//third_party/java/javapoet",
     ],
 )
@@ -98,6 +96,7 @@ java_library(
         "//hilt-compiler/main/java/dagger/hilt/processor/internal/root/ir",
         "//hilt-compiler/main/java/dagger/hilt/processor/internal/uninstallmodules:aggregated_uninstall_modules_metadata",
         "//third_party/java/auto:service",
+        "//third_party/java/error_prone:annotations",
         "//third_party/java/guava/base",
         "//third_party/java/guava/collect",
         "//third_party/java/incap",

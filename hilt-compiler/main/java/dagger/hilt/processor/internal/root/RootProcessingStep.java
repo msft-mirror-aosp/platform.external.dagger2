@@ -82,15 +82,14 @@ public final class RootProcessingStep extends BaseProcessingStep {
     XTypeElement rootElement = XElements.asTypeElement(element);
     // TODO(bcorso): Move this logic into a separate isolating processor to avoid regenerating it
     // for unrelated changes in Gradle.
-    RootType rootType = RootType.of(rootElement);
-    if (rootType.isTestRoot()) {
+    Root root = Root.create(rootElement, processingEnv());
+    if (root.isTestRoot()) {
       TestRootMetadata testRootMetadata = TestRootMetadata.of(processingEnv(), rootElement);
       if (testRootMetadata.skipTestInjectionAnnotation().isEmpty()) {
         new TestInjectorGenerator(processingEnv(), testRootMetadata).generate();
       }
     }
 
-    Root root = Root.create(rootElement, processingEnv());
     new AggregatedRootGenerator(
             rootElement,
             root.originatingRootElement(),
