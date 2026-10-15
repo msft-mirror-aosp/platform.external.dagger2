@@ -17,10 +17,21 @@ permissions:
   contents: read
 
 env:
-  USE_AGP_VERSION: '9.0.0'
+  # Build versions
+  USE_AGP_VERSION: &agp_version '9.0.0'
   USE_JAVA_DISTRIBUTION: 'zulu'
   USE_JAVA_VERSION_FOR_BAZEL: '21'
   USE_JAVA_VERSION_FOR_GRADLE: '21'
+
+  # Min test versions
+  MIN_JAVA_VERSION: &min_java_version '11'
+  MIN_KOTLIN_VERSION: &min_kotlin_version '2.3.0'
+  MIN_KSP_VERSION: &min_ksp_version '2.3.6'
+
+  # Max test versions
+  MAX_JAVA_VERSION: &max_java_version '21'
+  MAX_KOTLIN_VERSION: &max_kotlin_version '2.4.20'
+  MAX_KSP_VERSION: &max_ksp_version '2.3.12'
 
 jobs:
   validate-latest-dagger-version:
@@ -79,13 +90,13 @@ jobs:
       matrix:
         include:
           # Min Versions
-          - java: '11'
-            kotlin: '2.3.0'
-            ksp: '2.3.0'
+          - java: *min_java_version
+            kotlin: *min_kotlin_version
+            ksp: *min_ksp_version
           # Max Versions
-          - java: '21'
-            kotlin: '2.4.20'
-            ksp: '2.3.12'
+          - java: *max_java_version
+            kotlin: *max_kotlin_version
+            ksp: *max_ksp_version
     env:
       USE_JAVA_VERSION_FOR_GRADLE: ${{ matrix.java }}
       USE_KOTLIN_VERSION: ${{ matrix.kotlin }}
@@ -119,15 +130,15 @@ jobs:
       matrix:
         include:
           # Min Versions
-          - agp: '9.0.0'
-            java: '11'
-            kotlin: '2.3.0'
-            ksp: '2.3.6'
+          - agp: *agp_version
+            java: *min_java_version
+            kotlin: *min_kotlin_version
+            ksp: *min_ksp_version
           # Max Versions
-          - agp: '9.0.0'
-            java: '21'
-            kotlin: '2.4.20'
-            ksp: '2.3.12'
+          - agp: *agp_version
+            java: *max_java_version
+            kotlin: *max_kotlin_version
+            ksp: *max_ksp_version
     env:
       USE_AGP_VERSION: ${{ matrix.agp }}
       USE_JAVA_VERSION_FOR_GRADLE: ${{ matrix.java }}
