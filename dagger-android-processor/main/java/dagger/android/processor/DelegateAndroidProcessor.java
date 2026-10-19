@@ -27,10 +27,7 @@ import javax.inject.Singleton;
 /** An implementation of Dagger Android processor that is shared between Javac and KSP. */
 final class DelegateAndroidProcessor {
   static final XProcessingEnvConfig PROCESSING_ENV_CONFIG =
-      new XProcessingEnvConfig.Builder()
-          // TODO: b/526607713 - Remove this once we properly handle property annotations in KSP.
-          .includePropertyAnnotationsInFields(true)
-          .build();
+      new XProcessingEnvConfig.Builder().build();
   static final String FLAG_EXPERIMENTAL_USE_STRING_KEYS =
       "dagger.android.experimentalUseStringKeys";
 

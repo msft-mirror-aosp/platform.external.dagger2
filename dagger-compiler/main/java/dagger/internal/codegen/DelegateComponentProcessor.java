@@ -71,8 +71,6 @@ import javax.tools.Diagnostic.Kind;
 final class DelegateComponentProcessor {
   static final XProcessingEnvConfig PROCESSING_ENV_CONFIG =
       new XProcessingEnvConfig.Builder()
-          // TODO: b/526607713 - Remove this once we properly handle property annotations in KSP.
-          .includePropertyAnnotationsInFields(true)
           .disableAnnotatedElementValidation(true)
           .build();
 
